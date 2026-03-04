@@ -148,17 +148,58 @@ textarea{resize:vertical;min-height:65px}
 <body>
 <div id="tc"></div>
 <div id="login">
-  <div class="lbox">
+  <div class="lbox" style="max-width:400px">
     <div class="llogo">
       <div class="llogo-i">&#x26BD;</div>
       <h1 style="font-weight:800;font-size:20px">Sporcu Paneli</h1>
       <p style="color:var(--text3);font-size:13px;margin-top:3px">Akademi Yonetim Sistemi</p>
     </div>
-    <div class="lfg fgr"><label>E-posta</label><input type="email" id="le" value="admin@dragosfutbol.com"/></div>
-    <div class="lfg fgr"><label>Sifre</label><input type="password" id="lp" value="admin123"/></div>
-    <div id="lerr" class="al al-r dn" style="margin-top:8px">E-posta veya sifre hatali!</div>
-    <button class="btn bp w100" style="margin-top:12px" onclick="doLogin()">Giris Yap</button>
-    <div class="ldem">Demo: admin@dragosfutbol.com / admin123</div>
+    <div style="display:flex;background:var(--bg3);border-radius:8px;padding:3px;margin-bottom:18px">
+      <button id="tab-admin" onclick="switchLoginTab('admin')" style="flex:1;padding:7px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;background:var(--bg2);color:var(--text)">Kurum Girisi</button>
+      <button id="tab-sporcu" onclick="switchLoginTab('sporcu')" style="flex:1;padding:7px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Sporcu / Veli</button>
+    </div>
+    <div id="login-admin-form">
+      <div class="lfg fgr"><label>E-posta</label><input type="email" id="le" value="admin@dragosfutbol.com"/></div>
+      <div class="lfg fgr"><label>Sifre</label><input type="password" id="lp" value="admin123"/></div>
+      <div id="lerr" class="al al-r dn" style="margin-top:8px">E-posta veya sifre hatali!</div>
+      <button class="btn bp w100" style="margin-top:12px" onclick="doLogin()">Giris Yap</button>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--text3)"><button onclick="showForgotPassword('admin')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0">Sifremi Unuttum</button></div>
+      <div style="text-align:center;margin-top:6px;font-size:12px;color:var(--text3)">Hesabiniz yok mu? <button onclick="showRegister()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:12px;padding:0">Kurum Kaydi Olustur</button></div>
+    </div>
+    <div id="login-sporcu-form" style="display:none">
+      <div class="lfg fgr"><label>TC Kimlik No</label><input type="text" id="ls-tc" maxlength="11" placeholder="11 haneli TC kimlik"/></div>
+      <div class="lfg fgr"><label>Sifre</label><input type="password" id="ls-pass" placeholder="Sifreniz"/></div>
+      <div id="ls-err" class="al al-r dn" style="margin-top:8px">TC kimlik veya sifre hatali!</div>
+      <button class="btn bp w100" style="margin-top:12px" onclick="doSporcuLogin()">Sporcu Girisi</button>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--text3)"><button onclick="showForgotPassword('sporcu')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0">Sifremi Unuttum</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="loading-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,17,23,.85);z-index:9990;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+  <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
+  <div style="color:var(--text2);font-size:13px" id="loading-msg">Yukleniyor...</div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<div id="sporcu-portal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;overflow-y:auto;-webkit-overflow-scrolling:touch">
+  <div style="max-width:600px;margin:0 auto;padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="slogo-icon" style="width:30px;height:30px;font-size:14px">&#x26BD;</div>
+        <div id="sp-orgname" style="font-weight:700;font-size:13px">Akademi</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="sp-avatar" class="ava" style="width:30px;height:30px;font-size:11px">S</div>
+        <button onclick="doSporcuLogout()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text2);font-size:12px;cursor:pointer">Cikis</button>
+      </div>
+    </div>
+    <div id="sp-tabs" style="display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:16px;gap:2px">
+      <button class="sp-tab-btn active" onclick="spTab('profil')" id="sptab-profil" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--blue2);color:#fff">Profil</button>
+      <button class="sp-tab-btn" onclick="spTab('yoklama')" id="sptab-yoklama" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Yoklama</button>
+      <button class="sp-tab-btn" onclick="spTab('odemeler')" id="sptab-odemeler" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Odemeler</button>
+      <button class="sp-tab-btn" onclick="spTab('odeme-yap')" id="sptab-odeme-yap" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Odeme Yap</button>
+    </div>
+    <div id="sp-content"></div>
   </div>
 </div>
 <div id="wrap" class="dn">
@@ -214,6 +255,86 @@ textarea{resize:vertical;min-height:65px}
 </div>
 <div id="mc"></div>
 <script>
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+var SUPA_URL = 'https://wfarbydojxtufnkjuhtc.supabase.co';
+var SUPA_KEY = 'sb_publishable_w1_nXk_7TM1ePWHMN2CDcQ_1ufk0kYC';
+
+async function supa(table, method, data, filters) {
+  let url = SUPA_URL + '/rest/v1/' + table;
+  let params = [];
+  if (filters) {
+    Object.keys(filters).forEach(function(k){ params.push(k + '=eq.' + encodeURIComponent(filters[k])); });
+  }
+  if (method === 'GET' && params.length) url += '?' + params.join('&');
+  if (method === 'GET') url += (url.includes('?') ? '&' : '?') + 'order=created_at.desc&limit=1000';
+  
+  var realMethod = (method === 'UPSERT') ? 'POST' : method;
+  var headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-Client-Info': 'sporcu-paneli/1.0'
+  };
+  if (method === 'UPSERT') headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
+  else if (method === 'POST') headers['Prefer'] = 'return=representation';
+  else if (method === 'PATCH') headers['Prefer'] = 'return=representation';
+  
+  var opts = { method: realMethod, headers: headers, mode: 'cors' };
+  if (data && method !== 'GET') opts.body = JSON.stringify(data);
+  
+  try {
+    var res = await fetch(url, opts);
+    if (!res.ok) {
+      var err = await res.text();
+      console.error('Supabase error ' + res.status + ':', err);
+      return null;
+    }
+    var text = await res.text();
+    return text ? JSON.parse(text) : [];
+  } catch(e) {
+    console.error('Supabase fetch error:', e.message || e);
+    return null;
+  }
+}
+
+async function supaGet(table, filters) { return await supa(table, 'GET', null, filters); }
+async function supaPost(table, data) { return await supa(table, 'POST', data); }
+async function supaUpsert(table, data) { return await supa(table, 'UPSERT', Array.isArray(data)?data:[data]); }
+async function supaDelete(table, filters) {
+  let url = SUPA_URL + '/rest/v1/' + table + '?';
+  let params = Object.keys(filters).map(function(k){ return k + '=eq.' + encodeURIComponent(filters[k]); });
+  url += params.join('&');
+  var res = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Prefer': 'return=representation' }
+  });
+  return res.ok;
+}
+async function supaPatch(table, data, filters) {
+  let url = SUPA_URL + '/rest/v1/' + table + '?';
+  let params = Object.keys(filters).map(function(k){ return k + '=eq.' + encodeURIComponent(filters[k]); });
+  url += params.join('&');
+  var res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify(data)
+  });
+  return res.ok ? await res.json() : null;
+}
+
+// Loading overlay
+function showLoading() {
+  var el = document.getElementById('loading-overlay');
+  if (el) el.style.display = 'flex';
+}
+function hideLoading() {
+  var el = document.getElementById('loading-overlay');
+  if (el) el.style.display = 'none';
+}
+
 var EM = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'};
 function esc(s) {
   var r = String(s || ''), k = Object.keys(EM);
@@ -254,6 +375,9 @@ function row(lbl, val) { return '<div class="dr"><span class="dl">' + esc(lbl) +
 
 function load(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+// Namespace-aware wrappers (used after login)
+function loadT(k, d) { return loadNS ? loadNS(k, d) : load(k, d); }
+function saveT(k, v) { if (saveNS) saveNS(k, v); else save(k, v); }
 
 var DA = [
   {id:'1',fn:'Ahmet',ln:'Yilmaz',tc:'12345678901',bd:'2010-03-15',gn:'Erkek',ph:'0532 123 4567',em:'ahmet@email.com',sp:'Futbol',cat:'Kucuk',lic:'DFA-2024-001',rd:'2024-01-15',st:'active',pp:'monthly',fee:1500,nt:'Sol ayak forvet.',ci:'1',pn:'Ali Yilmaz',pp2:'0532 999 0001'},
@@ -288,19 +412,93 @@ var DM = [
   {id:'3',fr:'Selin Kara',role:'Antrenor',sub:'Zeynep Sahin',body:'Zeynep tekrar aktif olmak istedigini bildirdi.',dt:'2024-04-08',rd:true}
 ];
 
-var athletes = load('sp-a', null) || JSON.parse(JSON.stringify(DA));
-var payments = load('sp-p', null) || JSON.parse(JSON.stringify(DP));
-var coaches = load('sp-c', null) || JSON.parse(JSON.stringify(DC));
-var attData = load('sp-att', null) || {};
-var messages = load('sp-m', null) || JSON.parse(JSON.stringify(DM));
-var settings = load('sp-s', null) || {schoolName:'Dragos Futbol Akademisi'};
+var athletes = [], payments = [], coaches = [], attData = {}, messages = [], settings = {};
 
-function saveA() { save('sp-a', athletes); }
-function saveP() { save('sp-p', payments); }
-function saveC() { save('sp-c', coaches); }
-function saveAtt() { save('sp-att', attData); }
-function saveM() { save('sp-m', messages); }
-function saveS() { save('sp-s', settings); }
+async function loadOrgData() {
+  showLoading();
+  try {
+    var oid = currentOrgId;
+    var [aths, pays, coachs, atts, msgs, sets] = await Promise.all([
+      supaGet('athletes', {org_id: oid}),
+      supaGet('payments', {org_id: oid}),
+      supaGet('coaches', {org_id: oid}),
+      supaGet('attendance', {org_id: oid}),
+      supaGet('messages', {org_id: oid}),
+      supaGet('settings', {org_id: oid})
+    ]);
+    athletes = (aths||[]).map(dbToAth);
+    payments = (pays||[]).map(dbToPay);
+    coaches = (coachs||[]).map(dbToCoach);
+    // rebuild attData object: {date: {athleteId: status}}
+    attData = {};
+    (atts||[]).forEach(function(r) {
+      if (!attData[r.att_date]) attData[r.att_date] = {};
+      attData[r.att_date][r.athlete_id] = r.status;
+    });
+    messages = (msgs||[]).map(dbToMsg);
+    var org = getOrgById(currentOrgId);
+    settings = sets && sets[0] ? dbToSettings(sets[0]) : {schoolName: org ? org.name : 'Akademi'};
+  } catch(e) {
+    console.error('loadOrgData error:', e);
+  }
+  hideLoading();
+}
+
+// DB row mappers (snake_case -> camelCase/short keys)
+function dbToAth(r) { return {id:r.id,fn:r.fn,ln:r.ln,tc:r.tc,bd:r.bd,gn:r.gn,ph:r.ph,em:r.em,sp:r.sp,cat:r.cat,lic:r.lic,rd:r.rd,st:r.st,pp:r.pp,fee:r.fee,nt:r.nt,ci:r.ci,pn:r.pn,pp2:r.pp2,spPass:r.sp_pass}; }
+function athToDB(a,oid) { return {id:a.id,org_id:oid||currentOrgId,fn:a.fn,ln:a.ln,tc:a.tc,bd:a.bd,gn:a.gn,ph:a.ph,em:a.em,sp:a.sp,cat:a.cat,lic:a.lic,rd:a.rd,st:a.st,pp:a.pp,fee:a.fee,nt:a.nt,ci:a.ci,pn:a.pn,pp2:a.pp2,sp_pass:a.spPass}; }
+function dbToPay(r) { return {id:r.id,aid:r.aid,an:r.an,amt:r.amt,dt:r.dt,ty:r.ty,cat:r.cat,ds:r.ds,st:r.st,inv:r.inv,dd:r.dd,payMethod:r.pay_method,havaleNote:r.havale_note,sporcuName:r.sporcu_name,sporcuTC:r.sporcu_tc,needsApproval:r.needs_approval,approvedBy:r.approved_by,approvedAt:r.approved_at}; }
+function payToDB(p,oid) { return {id:p.id,org_id:oid||currentOrgId,aid:p.aid,an:p.an,amt:p.amt,dt:p.dt,ty:p.ty,cat:p.cat,ds:p.ds,st:p.st,inv:p.inv,dd:p.dd,pay_method:p.payMethod,havale_note:p.havaleNote,sporcu_name:p.sporcuName,sporcu_tc:p.sporcuTC,needs_approval:p.needsApproval,approved_by:p.approvedBy,approved_at:p.approvedAt}; }
+function dbToCoach(r) { return {id:r.id,fn:r.fn,ln:r.ln,ph:r.ph,em:r.em,sp:r.sp,sal:r.sal,st:r.st,sd:r.sd,nt:r.nt}; }
+function coachToDB(c,oid) { return {id:c.id,org_id:oid||currentOrgId,fn:c.fn,ln:c.ln,ph:c.ph,em:c.em,sp:c.sp,sal:c.sal,st:c.st,sd:c.sd,nt:c.nt}; }
+function dbToMsg(r) { return {id:r.id,fr:r.fr,role:r.role,sub:r.sub,body:r.body,dt:r.dt,rd:r.rd}; }
+function msgToDB(m,oid) { return {id:m.id,org_id:oid||currentOrgId,fr:m.fr,role:m.role,sub:m.sub,body:m.body,dt:m.dt,rd:m.rd}; }
+function dbToSettings(r) { return {schoolName:r.school_name,bankName:r.bank_name,accountName:r.account_name,iban:r.iban,ownerPhone:r.owner_phone}; }
+function settingsToDB(s,oid) { return {org_id:oid||currentOrgId,school_name:s.schoolName,bank_name:s.bankName,account_name:s.accountName,iban:s.iban,owner_phone:s.ownerPhone}; }
+// ---- MULTI-TENANT AUTH ----
+// Orgs cached in memory after login
+var _orgsCache = [];
+var _usersCache = [];
+
+function getAllOrgs() { return _orgsCache; }
+function getOrgById(oid) { for(var i=0;i<_orgsCache.length;i++){if(_orgsCache[i].id===oid)return _orgsCache[i];} return null; }
+function getAllUsers() { return _usersCache; }
+function saveAllUsers(u) { _usersCache = u; }
+
+// Auth data loaded from Supabase on login
+
+var currentUser = null;
+var currentOrgId = null;
+
+function nsKey(k) { return k + '-' + currentOrgId; }
+function loadNS(k, d) { try { var v = localStorage.getItem(nsKey(k)); return v ? JSON.parse(v) : d; } catch(e) { return d; } }
+function saveNS(k, v) { try { localStorage.setItem(nsKey(k), JSON.stringify(v)); } catch(e) {} }
+
+var acct = {email: '', pass: ''};
+
+async function saveA() { /* athletes saved individually */ }
+async function saveP() { /* payments saved individually */ }
+async function saveC() { /* coaches saved individually */ }
+async function saveAtt() { /* attendance saved individually */ }
+async function saveM() { /* messages saved individually */ }
+async function saveS() { await supaUpsert('settings', settingsToDB(settings)); }
+
+// Individual record savers
+async function dbSaveAth(a) { return await supaUpsert('athletes', athToDB(a)); }
+async function dbSavePay(p) { return await supaUpsert('payments', payToDB(p)); }
+async function dbSaveCoach(c) { return await supaUpsert('coaches', coachToDB(c)); }
+async function dbDelAth(id) { return await supaDelete('athletes', {id:id}); }
+async function dbDelPay(id) { return await supaDelete('payments', {id:id}); }
+async function dbDelCoach(id) { return await supaDelete('coaches', {id:id}); }
+async function dbSaveMsg(m) { return await supaUpsert('messages', msgToDB(m)); }
+async function dbDelMsg(id) { return await supaDelete('messages', {id:id}); }
+async function dbSaveAtt(date, athleteId, status) {
+  if (status === undefined) {
+    await supaDelete('attendance', {org_id:currentOrgId, athlete_id:athleteId, att_date:date});
+  } else {
+    await supaUpsert('attendance', {org_id:currentOrgId, athlete_id:athleteId, att_date:date, status:status});
+  }
+}
 
 function cname(cid) {
   for (var i = 0; i < coaches.length; i++) { if (coaches[i].id === cid) return coaches[i].fn + ' ' + coaches[i].ln; }
@@ -315,716 +513,1313 @@ function overdueCount() { var n = 0; for (var i = 0; i < payments.length; i++) {
 function pendingCount() { var n = 0; for (var i = 0; i < payments.length; i++) { if (payments[i].st === 'pending' || payments[i].st === 'overdue') n++; } return n; }
 function unreadCount() { var n = 0; for (var i = 0; i < messages.length; i++) { if (!messages[i].rd) n++; } return n; }
 
-function doLogin() {
-  var e = gv('le'), p = gv('lp');
-  if (e === 'admin@dragosfutbol.com' && p === 'admin123') {
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('wrap').classList.remove('dn');
-    document.getElementById('lerr').classList.add('dn');
-    updateBadges(); go('dashboard');
+
+// ============================================================
+// SPORCU / VELÄ° LOGIN SYSTEM
+// ============================================================
+var currentSporcu = null; // logged-in athlete object
+var currentSporcuOrgId = null;
+
+
+// ============================================================
+// FORGOT PASSWORD - SMS SÄ°MÃLASYON (Netgsm/Twilio sonra entegre)
+// ============================================================
+var _forgotCtx = null; // {type:'admin'|'sporcu', target: user/ath object, code: '123456'}
+
+function showForgotPassword(type) {
+  // type = 'admin' or 'sporcu'
+  _forgotCtx = {type: type, step: 1, code: null, target: null};
+  var title = type === 'admin' ? 'Sifre Sifirlama - Kurum' : 'Sifre Sifirlama - Sporcu';
+  var inputLabel = type === 'admin' ? 'Kayitli E-posta Adresiniz' : 'TC Kimlik Numaraniz';
+  var inputType = type === 'admin' ? 'email' : 'text';
+  var placeholder = type === 'admin' ? 'email@kurum.com' : '11 haneli TC kimlik';
+
+  var box = document.getElementById('login');
+  box.innerHTML = '<div class="lbox" style="max-width:400px">'
+    + '<div class="llogo"><div class="llogo-i">&#x1F512;</div>'
+    + '<h1 style="font-weight:800;font-size:18px">' + title + '</h1>'
+    + '<p style="color:var(--text3);font-size:13px;margin-top:3px">Kayitli telefon numaraniza dogrulama kodu gonderilecek</p></div>'
+    + '<div class="lfg fgr"><label>' + inputLabel + '</label>'
+    + '<input type="' + inputType + '" id="fp-id" placeholder="' + placeholder + '" maxlength="' + (type==='sporcu'?'11':'100') + '"/></div>'
+    + '<div id="fp-err" class="al al-r dn" style="margin-top:8px">Kayit bulunamadi!</div>'
+    + '<button class="btn bp w100" style="margin-top:12px" onclick="fpSendCode()">Dogrulama Kodu Gonder</button>'
+    + '<div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text3)">'
+    + '<button onclick="location.reload()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:12px;padding:0">&larr; Girisa Don</button></div>'
+    + '</div>';
+}
+
+function fpSendCode() {
+  var id = (document.getElementById('fp-id')||{}).value||'';
+  id = id.trim();
+  var errEl = document.getElementById('fp-err');
+  var found = null, phone = '';
+
+  if (_forgotCtx.type === 'admin') {
+    var users = getAllUsers();
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].email === id) { found = users[i]; break; }
+    }
+    if (found) {
+      // Get org to find phone - stored in org or user object
+      phone = found.phone || '';
+      if (!phone) {
+        // Try to get from org settings
+        var orgAthletes = [];
+        try { var v = localStorage.getItem('sp-s-' + found.orgId); if(v) { var s = JSON.parse(v); phone = s.ownerPhone||''; } } catch(e){}
+      }
+    }
   } else {
+    // Sporcu: search all orgs
+    var orgs = getAllOrgs();
+    for (var oi = 0; oi < orgs.length && !found; oi++) {
+      var orgAthletes = [];
+      try { var v = localStorage.getItem('sp-a-' + orgs[oi].id); if(v) orgAthletes = JSON.parse(v); } catch(e){}
+      for (var ai = 0; ai < orgAthletes.length; ai++) {
+        if (orgAthletes[ai].tc === id) { found = orgAthletes[ai]; phone = orgAthletes[ai].ph||''; break; }
+      }
+    }
+  }
+
+  if (!found) { errEl.classList.remove('dn'); return; }
+  if (!phone) {
+    // No phone registered - show warning but still allow (demo mode)
+    phone = 'kayitli telefon yok';
+  }
+
+  // Generate 6-digit code
+  var code = String(Math.floor(100000 + Math.random() * 900000));
+  _forgotCtx.code = code;
+  _forgotCtx.target = found;
+  _forgotCtx.codeExpiry = Date.now() + 5 * 60 * 1000; // 5 min
+
+  // === SMS ENTEGRASYON NOKTASI ===
+  // Buraya Netgsm veya Twilio kodu gelecek:
+  // netgsmSend(phone, 'Dogrulama kodunuz: ' + code);
+  // Simdilik kodu ekranda gosteriyoruz:
+
+  var maskedPhone = phone.length > 6
+    ? phone.slice(0,3) + '****' + phone.slice(-4)
+    : phone;
+
+  var box = document.getElementById('login');
+  box.innerHTML = '<div class="lbox" style="max-width:400px">'
+    + '<div class="llogo"><div class="llogo-i">&#x1F4F1;</div>'
+    + '<h1 style="font-weight:800;font-size:18px">Kodu Girin</h1>'
+    + '<p style="color:var(--text3);font-size:13px;margin-top:3px">' + maskedPhone + ' numarasina kod gonderildi</p></div>'
+    // DEMO MODU - gercek SMS entegrasyonunda bu kutu kaldirilacak
+    + '<div style="background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.25);border-radius:8px;padding:12px;margin-bottom:14px;text-align:center">'
+    + '<div style="font-size:11px;color:var(--blue);font-weight:700;margin-bottom:4px">&#x1F527; DEMO MODU - SMS entegrasyonu sonra aktif olacak</div>'
+    + '<div style="font-size:28px;font-weight:800;letter-spacing:6px;color:var(--text)">' + code + '</div>'
+    + '<div style="font-size:11px;color:var(--text3);margin-top:4px">Gercek SMS icin Netgsm/Twilio entegre edilecek</div>'
+    + '</div>'
+    + '<div class="lfg fgr"><label>6 Haneli Dogrulama Kodu</label>'
+    + '<input type="text" id="fp-code" maxlength="6" placeholder="______" style="font-size:22px;text-align:center;letter-spacing:6px"/></div>'
+    + '<div id="fp-code-err" class="al al-r dn" style="margin-top:8px">Yanlis veya suresi dolmus kod!</div>'
+    + '<button class="btn bp w100" style="margin-top:12px" onclick="fpVerifyCode()">Dogrula</button>'
+    + '<div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text3)">'
+    + '<button onclick="fpSendCode()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:12px;padding:0">Tekrar Gonder</button>'
+    + ' &nbsp;|&nbsp; '
+    + '<button onclick="location.reload()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0">Iptal</button></div>'
+    + '</div>';
+}
+
+function fpVerifyCode() {
+  var entered = ((document.getElementById('fp-code')||{}).value||'').trim();
+  var errEl = document.getElementById('fp-code-err');
+  if (!_forgotCtx || !_forgotCtx.code) { location.reload(); return; }
+  if (Date.now() > _forgotCtx.codeExpiry) { errEl.textContent = 'Kodun suresi doldu! Tekrar gonderin.'; errEl.classList.remove('dn'); return; }
+  if (entered !== _forgotCtx.code) { errEl.classList.remove('dn'); return; }
+
+  // Code verified - show new password form
+  var box = document.getElementById('login');
+  box.innerHTML = '<div class="lbox" style="max-width:400px">'
+    + '<div class="llogo"><div class="llogo-i">&#x2705;</div>'
+    + '<h1 style="font-weight:800;font-size:18px">Yeni Sifre</h1>'
+    + '<p style="color:var(--text3);font-size:13px;margin-top:3px">Kimliginiz dogrulandi. Yeni sifrenizi belirleyin.</p></div>'
+    + '<div class="lfg fgr"><label>Yeni Sifre *</label><input type="password" id="fp-np1" placeholder="En az 4 karakter"/></div>'
+    + '<div class="lfg fgr"><label>Sifre Tekrar *</label><input type="password" id="fp-np2" placeholder="Sifreyi tekrar girin"/></div>'
+    + '<div id="fp-new-err" class="al al-r dn" style="margin-top:8px">Hata!</div>'
+    + '<button class="btn bp w100" style="margin-top:12px" onclick="fpSetNewPassword()">Sifremi Guncelle</button>'
+    + '</div>';
+}
+
+function fpSetNewPassword() {
+  var p1 = (document.getElementById('fp-np1')||{}).value||'';
+  var p2 = (document.getElementById('fp-np2')||{}).value||'';
+  var errEl = document.getElementById('fp-new-err');
+  function showErr(m) { errEl.textContent = m; errEl.classList.remove('dn'); }
+  if (!p1) { showErr('Sifre bos olamaz!'); return; }
+  if (p1 !== p2) { showErr('Sifreler eslesmiyor!'); return; }
+  if (p1.length < 4) { showErr('En az 4 karakter olmali!'); return; }
+
+  if (_forgotCtx.type === 'admin') {
+    var users = getAllUsers();
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].id === _forgotCtx.target.id) { users[i].pass = p1; break; }
+    }
+    saveAllUsers(users);
+  } else {
+    // Sporcu - update in their org
+    var orgId = null;
+    var orgs = getAllOrgs();
+    for (var oi = 0; oi < orgs.length && !orgId; oi++) {
+      var orgAthletes = [];
+      try { var v = localStorage.getItem('sp-a-' + orgs[oi].id); if(v) orgAthletes = JSON.parse(v); } catch(e){}
+      for (var ai = 0; ai < orgAthletes.length; ai++) {
+        if (orgAthletes[ai].id === _forgotCtx.target.id) {
+          orgAthletes[ai].spPass = p1;
+          localStorage.setItem('sp-a-' + orgs[oi].id, JSON.stringify(orgAthletes));
+          orgId = orgs[oi].id; break;
+        }
+      }
+    }
+  }
+
+  _forgotCtx = null;
+  var box = document.getElementById('login');
+  box.innerHTML = '<div class="lbox" style="max-width:400px">'
+    + '<div class="llogo"><div class="llogo-i">&#x2705;</div>'
+    + '<h1 style="font-weight:800;font-size:18px">Sifre Guncellendi!</h1>'
+    + '<p style="color:var(--text3);font-size:13px;margin-top:3px">Yeni sifrenizle giris yapabilirsiniz.</p></div>'
+    + '<button class="btn bp w100" style="margin-top:16px" onclick="location.reload()">Giris Yap</button>'
+    + '</div>';
+}
+
+function switchLoginTab(tab) {
+  var adminForm = document.getElementById('login-admin-form');
+  var sporcuForm = document.getElementById('login-sporcu-form');
+  var tabAdmin = document.getElementById('tab-admin');
+  var tabSporcu = document.getElementById('tab-sporcu');
+  if (tab === 'admin') {
+    adminForm.style.display = ''; sporcuForm.style.display = 'none';
+    tabAdmin.style.background = 'var(--bg2)'; tabAdmin.style.color = 'var(--text)';
+    tabSporcu.style.background = 'transparent'; tabSporcu.style.color = 'var(--text3)';
+  } else {
+    adminForm.style.display = 'none'; sporcuForm.style.display = '';
+    tabSporcu.style.background = 'var(--bg2)'; tabSporcu.style.color = 'var(--text)';
+    tabAdmin.style.background = 'transparent'; tabAdmin.style.color = 'var(--text3)';
+  }
+}
+
+function doSporcuLogin() {
+  var tc = (document.getElementById('ls-tc')||{}).value || '';
+  var pass = (document.getElementById('ls-pass')||{}).value || '';
+  var errEl = document.getElementById('ls-err');
+  tc = tc.trim(); pass = pass.trim();
+
+  // Search all orgs for athlete with this TC
+  var orgs = getAllOrgs();
+  var foundAth = null, foundOrgId = null;
+  for (var oi = 0; oi < orgs.length; oi++) {
+    var orgId = orgs[oi].id;
+    var orgAthletes = [];
+    try { var v = localStorage.getItem('sp-a-' + orgId); if (v) orgAthletes = JSON.parse(v); } catch(e){}
+    for (var ai = 0; ai < orgAthletes.length; ai++) {
+      var a = orgAthletes[ai];
+      if (a.tc === tc) {
+        // Check password - stored as spPass, fallback to tc last 4 digits
+        var expectedPass = a.spPass || tc.slice(-4);
+        if (pass === expectedPass) { foundAth = a; foundOrgId = orgId; break; }
+      }
+    }
+    if (foundAth) break;
+  }
+
+  if (foundAth) {
+    currentSporcu = foundAth;
+    currentSporcuOrgId = foundOrgId;
+    // Load org data into memory for this sporcu session
+    currentOrgId = foundOrgId;
+    loadOrgData();
+    // Show sporcu portal
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('sporcu-portal').style.display = 'block';
+    // Set name/avatar
+    var av = document.getElementById('sp-avatar');
+    if (av) av.textContent = (foundAth.fn[0]||'S').toUpperCase();
+    var org = getOrgById(foundOrgId);
+    var on = document.getElementById('sp-orgname');
+    if (on && org) on.textContent = org.name;
+    errEl.classList.add('dn');
+    spTab('profil');
+  } else {
+    errEl.classList.remove('dn');
+  }
+}
+
+function doSporcuLogout() {
+  currentSporcu = null; currentSporcuOrgId = null;
+  document.getElementById('sporcu-portal').style.display = 'none';
+  document.getElementById('login').style.display = 'flex';
+}
+
+function spTab(tab) {
+  var tabs = ['profil','yoklama','odemeler','odeme-yap'];
+  for (var i = 0; i < tabs.length; i++) {
+    var btn = document.getElementById('sptab-' + tabs[i]);
+    if (btn) {
+      if (tabs[i] === tab) { btn.style.background='var(--blue2)'; btn.style.color='#fff'; }
+      else { btn.style.background='transparent'; btn.style.color='var(--text3)'; }
+    }
+  }
+  var el = document.getElementById('sp-content');
+  if (!el) return;
+  if (tab === 'profil') el.innerHTML = spProfil();
+  else if (tab === 'yoklama') el.innerHTML = spYoklama();
+  else if (tab === 'odemeler') el.innerHTML = spOdemeler();
+  else if (tab === 'odeme-yap') el.innerHTML = spOdemeYap();
+}
+
+function spProfil() {
+  var a = currentSporcu;
+  if (!a) return '';
+  var rate = attRate(a.id);
+  var apay = [], paid = 0;
+  for (var i = 0; i < payments.length; i++) { if (payments[i].aid === a.id && payments[i].st === 'completed') paid += payments[i].amt; }
+  var pending = 0;
+  for (var i = 0; i < payments.length; i++) { if (payments[i].aid === a.id && (payments[i].st === 'pending'||payments[i].st === 'overdue')) pending++; }
+
+  var h = '<div class="card mb3">';
+  h += '<div class="flex fca gap3 mb3">';
+  h += '<div class="ava" style="width:56px;height:56px;font-size:20px">' + ini(a.fn+' '+a.ln) + '</div>';
+  h += '<div><div style="font-size:18px;font-weight:800">' + esc(a.fn) + ' ' + esc(a.ln) + '</div>';
+  h += '<div class="tsm tm">' + esc(a.sp) + ' - ' + esc(a.cat||'') + '</div>';
+  h += '<div class="tsm tm">' + esc(a.lic||'') + '</div></div>';
+  h += '<span class="bg ' + stc(a.st) + '" style="margin-left:auto">' + stl(a.st) + '</span></div>';
+
+  h += '<div class="g3 mb3" style="gap:10px">';
+  h += '<div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--green)">' + (rate !== null ? rate+'%' : '-') + '</div><div class="ts tm">Devam Orani</div></div>';
+  h += '<div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--blue)">' + fmtN(paid) + ' TL</div><div class="ts tm">Toplam Odeme</div></div>';
+  h += '<div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:800;color:' + (pending?'var(--red)':'var(--green)') + '">' + pending + '</div><div class="ts tm">Bekleyen</div></div>';
+  h += '</div>';
+
+  h += '<div class="dsec"><h4>Kisisel Bilgiler</h4>';
+  h += row('Ad Soyad', esc(a.fn)+' '+esc(a.ln));
+  h += row('Dogum Tarihi', fmtD(a.bd) + ' (' + age(a.bd) + ' yas)');
+  h += row('Cinsiyet', a.gn||'-');
+  h += row('Telefon', a.ph||'-');
+  h += '</div>';
+  h += '<div class="dsec"><h4>Spor Bilgileri</h4>';
+  h += row('Dal', semi(a.sp)+' '+esc(a.sp));
+  h += row('Kategori', a.cat||'-');
+  h += row('Antrenor', cname(a.ci||''));
+  h += row('Kayit Tarihi', fmtD(a.rd));
+  h += row('Ucret', fmtN(a.fee)+' TL / '+pln(a.pp));
+  h += '</div>';
+  if (a.pn) { h += '<div class="dsec"><h4>Veli Bilgileri</h4>' + row('Veli', a.pn) + row('Tel', a.pp2||'-') + '</div>'; }
+
+  // Password change
+  h += '<div class="dsec"><h4>Sifre Degistir</h4>';
+  h += '<div class="fg" style="margin-top:8px">';
+  h += '<div class="fgr"><label>Yeni Sifre</label><input id="sp-p1" type="password" placeholder="Yeni sifre"/></div>';
+  h += '<div class="fgr"><label>Tekrar</label><input id="sp-p2" type="password" placeholder="Sifre tekrar"/></div>';
+  h += '</div><button class="btn bp btn-sm" style="margin-top:8px" onclick="spChangePass()">Sifreyi Degistir</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function spChangePass() {
+  var p1 = (document.getElementById('sp-p1')||{}).value||'';
+  var p2 = (document.getElementById('sp-p2')||{}).value||'';
+  if (!p1) { toast('Sifre bos olamaz!','e'); return; }
+  if (p1 !== p2) { toast('Sifreler eslesmiyor!','e'); return; }
+  if (p1.length < 4) { toast('En az 4 karakter!','e'); return; }
+  // Update athlete record
+  for (var i = 0; i < athletes.length; i++) {
+    if (athletes[i].id === currentSporcu.id) { athletes[i].spPass = p1; currentSporcu = athletes[i]; break; }
+  }
+  saveA(); toast('Sifre guncellendi');
+}
+
+function spYoklama() {
+  var a = currentSporcu;
+  var keys = Object.keys(attData).sort().reverse();
+  var h = '<div class="card"><div class="tw6 mb3">Devam Gecmisi</div>';
+  if (!keys.length) { h += '<div style="text-align:center;padding:30px;color:var(--text3)">Kayit yok</div>'; }
+  else {
+    h += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Durum</th></tr></thead><tbody>';
+    var shown = 0;
+    for (var i = 0; i < keys.length && shown < 60; i++) {
+      var day = attData[keys[i]], v = day[a.id];
+      if (v === undefined) continue;
+      var lbl = v==='P'?'Katildi':v==='L'?'Gec Geldi':'Katilmadi';
+      var cls = v==='P'?'bg-g':v==='L'?'bg-y':'bg-r';
+      h += '<tr><td class="tsm">' + fmtD(keys[i]) + '</td><td><span class="bg '+cls+'">' + lbl + '</span></td></tr>';
+      shown++;
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function spOdemeler() {
+  var a = currentSporcu;
+  var list = payments.filter(function(p){ return p.aid === a.id; }).sort(function(a,b){ return new Date(b.dt)-new Date(a.dt); });
+  var h = '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Odeme Gecmisi</div>';
+  h += '<button class="btn bp btn-sm" onclick="spTab(\'odeme-yap\')">Odeme Yap</button></div>';
+  if (!list.length) { h += '<div style="text-align:center;padding:30px;color:var(--text3)">Odeme kaydi yok</div>'; }
+  else {
+    h += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Aciklama</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>';
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i];
+      var sc2 = stc(p.st); var sl2 = stl(p.st);
+      // If pending bank transfer, show awaiting approval
+      if (p.payMethod === 'havale' && p.st === 'pending') { sc2 = 'bg-y'; sl2 = 'Onay Bekliyor'; }
+      h += '<tr><td class="tsm">'+fmtD(p.dt)+'</td><td class="tsm">'+esc(p.ds)+'</td>';
+      h += '<td class="tw6 tg">'+fmtN(p.amt)+' TL</td>';
+      h += '<td><span class="bg '+sc2+'">'+sl2+'</span></td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function spOdemeYap() {
+  var a = currentSporcu;
+  // Find overdue/pending payments for this athlete
+  var due = payments.filter(function(p){ return p.aid===a.id && (p.st==='overdue'||p.st==='pending'); });
+  var h = '<div class="card mb3"><div class="tw6 mb3">Odeme Yap</div>';
+
+  if (due.length) {
+    h += '<div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:14px">';
+    h += '<div class="tsm tw6 mb2" style="color:var(--yellow)">Bekleyen Odemeler</div>';
+    for (var i = 0; i < due.length; i++) {
+      h += '<div class="flex fca fjb" style="padding:5px 0"><span class="tsm">'+esc(due[i].ds)+'</span><span class="tw6 tr2">'+fmtN(due[i].amt)+' TL</span></div>';
+    }
+    h += '</div>';
+  }
+
+  h += '<div class="fgr mb3"><label>Odeme Tutari (TL) *</label><input id="sp-amt" type="number" placeholder="0" value="'+(due.length?due[0].amt:'')+'"/></div>';
+  h += '<div class="fgr mb3"><label>Aciklama</label><input id="sp-desc" type="text" value="'+(due.length?esc(due[0].ds):'Aidat odeme')+'" placeholder="Odeme aciklamasi"/></div>';
+
+  h += '<div class="tw6 tsm mb2" style="margin-top:16px">Odeme Yontemi</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">';
+  h += '<div id="pm-kk" onclick="selectPayMethod(\'kk\')" style="border:2px solid var(--blue);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:rgba(88,166,255,.08)">';
+  h += '<div style="font-size:22px">&#x1F4B3;</div><div class="tsm tw6" style="margin-top:6px">Kredi/Banka Karti</div><div class="ts tm">(PayTR - Yakin zamanda)</div></div>';
+  h += '<div id="pm-havale" onclick="selectPayMethod(\'havale\')" style="border:2px solid var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer">';
+  h += '<div style="font-size:22px">&#x1F3E6;</div><div class="tsm tw6" style="margin-top:6px">Havale / EFT</div><div class="ts tm">Admin onayÄ± gerekir</div></div>';
+  h += '</div>';
+
+  // Credit card section (PayTR placeholder)
+  h += '<div id="pm-kk-form" style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:12px">';
+  h += '<div class="flex fca gap2 mb2"><span style="font-size:16px">&#x1F512;</span><span class="tsm tw6">Guvenli Odeme (PayTR)</span></div>';
+  h += '<div class="al" style="background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.2);color:var(--blue);border-radius:8px;padding:10px;font-size:12px">PayTR entegrasyonu yakin zamanda aktif olacak. Simdilik havale ile odeme yapabilirsiniz.</div>';
+  h += '<button class="btn bp w100" style="margin-top:12px;opacity:.5" disabled>Kart ile Ode (Yakin zamanda)</button>';
+  h += '</div>';
+
+  // Bank transfer section
+  h += '<div id="pm-havale-form" style="display:none">';
+  h += '<div style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:12px">';
+  h += '<div class="tw6 tsm mb2">Havale / EFT Bilgileri</div>';
+  h += '<div class="al" style="background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.2);color:var(--text);border-radius:8px;padding:12px;font-size:13px">';
+  
+  // Get org IBAN from settings
+  var orgSettings = loadNS ? loadNS('sp-s', {}) : {};
+  var iban = orgSettings.iban || 'TR00 0000 0000 0000 0000 0000 00';
+  var bankName = orgSettings.bankName || 'Kurum Bankasi';
+  var accountName = orgSettings.accountName || 'Kurum Hesabi';
+  
+  h += '<div class="dr"><span class="dl">Banka</span><span class="dvl tw6">'+esc(bankName)+'</span></div>';
+  h += '<div class="dr"><span class="dl">Hesap Sahibi</span><span class="dvl tw6">'+esc(accountName)+'</span></div>';
+  h += '<div class="dr"><span class="dl">IBAN</span><span class="dvl tw6" style="font-family:monospace;font-size:12px">'+esc(iban)+'</span></div>';
+  h += '</div>';
+  h += '<div class="fgr mt3"><label>Aciklama/Not (Opsiyonel)</label><textarea id="sp-havale-note" placeholder="Havale yaparken kullandiginiz aciklamayÄ± yazin..." style="min-height:60px"></textarea></div>';
+  h += '</div>';
+  h += '<div class="al" style="background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.2);color:var(--yellow);border-radius:8px;padding:10px;font-size:12px;margin-bottom:12px">&#9888; Havaleni yaptiktan sonra bildirimi gonderin. Admin onayladiktan sonra odemeniz tamamlanmis sayilacaktir.</div>';
+  h += '<button class="btn bp w100" onclick="spSubmitHavale()">Havale Bildirimini Gonder</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+var _selPayMethod = 'kk';
+function selectPayMethod(m) {
+  _selPayMethod = m;
+  var kk = document.getElementById('pm-kk');
+  var hav = document.getElementById('pm-havale');
+  var kkf = document.getElementById('pm-kk-form');
+  var havf = document.getElementById('pm-havale-form');
+  if (m === 'kk') {
+    kk.style.border='2px solid var(--blue)'; kk.style.background='rgba(88,166,255,.08)';
+    hav.style.border='2px solid var(--border)'; hav.style.background='transparent';
+    if(kkf) kkf.style.display=''; if(havf) havf.style.display='none';
+  } else {
+    hav.style.border='2px solid var(--green)'; hav.style.background='rgba(63,185,80,.08)';
+    kk.style.border='2px solid var(--border)'; kk.style.background='transparent';
+    if(kkf) kkf.style.display='none'; if(havf) havf.style.display='';
+  }
+}
+
+function spSubmitHavale() {
+  var amt = parseFloat((document.getElementById('sp-amt')||{}).value||'0');
+  var desc = (document.getElementById('sp-desc')||{}).value||'Aidat';
+  var note = (document.getElementById('sp-havale-note')||{}).value||'';
+  if (!amt || amt <= 0) { toast('Gecerli bir tutar girin!','e'); return; }
+  var a = currentSporcu;
+  var newPay = {
+    id: uid(), aid: a.id, an: a.fn+' '+a.ln,
+    amt: amt, dt: tod(), ty: 'income', cat: 'Aidat',
+    ds: desc, st: 'pending', inv: 'INV-'+Date.now(),
+    payMethod: 'havale', havaleNote: note,
+    sporcuName: a.fn+' '+a.ln, sporcuTC: a.tc,
+    needsApproval: true
+  };
+  payments.unshift(newPay);
+  saveP();
+  toast('Havale bildirimi gonderildi! Admin onayini bekleyin.');
+  spTab('odemeler');
+}
+
+async function doLogin() {
+  var e = gv('le'), p = gv('lp');
+  showLoading();
+  try {
+    // Load all users and orgs from Supabase
+    var [allUsers, allOrgs] = await Promise.all([
+      supaGet('users'),
+      supaGet('orgs')
+    ]);
+    _usersCache = (allUsers||[]).map(function(u){ return {id:u.id,orgId:u.org_id,email:u.email,pass:u.pass,role:u.role,name:u.name,phone:u.phone}; });
+    _orgsCache = (allOrgs||[]).map(function(o){ return {id:o.id,name:o.name}; });
+
+    var found = null;
+    for (var i = 0; i < _usersCache.length; i++) {
+      if (_usersCache[i].email === e && _usersCache[i].pass === p) { found = _usersCache[i]; break; }
+    }
+    hideLoading();
+    if (found) {
+      currentUser = found;
+      currentOrgId = found.orgId;
+      acct.email = found.email;
+      acct.pass = found.pass;
+      await loadOrgData();
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('wrap').classList.remove('dn');
+      document.getElementById('lerr').classList.add('dn');
+      var suname = document.getElementById('suname');
+      if (suname) suname.textContent = found.name || found.email.split('@')[0];
+      var sava = document.getElementById('sava');
+      if (sava) sava.textContent = (found.name || found.email)[0].toUpperCase();
+      var sn = document.getElementById('sn');
+      var org = getOrgById(currentOrgId);
+      if (sn && org) sn.textContent = org.name.split(' ').slice(0,2).join(' ');
+      updateBadges(); go('dashboard');
+    } else {
+      document.getElementById('lerr').classList.remove('dn');
+    }
+  } catch(e2) {
+    hideLoading();
+    console.error('Login error:', e2);
     document.getElementById('lerr').classList.remove('dn');
   }
 }
 function doLogout() {
+  currentUser = null; currentOrgId = null;
   document.getElementById('wrap').classList.add('dn');
   document.getElementById('login').style.display = 'flex';
 }
-document.addEventListener('keydown', function (e) { if (e.keyCode === 13 && document.getElementById('login').style.display !== 'none') doLogin(); });
-
-var curPage = '';
-var PTITLES = {dashboard:'Gosterge Paneli',athletes:'Sporcu Yonetimi',payments:'Odemeler',accounting:'Muhasebe',attendance:'Devam Takibi',coaches:'Antrenorler',messages:'Mesajlar',settings:'Ayarlar'};
+function showRegister() {
+  var box = document.getElementById('login');
+  box.innerHTML = '<div class="lbox">'
+    + '<div class="llogo"><div class="llogo-i">&#x26BD;</div>'
+    + '<h1 style="font-weight:800;font-size:20px">Kurum Kaydi</h1>'
+    + '<p style="color:var(--text3);font-size:13px;margin-top:3px">Yeni kurum hesabi olustur</p></div>'
+    + '<div class="lfg fgr"><label>Kurum Adi *</label><input type="text" id="rg-org" placeholder="Akademi adi"/></div>'
+    + '<div class="lfg fgr"><label>Yetkili Adi *</label><input type="text" id="rg-name" placeholder="Ad Soyad"/></div>'
+    + '<div class="lfg fgr"><label>Yetkili Telefon *</label><input type="tel" id="rg-phone" placeholder="05XX XXX XX XX"/></div>'
+    + '<div class="lfg fgr"><label>E-posta *</label><input type="email" id="rg-em" placeholder="email@kurum.com"/></div>'
+    + '<div class="lfg fgr"><label>Sifre *</label><input type="password" id="rg-p1" placeholder="En az 4 karakter"/></div>'
+    + '<div class="lfg fgr"><label>Sifre Tekrar *</label><input type="password" id="rg-p2" placeholder="Sifreyi tekrar girin"/></div>'
+    + '<div id="rg-err" class="al al-r dn" style="margin-top:8px">Hata!</div>'
+    + '<button class="btn bp w100" style="margin-top:12px" onclick="doRegister()">Kayit Ol</button>'
+    + '<div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text3)">Zaten hesabiniz var mi? <button onclick="location.reload()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:12px;padding:0">Giris Yap</button></div>'
+    + '</div>';
+}
+async function doRegister() {
+  var orgName = (document.getElementById('rg-org')||{}).value || '';
+  var name = (document.getElementById('rg-name')||{}).value || '';
+  var em = (document.getElementById('rg-em')||{}).value || '';
+  var phone = (document.getElementById('rg-phone')||{}).value || '';
+  var p1 = (document.getElementById('rg-p1')||{}).value || '';
+  var p2 = (document.getElementById('rg-p2')||{}).value || '';
+  var errEl = document.getElementById('rg-err');
+  function showErr(msg) { errEl.textContent = msg; errEl.classList.remove('dn'); }
+  if (!orgName || !name || !em || !p1) { showErr('Tum alanlar zorunlu!'); return; }
+  if (p1 !== p2) { showErr('Sifreler eslesmiyor!'); return; }
+  if (p1.length < 4) { showErr('Sifre en az 4 karakter olmali!'); return; }
+  showLoading();
+  var existing = await supaGet('users', {email: em});
+  if (existing && existing.length > 0) { hideLoading(); showErr('Bu e-posta zaten kayitli!'); return; }
+  var orgId = 'org-' + Date.now().toString(36);
+  var userId = 'u-' + Date.now().toString(36);
+  await supaPost('orgs', {id: orgId, name: orgName});
+  await supaPost('users', {id: userId, org_id: orgId, email: em, pass: p1, role: 'admin', name: name, phone: phone});
+  hideLoading();
+  alert('Kayit basarili! Simdi giris yapabilirsiniz.');
+  location.reload();
+}
+v
+// ============================================================
+// CORE UI FUNCTIONS
+// ============================================================
+var curPage = 'dashboard';
+var ATD = (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+var ATSP = '';
+var _payFilter = {sp:'',st:'',q:''};
 
 function go(pg) {
   curPage = pg;
-  document.getElementById('btit').textContent = PTITLES[pg] || pg;
-  var nis = document.querySelectorAll('.ni');
-  for (var i = 0; i < nis.length; i++) nis[i].classList.remove('on');
-  var bns = document.querySelectorAll('.bni-btn');
-  for (var i = 0; i < bns.length; i++) bns[i].classList.remove('on');
-  var sn = document.getElementById('nav-' + pg); if (sn) sn.classList.add('on');
-  var bn = document.getElementById('bn-' + pg); if (bn) bn.classList.add('on');
+  var main = document.getElementById('main');
+  if (!main) return;
+  if (pg === 'dashboard') main.innerHTML = pgDashboard();
+  else if (pg === 'athletes') main.innerHTML = pgAthletes();
+  else if (pg === 'payments') main.innerHTML = pgPayments();
+  else if (pg === 'accounting') main.innerHTML = pgAccounting();
+  else if (pg === 'attendance') main.innerHTML = pgAttendance();
+  else if (pg === 'coaches') main.innerHTML = pgCoaches();
+  else if (pg === 'messages') main.innerHTML = pgMessages();
+  else if (pg === 'settings') main.innerHTML = pgSettings();
+  // Update nav active states
+  document.querySelectorAll('[data-pg]').forEach(function(el){
+    el.classList.toggle('active', el.dataset.pg === pg);
+  });
   closeSide();
-  var el = document.getElementById('page');
-  if (pg === 'dashboard') el.innerHTML = pgDash();
-  else if (pg === 'athletes') { el.innerHTML = pgAthletes(); renderAthTbl(); }
-  else if (pg === 'payments') { el.innerHTML = pgPayments(); renderPayTbl(); }
-  else if (pg === 'accounting') el.innerHTML = pgAccounting();
-  else if (pg === 'attendance') el.innerHTML = pgAttendance();
-  else if (pg === 'coaches') el.innerHTML = pgCoaches();
-  else if (pg === 'messages') el.innerHTML = pgMessages();
-  else if (pg === 'settings') el.innerHTML = pgSettings();
-  updateBadges();
 }
-function updateBadges() {
-  var pc = pendingCount(), mc = unreadCount(), oc = overdueCount();
-  var pb = document.getElementById('pbadge'); if (pb) { pb.textContent = pc; if (pc > 0) pb.classList.remove('dn'); else pb.classList.add('dn'); }
-  var mb2 = document.getElementById('mbadge'); if (mb2) { mb2.textContent = mc; if (mc > 0) mb2.classList.remove('dn'); else mb2.classList.add('dn'); }
-  var nd = document.getElementById('ndot'); if (nd) { if (oc + mc > 0) nd.classList.remove('dn'); else nd.classList.add('dn'); }
-}
-function toggleSide() {
-  document.getElementById('side').classList.toggle('open');
-  document.getElementById('overlay').classList.toggle('show');
-}
+
 function closeSide() {
-  document.getElementById('side').classList.remove('open');
-  document.getElementById('overlay').classList.remove('show');
+  var side = document.getElementById('side');
+  var overlay = document.getElementById('overlay');
+  if (side) side.classList.remove('open');
+  if (overlay) overlay.classList.remove('show');
+}
+function openSide() {
+  var side = document.getElementById('side');
+  var overlay = document.getElementById('overlay');
+  if (side) side.classList.add('open');
+  if (overlay) overlay.classList.add('show');
 }
 
 function toast(msg, type) {
-  type = type || 's';
   var t = document.createElement('div');
-  t.className = 'toast ' + type;
-  t.innerHTML = '<span style="font-weight:800">' + (type === 's' ? 'OK' : type === 'e' ? 'X' : 'i') + '\x3C/span><span>' + esc(msg) + '\x3C/span>';
-  document.getElementById('tc').appendChild(t);
-  setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2800);
+  t.className = 'toast' + (type === 'e' ? ' toast-e' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.classList.add('show'); }, 10);
+  setTimeout(function(){ t.classList.remove('show'); setTimeout(function(){ t.remove(); }, 300); }, 2500);
 }
 
-function modal(title, body, btns, lg) {
-  var bhtml = '';
-  for (var i = 0; i < btns.length; i++) {
-    bhtml += '<button class="btn ' + btns[i].cls + '" onclick="' + btns[i].fn + '">' + esc(btns[i].lbl) + '\x3C/button>';
-  }
-  document.getElementById('mc').innerHTML =
-    '<div class="mo" onclick="if(event.target===this)closeModal()">'
-    + '<div class="mb' + (lg ? ' mb-lg' : '') + '" onclick="event.stopPropagation()">'
-    + '<div class="mh"><div class="mt2x">' + esc(title) + '\x3C/div>'
-    + '<button class="mcx" onclick="closeModal()"><svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>\x3C/svg>\x3C/button>\x3C/div>'
-    + '<div class="mbody">' + body + '\x3C/div>'
-    + (bhtml ? '<div class="mfoot">' + bhtml + '\x3C/div>' : '')
-    + '\x3C/div>\x3C/div>';
+function modal(title, body, btns) {
+  var m = document.getElementById('modal');
+  var mt = document.getElementById('modal-title');
+  var mb = document.getElementById('modal-body');
+  var mf = document.getElementById('modal-footer');
+  if (!m) return;
+  mt.textContent = title;
+  mb.innerHTML = body;
+  mf.innerHTML = '';
+  (btns||[]).forEach(function(b){
+    var btn = document.createElement('button');
+    btn.className = 'btn ' + (b.cls||'bs');
+    btn.textContent = b.lbl;
+    btn.onclick = function(){ eval(b.fn); };
+    mf.appendChild(btn);
+  });
+  m.classList.add('show');
 }
-function closeModal() { document.getElementById('mc').innerHTML = ''; }
-function confirm2(title, msg, fn) {
-  modal(title, '<div class="al al-r"><strong>' + esc(msg) + '\x3C/strong>\x3C/div>',
-    [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Evet Sil',cls:'bd',fn:'_cfm()'}]);
-  window._cfm = function () { closeModal(); fn(); };
-}
-
-function toggleNotif() {
-  var p = document.getElementById('npanel');
-  if (p.classList.contains('dn')) { buildNotif(); p.classList.remove('dn'); }
-  else p.classList.add('dn');
-}
-document.addEventListener('click', function (e) {
-  var nb = document.getElementById('nbtn');
-  var np = document.getElementById('npanel');
-  if (!np || np.classList.contains('dn')) return;
-  if (!(nb && nb.contains(e.target)) && !np.contains(e.target)) np.classList.add('dn');
-});
-function closeNotif() { var p = document.getElementById('npanel'); if (p) p.classList.add('dn'); }
-function buildNotif() {
-  var i, od = [], un = [], h = '';
-  for (i = 0; i < payments.length; i++) { if (payments[i].st === 'overdue') od.push(payments[i]); }
-  for (i = 0; i < messages.length; i++) { if (!messages[i].rd) un.push(messages[i]); }
-  h += '<div class="nph"><span>Bildirimler\x3C/span><span class="tm ts">' + (od.length + un.length) + '\x3C/span>\x3C/div>';
-  for (i = 0; i < od.length && i < 3; i++) {
-    h += '<div class="npi" onclick="closeNotif();go(\'payments\')">';
-    h += '<div class="npit">Gecikmis Odeme\x3C/div>';
-    h += '<div class="npis">' + esc(od[i].an || '-') + ' - ' + fmtN(od[i].amt) + ' TL\x3C/div>\x3C/div>';
-  }
-  for (i = 0; i < un.length && i < 3; i++) {
-    h += '<div class="npi" onclick="closeNotif();go(\'messages\')">';
-    h += '<div class="npit">' + esc(un[i].fr) + '\x3C/div>';
-    h += '<div class="npis">' + esc(un[i].sub) + '\x3C/div>\x3C/div>';
-  }
-  if (!od.length && !un.length) h += '<div style="padding:20px;text-align:center;color:var(--text3)">Bildirim yok\x3C/div>';
-  document.getElementById('npanel').innerHTML = h;
+function closeModal() {
+  var m = document.getElementById('modal');
+  if (m) m.classList.remove('show');
 }
 
-function exportAll() {
-  var d = JSON.stringify({athletes:athletes,payments:payments,coaches:coaches,attendance:attData,messages:messages,date:new Date().toISOString()}, null, 2);
-  var b = new Blob([d], {type:'application/json'});
-  var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'sporcu-' + tod() + '.json'; a.click();
-  toast('Veriler aktarildi');
-}
-function exportCSV(data, fname) {
-  if (!data || !data.length) return;
-  var keys = Object.keys(data[0]), rows = [keys.join(',')];
-  for (var i = 0; i < data.length; i++) {
-    rows.push(keys.map(function (k) { return '"' + (data[i][k] || '') + '"'; }).join(','));
-  }
-  var b = new Blob([rows.join('\r\n')], {type:'text/csv'});
-  var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = fname; a.click();
-  toast(fname + ' indirildi');
-}
-function importData() {
-  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
-  inp.onchange = function (e) {
-    var f = e.target.files[0]; if (!f) return;
-    var r = new FileReader();
-    r.onload = function (ev) {
-      try {
-        var d = JSON.parse(ev.target.result);
-        if (d.athletes) { athletes = d.athletes; saveA(); }
-        if (d.payments) { payments = d.payments; saveP(); }
-        if (d.coaches) { coaches = d.coaches; saveC(); }
-        if (d.attendance) { attData = d.attendance; saveAtt(); }
-        if (d.messages) { messages = d.messages; saveM(); }
-        go(curPage); toast('Veriler yuklendi');
-      } catch (err) { toast('Gecersiz dosya!', 'e'); }
-    };
-    r.readAsText(f);
-  };
-  inp.click();
+function confirm2(title, msg, cb) {
+  modal(title, '<p style="color:var(--text2);font-size:14px">' + msg + '</p>', [
+    {lbl:'Vazgec', cls:'bs', fn:'closeModal()'},
+    {lbl:'Evet, Devam Et', cls:'bd', fn:'closeModal();(' + cb.toString() + ')()'}
+  ]);
 }
 
-function sc(col, ico, val, lbl, chg) {
-  return '<div class="stat"><div class="sico ' + col + '">' + ico + '\x3C/div><div class="sval">' + esc(String(val)) + '\x3C/div><div class="slbl">' + esc(lbl) + '\x3C/div><div class="ts tm" style="margin-top:3px">' + esc(chg) + '\x3C/div>\x3C/div>';
-}
-function markPaid(id) {
-  for (var i = 0; i < payments.length; i++) { if (payments[i].id === id) { payments[i].st = 'completed'; break; } }
-  saveP(); go(curPage); toast('Odeme tamamlandi');
+function updateBadges() {
+  var od = overdueCount(), un = unreadCount(), pend = pendingCount();
+  var b1 = document.getElementById('badge-pay');
+  var b2 = document.getElementById('badge-msg');
+  if (b1) { b1.textContent = od; b1.style.display = od > 0 ? '' : 'none'; }
+  if (b2) { b2.textContent = un; b2.style.display = un > 0 ? '' : 'none'; }
 }
 
-function pgDash() {
-  var i, activeN = 0;
-  for (i = 0; i < athletes.length; i++) { if (athletes[i].st === 'active') activeN++; }
-  var totInc = 0;
-  for (i = 0; i < payments.length; i++) { if (payments[i].ty === 'income' && payments[i].st === 'completed') totInc += payments[i].amt; }
-  var odList = [];
-  for (i = 0; i < payments.length; i++) { if (payments[i].st === 'overdue') odList.push(payments[i]); }
-  var pendList = [];
-  for (i = 0; i < payments.length; i++) { if (payments[i].st === 'pending' || payments[i].st === 'overdue') pendList.push(payments[i]); }
-  var todayAtt = attData[tod()] || {};
-  var presentT = 0;
-  var attKeys = Object.keys(todayAtt);
-  for (i = 0; i < attKeys.length; i++) { if (todayAtt[attKeys[i]] === 'P') presentT++; }
-  var now = new Date(), months = [];
-  for (var mi = 5; mi >= 0; mi--) {
-    var d = new Date(now.getFullYear(), now.getMonth() - mi, 1);
-    var mm = d.getMonth(), yy = d.getFullYear(), inc = 0, exp = 0;
-    for (i = 0; i < payments.length; i++) {
-      var p = payments[i], pd = new Date(p.dt);
-      if (pd.getMonth() === mm && pd.getFullYear() === yy && p.st === 'completed') {
-        if (p.ty === 'income') inc += p.amt; else exp += p.amt;
-      }
+// ============================================================
+// PAGE: DASHBOARD
+// ============================================================
+function pgDashboard() {
+  var totalA = athletes.length, activeA = 0, totalIncome = 0, totalExp = 0;
+  for (var i = 0; i < athletes.length; i++) { if (athletes[i].st === 'active') activeA++; }
+  for (var i = 0; i < payments.length; i++) {
+    if (payments[i].st === 'completed') {
+      if (payments[i].ty === 'income') totalIncome += Number(payments[i].amt)||0;
+      else totalExp += Number(payments[i].amt)||0;
     }
-    months.push({label:mname(mm), inc:inc, exp:exp});
   }
-  var maxV = 1;
-  for (i = 0; i < months.length; i++) { if (months[i].inc > maxV) maxV = months[i].inc; if (months[i].exp > maxV) maxV = months[i].exp; }
-  var scounts = {};
-  for (i = 0; i < athletes.length; i++) { var sp = athletes[i].sp; scounts[sp] = (scounts[sp] || 0) + 1; }
-  var slist = Object.keys(scounts).sort(function (a, b) { return scounts[b] - scounts[a]; });
-  var h = '';
+  var od = overdueCount(), pend = pendingCount(), unread = unreadCount();
+  var h = '<div class="ph"><div class="stit">Dashboard\x3C/div><div class="ssub">' + (settings.schoolName||'Akademi') + '\x3C/div>\x3C/div>';
   h += '<div class="g4 mb3">';
-  h += sc('b', '&#x1F465;', athletes.length, 'Toplam Sporcu', activeN + ' aktif');
-  h += sc('g', 'TL', fmtN(totInc) + ' TL', 'Toplam Gelir', 'Tamamlanan');
-  h += sc('y', '!', pendList.length, 'Bekleyen', odList.length + ' gecikmis');
-  h += sc('p', 'OK', presentT, 'Bugun Katilan', attKeys.length + ' kayit');
+  h += sc('b','&#x1F3C5;', activeA, 'Aktif Sporcu', 'athletes');
+  h += sc('g','&#x1F4B0;', fmtN(totalIncome)+' TL', 'Gelir', 'accounting');
+  h += sc('r','&#x1F4C9;', fmtN(totalExp)+' TL', 'Gider', 'accounting');
+  h += sc('y','&#x26A0;', od+pend, 'Bekleyen', 'payments');
   h += '\x3C/div>';
+  // Recent athletes
   h += '<div class="g21 mb3">';
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Aylik Gelir / Gider\x3C/div>';
-  h += '<div class="flex gap2 ts"><span class="tg">Gelir\x3C/span><span class="tr2">Gider\x3C/span>\x3C/div>\x3C/div>';
-  h += '<div class="barchart">';
-  for (i = 0; i < months.length; i++) {
-    var bh1 = Math.round(months[i].inc / maxV * 110);
-    var bh2 = Math.round(months[i].exp / maxV * 110);
-    h += '<div class="barcol"><div style="display:flex;align-items:flex-end;gap:2px;height:110px;width:100%;justify-content:center">';
-    h += '<div class="bar" style="background:var(--green);height:' + bh1 + 'px;width:45%;opacity:.8">\x3C/div>';
-    h += '<div class="bar" style="background:var(--red);height:' + bh2 + 'px;width:45%;opacity:.8">\x3C/div>';
-    h += '\x3C/div><div class="barlbl">' + months[i].label + '\x3C/div>\x3C/div>';
-  }
-  h += '\x3C/div>\x3C/div>';
-  h += '<div class="card"><div class="tw6 mb3">Spor Dagilimi\x3C/div>';
-  for (i = 0; i < slist.length; i++) {
-    var sp2 = slist[i], cnt = scounts[sp2];
-    h += '<div class="flex fca gap2 mb3"><div style="width:22px;text-align:center">' + semi(sp2) + '\x3C/div>';
-    h += '<div style="flex:1"><div class="flex fjb tsm mb1"><span class="tw6">' + esc(sp2) + '\x3C/span><span class="tm">' + cnt + '\x3C/span>\x3C/div>';
-    h += '<div class="pr"><div class="prb prb-b" style="width:' + Math.round(cnt / athletes.length * 100) + '%;background:' + scolor(sp2) + '">\x3C/div>\x3C/div>\x3C/div>\x3C/div>';
-  }
-  h += '\x3C/div>\x3C/div>';
-  h += '<div class="g2">';
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Gecikmis Odemeler\x3C/div>' + (odList.length ? '<span class="bg bg-or">' + odList.length + ' adet\x3C/span>' : '') + '\x3C/div>';
-  if (!odList.length) h += '<div style="text-align:center;padding:20px;color:var(--text3)">Gecikmis odeme yok\x3C/div>';
-  for (i = 0; i < odList.length; i++) {
-    var op = odList[i];
-    h += '<div class="flex fca fjb" style="padding:8px 0;border-bottom:1px solid var(--border)">';
-    h += '<div><div class="tw6 tsm">' + esc(op.an || '-') + '\x3C/div><div class="ts tm">' + esc(op.ds) + ' - ' + fmtD(op.dd || op.dt) + '\x3C/div>\x3C/div>';
-    h += '<div style="text-align:right"><div class="tw6 tr2">' + fmtN(op.amt) + ' TL\x3C/div>';
-    h += '<button class="btn bsu btn-xs" style="margin-top:4px" data-id="' + esc(op.id) + '" onclick="markPaid(this.dataset.id)">Odendi\x3C/button>\x3C/div>\x3C/div>';
-  }
-  h += '\x3C/div>';
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Sporcular\x3C/div><button class="btn bs btn-sm" onclick="go(\'athletes\')">Tumunu Gor\x3C/button>\x3C/div>';
-  for (i = 0; i < athletes.length && i < 5; i++) {
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Sporcular\x3C/div><button class="btn bp btn-sm" onclick="go(\'athletes\')">Tumu\x3C/button>\x3C/div>';
+  var shown = 0;
+  for (var i = 0; i < athletes.length && shown < 5; i++) {
     var a = athletes[i];
-    h += '<div class="flex fca gap2 mb3" style="cursor:pointer" data-id="' + esc(a.id) + '" onclick="athDetail(this.dataset.id)">';
-    h += '<div class="ava" style="width:32px;height:32px;font-size:11px">' + ini(a.fn + ' ' + a.ln) + '\x3C/div>';
-    h += '<div style="flex:1"><div class="tw6 tsm">' + esc(a.fn) + ' ' + esc(a.ln) + '\x3C/div>';
-    h += '<div class="ts tm">' + semi(a.sp) + ' ' + esc(a.sp) + ' - ' + esc(a.cat) + '\x3C/div>\x3C/div>';
+    h += '<div class="att-row"><div class="ava" style="width:32px;height:32px;font-size:11px">' + ini(a.fn+' '+a.ln) + '\x3C/div>';
+    h += '<div style="flex:1"><div class="tw6 tsm">' + esc(a.fn) + ' ' + esc(a.ln) + '\x3C/div><div class="ts tm">' + esc(a.sp) + '\x3C/div>\x3C/div>';
     h += '<span class="bg ' + stc(a.st) + '">' + stl(a.st) + '\x3C/span>\x3C/div>';
+    shown++;
   }
+  if (!shown) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Sporcu yok\x3C/div>';
+  h += '\x3C/div>';
+  // Recent payments
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Odemeler\x3C/div><button class="btn bp btn-sm" onclick="go(\'payments\')">Tumu\x3C/button>\x3C/div>';
+  var shownP = 0;
+  for (var i = 0; i < payments.length && shownP < 5; i++) {
+    var p = payments[i];
+    h += '<div class="dr"><span class="dl tsm">' + esc(p.an||'-') + '\x3C/span><span class="dvl tw6 ' + (p.ty==='income'?'tg':'tr2') + '">' + (p.ty==='income'?'+':'-') + fmtN(p.amt) + ' TL\x3C/span>\x3C/div>';
+    shownP++;
+  }
+  if (!shownP) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Odeme yok\x3C/div>';
   h += '\x3C/div>\x3C/div>';
+  updateBadges();
   return h;
 }
 
-var AF = {search:'', sport:'', status:'', sort:'name'};
+function sc(color, icon, val, label, pg) {
+  var cls = color === 'b' ? 'stat-b' : color === 'g' ? 'stat-g' : color === 'r' ? 'stat-r' : 'stat-y';
+  return '<div class="card stat-card ' + cls + '" ' + (pg?'onclick="go(\''+pg+'\')" style="cursor:pointer"':'') + '>'
+    + '<div class="stat-icon">' + icon + '\x3C/div>'
+    + '<div class="stat-val">' + val + '\x3C/div>'
+    + '<div class="stat-lbl">' + label + '\x3C/div>\x3C/div>';
+}
+
+// ============================================================
+// PAGE: ATHLETES
+// ============================================================
+var _athFilter = {sp:'', st:'', q:''};
+
 function pgAthletes() {
-  var sports = [];
-  for (var i = 0; i < athletes.length; i++) { if (sports.indexOf(athletes[i].sp) < 0) sports.push(athletes[i].sp); }
-  var h = '<div class="ph"><div class="sh"><div><div class="stit">Sporcu Yonetimi\x3C/div><div class="ssub">' + athletes.length + ' sporcu kayitli\x3C/div>\x3C/div>';
-  h += '<div class="flex gap2 fwrap">';
-  h += '<button class="btn bs btn-sm" onclick="exportCSV(athletes,\'sporcular.csv\')">CSV\x3C/button>';
-  h += '<button class="btn bp btn-sm" onclick="showAthForm(null)">+ Sporcu Ekle\x3C/button>';
-  h += '\x3C/div>\x3C/div>\x3C/div>';
-  h += '<div class="fb"><div class="sb" style="flex:1;max-width:260px">';
-  h += '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>\x3C/svg>';
-  h += '<input type="text" id="ath-s" placeholder="Ad, soyad..." value="' + esc(AF.search) + '" oninput="AF.search=this.value;renderAthTbl()"/>\x3C/div>';
-  h += '<select class="fs" onchange="AF.sport=this.value;renderAthTbl()"><option value="">Tum Sporlar\x3C/option>';
-  for (var i = 0; i < sports.length; i++) h += '<option value="' + esc(sports[i]) + '"' + (AF.sport === sports[i] ? ' selected' : '') + '>' + esc(sports[i]) + '\x3C/option>';
-  h += '\x3C/select>';
-  h += '<select class="fs" onchange="AF.status=this.value;renderAthTbl()"><option value="">Tum Durumlar\x3C/option><option value="active"' + (AF.status === 'active' ? ' selected' : '') + '>Aktif\x3C/option><option value="inactive"' + (AF.status === 'inactive' ? ' selected' : '') + '>Pasif\x3C/option>\x3C/select>';
-  h += '\x3C/div><div id="ath-tbl">\x3C/div>';
-  return h;
-}
-function renderAthTbl() {
-  var list = athletes.slice();
-  if (AF.search) { var q = AF.search.toLowerCase(); list = list.filter(function (a) { return (a.fn + ' ' + a.ln + ' ' + (a.tc || '')).toLowerCase().indexOf(q) >= 0; }); }
-  if (AF.sport) list = list.filter(function (a) { return a.sp === AF.sport; });
-  if (AF.status) list = list.filter(function (a) { return a.st === AF.status; });
-  list.sort(function (a, b) { return a.fn < b.fn ? -1 : a.fn > b.fn ? 1 : 0; });
-  var el = document.getElementById('ath-tbl'); if (!el) return;
-  if (!list.length) { el.innerHTML = '<div style="text-align:center;padding:50px;color:var(--text3)">Sporcu bulunamadi\x3C/div>'; return; }
-  var h = '<div class="tw"><table><thead><tr><th>Sporcu\x3C/th><th>Spor\x3C/th><th>Yas\x3C/th><th>Antrenor\x3C/th><th>Ucret\x3C/th><th>Durum\x3C/th><th>Islem\x3C/th>\x3C/tr>\x3C/thead><tbody>';
-  for (var i = 0; i < list.length; i++) {
-    var a = list[i];
-    h += '<tr><td><div class="flex fca gap2">';
-    h += '<div class="ava" style="width:30px;height:30px;font-size:11px;flex-shrink:0">' + ini(a.fn + ' ' + a.ln) + '\x3C/div>';
-    h += '<div><div class="tdn" style="cursor:pointer" data-id="' + esc(a.id) + '" onclick="athDetail(this.dataset.id)">' + esc(a.fn) + ' ' + esc(a.ln) + '\x3C/div>';
-    h += '<div class="ts tm">' + esc(a.lic || '') + '\x3C/div>\x3C/div>\x3C/div>\x3C/td>';
-    h += '<td>' + semi(a.sp) + ' ' + esc(a.sp) + '<br><span class="ts tm">' + esc(a.cat || '') + '\x3C/span>\x3C/td>';
-    h += '<td>' + age(a.bd) + '\x3C/td>';
-    h += '<td class="tsm">' + esc(cname(a.ci || '')) + '\x3C/td>';
-    h += '<td class="tw6">' + fmtN(a.fee) + ' TL\x3C/td>';
+  var sports = []; athletes.forEach(function(a){ if (a.sp && sports.indexOf(a.sp) < 0) sports.push(a.sp); });
+  var filtered = athletes.filter(function(a){
+    if (_athFilter.st && a.st !== _athFilter.st) return false;
+    if (_athFilter.sp && a.sp !== _athFilter.sp) return false;
+    if (_athFilter.q) { var q = _athFilter.q.toLowerCase(); if ((a.fn+' '+a.ln+a.tc).toLowerCase().indexOf(q) < 0) return false; }
+    return true;
+  });
+  var h = '<div class="ph"><div class="sh"><div><div class="stit">Sporcular\x3C/div><div class="ssub">' + filtered.length + ' / ' + athletes.length + ' sporcu\x3C/div>\x3C/div>';
+  h += '<button class="btn bp btn-sm" onclick="showAthForm(null)">+ Sporcu Ekle\x3C/button>\x3C/div>\x3C/div>';
+  h += '<div class="filters mb3"><input class="fs" type="text" placeholder="Ara..." value="' + esc(_athFilter.q) + '" oninput="_athFilter.q=this.value;go(\'athletes\')">';
+  h += '<select class="fs" onchange="_athFilter.st=this.value;go(\'athletes\')"><option value="">Tum Durumlar\x3C/option><option value="active"' + (_athFilter.st==='active'?' selected':'') + '>Aktif\x3C/option><option value="inactive"' + (_athFilter.st==='inactive'?' selected':'') + '>Pasif\x3C/option>\x3C/select>';
+  h += '<select class="fs" onchange="_athFilter.sp=this.value;go(\'athletes\')"><option value="">Tum Sporlar\x3C/option>';
+  sports.forEach(function(s){ h += '<option value="'+esc(s)+'"'+((_athFilter.sp===s)?' selected':'')+'>'+esc(s)+'\x3C/option>'; });
+  h += '\x3C/select>\x3C/div>';
+  h += '<div class="tw mb3"><table><thead><tr><th>Sporcu\x3C/th><th>Dal\x3C/th><th>Antrenor\x3C/th><th>Ucret\x3C/th><th>Durum\x3C/th><th>\x3C/th>\x3C/tr>\x3C/thead><tbody>';
+  filtered.forEach(function(a){
+    h += '<tr><td><div class="flex fca gap2"><div class="ava" style="width:28px;height:28px;font-size:10px">' + ini(a.fn+' '+a.ln) + '\x3C/div><div><div class="tw6 tsm">' + esc(a.fn) + ' ' + esc(a.ln) + '\x3C/div><div class="ts tm">' + esc(a.tc||'') + '\x3C/div>\x3C/div>\x3C/div>\x3C/td>';
+    h += '<td class="tsm">' + semi(a.sp) + ' ' + esc(a.sp||'-') + '\x3C/td>';
+    h += '<td class="tsm tm">' + esc(cname(a.ci)) + '\x3C/td>';
+    h += '<td class="tsm">' + fmtN(a.fee) + ' TL\x3C/td>';
     h += '<td><span class="bg ' + stc(a.st) + '">' + stl(a.st) + '\x3C/span>\x3C/td>';
-    h += '<td><div class="flex gap1"><button class="btn bs btn-xs" data-id="' + esc(a.id) + '" onclick="athDetail(this.dataset.id)">Detay\x3C/button>';
-    h += '<button class="btn bs btn-xs" data-id="' + esc(a.id) + '" onclick="showAthForm(this.dataset.id)">Duzenle\x3C/button>';
-    h += '<button class="btn bd btn-xs" data-id="' + esc(a.id) + '" onclick="delAth(this.dataset.id)">Sil\x3C/button>\x3C/div>\x3C/td>\x3C/tr>';
-  }
+    h += '<td><div class="flex gap1"><button class="btn bs btn-xs" data-id="'+a.id+'" onclick="showAthForm(this.dataset.id)">Duzenle\x3C/button><button class="btn bd btn-xs" data-id="'+a.id+'" onclick="delAth(this.dataset.id)">Sil\x3C/button>\x3C/div>\x3C/td>\x3C/tr>';
+  });
+  if (!filtered.length) h += '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text3)">Sporcu bulunamadi\x3C/td>\x3C/tr>';
   h += '\x3C/tbody>\x3C/table>\x3C/div>';
-  el.innerHTML = h;
+  return h;
 }
-function athDetail(id) {
-  var a = null;
-  for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } }
-  if (!a) return;
-  var rate = attRate(id);
-  var apay = [], paid = 0, pend = [];
-  for (var i = 0; i < payments.length; i++) { if (payments[i].aid === id) apay.push(payments[i]); }
-  for (var i = 0; i < apay.length; i++) { if (apay[i].st === 'completed') paid += apay[i].amt; }
-  for (var i = 0; i < apay.length; i++) { if (apay[i].st === 'pending' || apay[i].st === 'overdue') pend.push(apay[i]); }
-  var h = '<div class="flex fca gap3 mb3">';
-  h += '<div class="ava" style="width:48px;height:48px;font-size:17px">' + ini(a.fn + ' ' + a.ln) + '\x3C/div>';
-  h += '<div><div style="font-size:17px;font-weight:800">' + esc(a.fn) + ' ' + esc(a.ln) + '\x3C/div><div class="tsm tm">' + esc(a.lic || '') + '\x3C/div>\x3C/div>';
-  h += '<span class="bg ' + stc(a.st) + '" style="margin-left:auto">' + stl(a.st) + '\x3C/span>\x3C/div>';
-  h += '<div class="g3 mb3" style="gap:10px">';
-  h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:19px;font-weight:800;color:var(--green)">' + fmtN(paid) + ' TL\x3C/div><div class="ts tm">Odeme\x3C/div>\x3C/div>';
-  h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:19px;font-weight:800;color:var(--blue)">' + (rate !== null ? rate + '%' : '-') + '\x3C/div><div class="ts tm">Devam\x3C/div>\x3C/div>';
-  h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:19px;font-weight:800;color:' + (pend.length ? 'var(--red)' : 'var(--green)') + '">' + pend.length + '\x3C/div><div class="ts tm">Bekleyen\x3C/div>\x3C/div>';
-  h += '\x3C/div>';
-  h += '<div class="dsec"><h4>Kisisel\x3C/h4>' + row('TCKN', a.tc || '-') + row('Dogum', fmtD(a.bd) + ' (' + age(a.bd) + ' yas)') + row('Cinsiyet', a.gn || '-') + row('Telefon', a.ph || '-') + row('E-posta', a.em || '-') + '\x3C/div>';
-  h += '<div class="dsec"><h4>Spor\x3C/h4>' + row('Dal', semi(a.sp) + ' ' + esc(a.sp)) + row('Kategori', a.cat || '-') + row('Antrenor', cname(a.ci || '')) + row('Kayit', fmtD(a.rd)) + '\x3C/div>';
-  h += '<div class="dsec"><h4>Odeme\x3C/h4>' + row('Aylik Ucret', fmtN(a.fee) + ' TL') + row('Plan', pln(a.pp)) + '\x3C/div>';
-  if (a.pn) { h += '<div class="dsec"><h4>Veli\x3C/h4>' + row('Ad', a.pn) + row('Tel', a.pp2 || '-') + '\x3C/div>'; }
-  if (a.nt) { h += '<div class="card" style="background:var(--bg3);padding:12px"><div class="ts tm mb1">Notlar\x3C/div><div class="tsm">' + esc(a.nt) + '\x3C/div>\x3C/div>'; }
-  modal(a.fn + ' ' + a.ln, h, [{lbl:'Duzenle',cls:'bs',fn:'closeModal();showAthForm("' + id + '")'},{lbl:'Kapat',cls:'bp',fn:'closeModal()'}]);
-}
-function sopts(arr, cur) { var o = '<option value="">Secin\x3C/option>'; for (var j = 0; j < arr.length; j++) o += '<option' + (arr[j] === cur ? ' selected' : '') + '>' + esc(arr[j]) + '\x3C/option>'; return o; }
+
 function showAthForm(id) {
-  var a = null; if (id) { for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } } }
-  var copts = '<option value="">Secin\x3C/option>';
-  for (var i = 0; i < coaches.length; i++) { var c = coaches[i]; copts += '<option value="' + esc(c.id) + '"' + (a && a.ci === c.id ? ' selected' : '') + '>' + esc(c.fn) + ' ' + esc(c.ln) + '\x3C/option>'; }
-  var sports = ['Futbol','Basketbol','Yuzme','Voleybol','Atletizm','Gures','Boks','Diger'];
-  var cats = ['Minik','Yildiz','Kucuk','Genc','Acik','Diger'];
-  var h = '<div class="fg">';
-  h += '<div class="fgr"><label>Ad *\x3C/label><input id="af-fn" type="text" value="' + (a ? esc(a.fn) : '') + '" placeholder="Ad"/>\x3C/div>';
-  h += '<div class="fgr"><label>Soyad *\x3C/label><input id="af-ln" type="text" value="' + (a ? esc(a.ln) : '') + '" placeholder="Soyad"/>\x3C/div>';
-  h += '<div class="fgr"><label>TCKN *\x3C/label><input id="af-tc" type="text" value="' + (a ? esc(a.tc) : '') + '" maxlength="11"/>\x3C/div>';
-  h += '<div class="fgr"><label>Dogum\x3C/label><input id="af-bd" type="date" value="' + (a ? a.bd : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Cinsiyet\x3C/label><select id="af-gn"><option value="">Secin\x3C/option><option' + (a && a.gn === 'Erkek' ? ' selected' : '') + '>Erkek\x3C/option><option' + (a && a.gn === 'Kiz' ? ' selected' : '') + '>Kiz\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Telefon\x3C/label><input id="af-ph" type="tel" value="' + (a ? esc(a.ph) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Spor Dali *\x3C/label><select id="af-sp">' + sopts(sports, a ? a.sp : '') + '\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Kategori\x3C/label><select id="af-ct">' + sopts(cats, a ? a.cat : '') + '\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Lisans No\x3C/label><input id="af-li" type="text" value="' + (a ? esc(a.lic) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Antrenor\x3C/label><select id="af-ci">' + copts + '\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Durum\x3C/label><select id="af-st"><option value="active"' + ((!a || a.st === 'active') ? ' selected' : '') + '>Aktif\x3C/option><option value="inactive"' + (a && a.st === 'inactive' ? ' selected' : '') + '>Pasif\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Aylik Ucret (TL)\x3C/label><input id="af-fe" type="number" value="' + (a ? a.fee : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Odeme Plani\x3C/label><select id="af-pl"><option value="monthly"' + ((!a || a.pp === 'monthly') ? ' selected' : '') + '>Aylik\x3C/option><option value="quarterly"' + (a && a.pp === 'quarterly' ? ' selected' : '') + '>3 Aylik\x3C/option><option value="semester"' + (a && a.pp === 'semester' ? ' selected' : '') + '>6 Aylik\x3C/option><option value="yearly"' + (a && a.pp === 'yearly' ? ' selected' : '') + '>Yillik\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Veli Adi\x3C/label><input id="af-pn" type="text" value="' + (a ? esc(a.pn) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Veli Telefon\x3C/label><input id="af-pp" type="tel" value="' + (a ? esc(a.pp2) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr full"><label>Notlar\x3C/label><textarea id="af-nt">' + (a ? esc(a.nt) : '') + '\x3C/textarea>\x3C/div>';
-  h += '\x3C/div>';
-  modal(id ? 'Sporcu Duzenle' : 'Yeni Sporcu Ekle', h, [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:id ? 'Kaydet' : 'Ekle',cls:'bp',fn:'saveAth("' + (id || '') + '")'}], true);
+  var a = null;
+  if (id) { for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } } }
+  var coachOpts = '<option value="">Antrenor Sec\x3C/option>';
+  coaches.forEach(function(c){ coachOpts += '<option value="'+c.id+'"'+(a&&a.ci===c.id?' selected':'')+'>'+esc(c.fn)+' '+esc(c.ln)+'\x3C/option>'; });
+  var h = '<div class="fg">'
+    + '<div class="fgr"><label>Ad *\x3C/label><input id="af-fn" type="text" value="'+(a?esc(a.fn):'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Soyad *\x3C/label><input id="af-ln" type="text" value="'+(a?esc(a.ln):'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>TC Kimlik *\x3C/label><input id="af-tc" type="text" maxlength="11" value="'+(a?esc(a.tc||''):'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Dogum Tarihi\x3C/label><input id="af-bd" type="date" value="'+(a?a.bd||'':'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Cinsiyet\x3C/label><select id="af-gn"><option value="">\x3C/option><option value="Erkek"'+(a&&a.gn==='Erkek'?' selected':'')+'>Erkek\x3C/option><option value="Kadin"'+(a&&a.gn==='Kadin'?' selected':'')+'>Kadin\x3C/option>\x3C/select>\x3C/div>'
+    + '<div class="fgr"><label>Telefon\x3C/label><input id="af-ph" type="tel" value="'+(a?esc(a.ph||''):'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Spor *\x3C/label><input id="af-sp" type="text" value="'+(a?esc(a.sp||''):'')+'" placeholder="Futbol, Basketbol..."/>\x3C/div>'
+    + '<div class="fgr"><label>Kategori\x3C/label><input id="af-ct" type="text" value="'+(a?esc(a.cat||''):'')+'" placeholder="U12, U14..."/>\x3C/div>'
+    + '<div class="fgr"><label>Lisans No\x3C/label><input id="af-li" type="text" value="'+(a?esc(a.lic||''):'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Antrenor\x3C/label><select id="af-ci">'+coachOpts+'\x3C/select>\x3C/div>'
+    + '<div class="fgr"><label>Durum\x3C/label><select id="af-st"><option value="active"'+((!a||a.st==='active')?' selected':'')+'>Aktif\x3C/option><option value="inactive"'+(a&&a.st==='inactive'?' selected':'')+'>Pasif\x3C/option>\x3C/select>\x3C/div>'
+    + '<div class="fgr"><label>Ucret (TL)\x3C/label><input id="af-fe" type="number" value="'+(a?a.fee||0:'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Odeme Plani\x3C/label><select id="af-pl"><option value="monthly"'+((!a||a.pp==='monthly')?' selected':'')+'>Aylik\x3C/option><option value="quarterly"'+(a&&a.pp==='quarterly'?' selected':'')+'>3 Aylik\x3C/option><option value="yearly"'+(a&&a.pp==='yearly'?' selected':'')+'>Yillik\x3C/option>\x3C/select>\x3C/div>'
+    + '<div class="fgr"><label>Veli Adi\x3C/label><input id="af-pn" type="text" value="'+(a?esc(a.pn||''):'')+'" />\x3C/div>'
+    + '<div class="fgr"><label>Veli Tel\x3C/label><input id="af-pp" type="tel" value="'+(a?esc(a.pp2||''):'')+'" />\x3C/div>'
+    + '<div class="fgr full"><label>Notlar\x3C/label><textarea id="af-nt">'+(a?esc(a.nt||''):'')+'\x3C/textarea>\x3C/div>'
+    + '<div class="fgr full" style="border-top:1px solid var(--border);padding-top:12px"><label style="color:var(--blue)">Sporcu Giris Sifresi (bos biraksan TC son 4 hane)\x3C/label><input id="af-spass" type="text" value="'+(a?esc(a.spPass||''):'')+'" />\x3C/div>'
+    + '\x3C/div>';
+  modal(id ? 'Sporcu Duzenle' : 'Yeni Sporcu Ekle', h,
+    [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:id?'Kaydet':'Ekle',cls:'bp',fn:'saveAth("'+(id||'')+'")'}]);
 }
-function saveAth(id) {
-  var fn = gv('af-fn'), ln = gv('af-ln'), tc = gv('af-tc'), sp = gv('af-sp');
-  if (!fn || !ln || !tc || !sp) { toast('Ad, soyad, TCKN ve spor zorunlu!', 'e'); return; }
-  if (tc.length !== 11) { toast('TCKN 11 hane olmali!', 'e'); return; }
-  var d = {fn:fn,ln:ln,tc:tc,bd:gv('af-bd'),gn:gv('af-gn'),ph:gv('af-ph'),em:'',sp:sp,cat:gv('af-ct'),lic:gv('af-li'),ci:gv('af-ci'),st:gv('af-st'),fee:gvn('af-fe'),pp:gv('af-pl'),pn:gv('af-pn'),pp2:gv('af-pp'),nt:gv('af-nt')};
-  if (id) { for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { athletes[i] = Object.assign({}, athletes[i], d); break; } } toast('Sporcu guncellendi'); }
-  else { d.id = uid(); d.rd = tod(); athletes.unshift(d); toast('Sporcu eklendi'); }
-  saveA(); closeModal(); go('athletes');
+
+async function saveAth(id) {
+  var fn=gv('af-fn'), ln=gv('af-ln'), tc=gv('af-tc'), sp=gv('af-sp');
+  if (!fn||!ln||!tc||!sp) { toast('Ad, soyad, TCKN ve spor zorunlu!','e'); return; }
+  if (tc.length !== 11) { toast('TCKN 11 hane olmali!','e'); return; }
+  var d = {fn:fn,ln:ln,tc:tc,bd:gv('af-bd'),gn:gv('af-gn'),ph:gv('af-ph'),em:'',sp:sp,cat:gv('af-ct'),lic:gv('af-li'),ci:gv('af-ci'),st:gv('af-st'),fee:gvn('af-fe'),pp:gv('af-pl'),pn:gv('af-pn'),pp2:gv('af-pp'),nt:gv('af-nt'),spPass:gv('af-spass')||undefined};
+  showLoading();
+  if (id) {
+    for (var i=0;i<athletes.length;i++){if(athletes[i].id===id){athletes[i]=Object.assign({},athletes[i],d);break;}}
+    await dbSaveAth(athletes.find(function(a){return a.id===id;}));
+    toast('Sporcu guncellendi');
+  } else {
+    d.id=uid(); d.rd=tod(); athletes.unshift(d);
+    await dbSaveAth(d);
+    toast('Sporcu eklendi');
+  }
+  hideLoading(); closeModal(); go('athletes');
 }
+
 function delAth(id) {
-  var a = null; for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } } if (!a) return;
-  confirm2(a.fn + ' ' + a.ln + ' silinsin mi?', 'Bu islem geri alinamaz.', function () {
-    var na = [], np = [];
-    for (var i = 0; i < athletes.length; i++) { if (athletes[i].id !== id) na.push(athletes[i]); }
-    for (var i = 0; i < payments.length; i++) { if (payments[i].aid !== id) np.push(payments[i]); }
-    athletes = na; payments = np; saveA(); saveP(); toast('Sporcu silindi'); go('athletes');
+  var a=null; for(var i=0;i<athletes.length;i++){if(athletes[i].id===id){a=athletes[i];break;}} if(!a)return;
+  confirm2(a.fn+' '+a.ln+' silinsin mi?','Bu islem geri alinamaz.', async function(){
+    athletes=athletes.filter(function(x){return x.id!==id;});
+    await dbDelAth(id);
+    toast('Sporcu silindi'); go('athletes');
   });
 }
 
-var PF = {search:'', status:'', type:''};
+// ============================================================
+// PAGE: PAYMENTS
+// ============================================================
 function pgPayments() {
-  var odList = []; for (var i = 0; i < payments.length; i++) { if (payments[i].st === 'overdue') odList.push(payments[i]); }
-  var totInc = 0; for (var i = 0; i < payments.length; i++) { if (payments[i].ty === 'income' && payments[i].st === 'completed') totInc += payments[i].amt; }
-  var pendN = 0; for (var i = 0; i < payments.length; i++) { if (payments[i].st === 'pending') pendN++; }
-  var h = '<div class="ph"><div class="sh"><div><div class="stit">Odemeler\x3C/div><div class="ssub">Aidat ve odeme takibi\x3C/div>\x3C/div>';
-  h += '<div class="flex gap2"><button class="btn bs btn-sm" onclick="exportCSV(payments,\'odemeler.csv\')">CSV\x3C/button>';
-  h += '<button class="btn bp btn-sm" onclick="showPayForm()">+ Odeme Ekle\x3C/button>\x3C/div>\x3C/div>\x3C/div>';
-  if (odList.length) { h += '<div class="al al-r mb3">! ' + odList.length + ' gecikmis odeme var\x3C/div>'; }
-  h += '<div class="g4 mb3">';
-  h += sc('g', 'TL', fmtN(totInc) + ' TL', 'Toplam Gelir', 'Tamamlanan');
-  h += sc('y', '!', pendN, 'Bekliyor', '');
-  h += sc('r', 'X', odList.length, 'Gecikmis', '');
-  h += sc('b', '~', '', '', '');
-  h += '\x3C/div>';
-  h += '<div class="fb"><div class="sb" style="flex:1;max-width:260px">';
-  h += '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>\x3C/svg>';
-  h += '<input type="text" id="pay-s" placeholder="Sporcu, aciklama..." oninput="PF.search=this.value;renderPayTbl()"/>\x3C/div>';
-  h += '<select class="fs" onchange="PF.status=this.value;renderPayTbl()"><option value="">Tum Durumlar\x3C/option><option value="completed">Tamamlandi\x3C/option><option value="pending">Bekliyor\x3C/option><option value="overdue">Gecikmis\x3C/option>\x3C/select>';
-  h += '<select class="fs" onchange="PF.type=this.value;renderPayTbl()"><option value="">Gelir & Gider\x3C/option><option value="income">Gelir\x3C/option><option value="expense">Gider\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div id="pay-tbl">\x3C/div>';
+  var filtered = payments.filter(function(p){
+    if (_payFilter.st && p.st !== _payFilter.st) return false;
+    if (_payFilter.sp) { var a=null; for(var i=0;i<athletes.length;i++){if(athletes[i].id===p.aid){a=athletes[i];break;}} if(!a||a.sp!==_payFilter.sp)return false; }
+    if (_payFilter.q) { var q=_payFilter.q.toLowerCase(); if((p.an||'').toLowerCase().indexOf(q)<0&&(p.ds||'').toLowerCase().indexOf(q)<0)return false; }
+    return true;
+  });
+  var odList = payments.filter(function(p){return p.st==='overdue';});
+  var havaleList = payments.filter(function(p){return p.payMethod==='havale'&&p.st==='pending'&&p.needsApproval;});
+  var sports=[]; athletes.forEach(function(a){if(a.sp&&sports.indexOf(a.sp)<0)sports.push(a.sp);});
+  var h='<div class="ph"><div class="sh"><div><div class="stit">Odemeler\x3C/div><div class="ssub">'+filtered.length+' kayit\x3C/div>\x3C/div>';
+  h+='<button class="btn bp btn-sm" onclick="showPayForm()">+ Odeme Ekle\x3C/button>\x3C/div>\x3C/div>';
+  if(havaleList.length){
+    h+='<div class="card mb3" style="border-color:rgba(210,153,34,.4)"><div class="flex fca fjb mb3"><div class="tw6" style="color:var(--yellow)">&#9888; Havale Onay Bekliyor ('+havaleList.length+')\x3C/div>\x3C/div>';
+    havaleList.forEach(function(hp){
+      h+='<div class="flex fca fjb" style="padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">';
+      h+='<div><div class="tw6 tsm">'+esc(hp.an||'-')+' - '+fmtN(hp.amt)+' TL\x3C/div>';
+      h+='<div class="ts tm">'+esc(hp.ds)+' | TC: '+esc(hp.sporcuTC||'-')+'\x3C/div>';
+      if(hp.havaleNote)h+='<div class="ts tm">Not: '+esc(hp.havaleNote)+'\x3C/div>';
+      h+='<div class="ts tm">'+fmtD(hp.dt)+'\x3C/div>\x3C/div>';
+      h+='<div class="flex gap1"><button class="btn bsu btn-xs" data-id="'+esc(hp.id)+'" onclick="approveHavale(this.dataset.id)">Onayla\x3C/button>';
+      h+='<button class="btn bd btn-xs" data-id="'+esc(hp.id)+'" onclick="rejectHavale(this.dataset.id)">Reddet\x3C/button>\x3C/div>\x3C/div>';
+    });
+    h+='\x3C/div>';
+  }
+  if(odList.length)h+='<div class="al al-r mb3">! '+odList.length+' gecikmis odeme var\x3C/div>';
+  h+='<div id="pay-filters" class="filters mb3">';
+  h+='<input class="fs" type="text" placeholder="Ara..." value="'+esc(_payFilter.q)+'" oninput="_payFilter.q=this.value;renderPayTbl()">';
+  h+='<select class="fs" onchange="_payFilter.st=this.value;renderPayTbl()"><option value="">Tum Durumlar\x3C/option>';
+  ['pending','completed','overdue','cancelled'].forEach(function(s){h+='<option value="'+s+'"'+(_payFilter.st===s?' selected':'')+'>'+stl(s)+'\x3C/option>';});
+  h+='\x3C/select>\x3C/div>';
+  h+='<div class="tw" id="pay-tbl">\x3C/div>';
+  setTimeout(renderPayTbl, 0);
   return h;
 }
+
 function renderPayTbl() {
-  var list = payments.slice();
-  if (PF.search) { var q = PF.search.toLowerCase(); list = list.filter(function (p) { return ((p.an || '') + ' ' + p.ds + ' ' + p.inv).toLowerCase().indexOf(q) >= 0; }); }
-  if (PF.status) list = list.filter(function (p) { return p.st === PF.status; });
-  if (PF.type) list = list.filter(function (p) { return p.ty === PF.type; });
-  list.sort(function (a, b) { return new Date(b.dt) - new Date(a.dt); });
-  var el = document.getElementById('pay-tbl'); if (!el) return;
-  if (!list.length) { el.innerHTML = '<div style="text-align:center;padding:50px;color:var(--text3)">Kayit bulunamadi\x3C/div>'; return; }
-  var h = '<div class="tw"><table><thead><tr><th>Tarih\x3C/th><th>Sporcu\x3C/th><th>Aciklama\x3C/th><th>Tur\x3C/th><th>Tutar\x3C/th><th>Durum\x3C/th><th>Islem\x3C/th>\x3C/tr>\x3C/thead><tbody>';
-  for (var i = 0; i < list.length; i++) {
-    var p = list[i];
-    h += '<tr><td class="tsm">' + fmtD(p.dt) + '\x3C/td>';
-    h += '<td class="tdn">' + esc(p.an || '-') + '\x3C/td>';
-    h += '<td class="tsm">' + esc(p.ds) + '<br><span class="ts tm">' + esc(p.inv) + '\x3C/span>\x3C/td>';
-    h += '<td><span class="bg ' + (p.ty === 'income' ? 'bg-g' : 'bg-r') + '">' + (p.ty === 'income' ? 'Gelir' : 'Gider') + '\x3C/span>\x3C/td>';
-    h += '<td class="tw6 ' + (p.ty === 'income' ? 'tg' : 'tr2') + '">' + (p.ty === 'income' ? '+' : '-') + fmtN(p.amt) + ' TL\x3C/td>';
-    h += '<td><span class="bg ' + stc(p.st) + '">' + stl(p.st) + '\x3C/span>\x3C/td>';
-    h += '<td><div class="flex gap1">';
-    if (p.st !== 'completed') h += '<button class="btn bsu btn-xs" data-id="' + esc(p.id) + '" onclick="markPaid(this.dataset.id)">Odendi\x3C/button>';
-    h += '<button class="btn bd btn-xs" data-id="' + esc(p.id) + '" onclick="delPay(this.dataset.id)">Sil\x3C/button>';
-    h += '\x3C/div>\x3C/td>\x3C/tr>';
-  }
-  h += '\x3C/tbody>\x3C/table>\x3C/div>';
-  el.innerHTML = h;
+  var el=document.getElementById('pay-tbl'); if(!el)return;
+  var filtered=payments.filter(function(p){
+    if(_payFilter.st&&p.st!==_payFilter.st)return false;
+    if(_payFilter.q){var q=_payFilter.q.toLowerCase();if((p.an||'').toLowerCase().indexOf(q)<0&&(p.ds||'').toLowerCase().indexOf(q)<0)return false;}
+    return true;
+  });
+  var h='<table><thead><tr><th>Tarih\x3C/th><th>Sporcu\x3C/th><th>Aciklama\x3C/th><th>Tutar\x3C/th><th>Durum\x3C/th><th>\x3C/th>\x3C/tr>\x3C/thead><tbody>';
+  filtered.forEach(function(p){
+    var sc2=stc(p.st), sl2=stl(p.st);
+    if(p.payMethod==='havale'&&p.st==='pending'){sc2='bg-y';sl2='Onay Bekliyor';}
+    h+='<tr><td class="tsm">'+fmtD(p.dt)+'\x3C/td><td class="tsm">'+esc(p.an||'-')+'\x3C/td><td class="tsm">'+esc(p.ds)+'\x3C/td>';
+    h+='<td class="tw6 '+(p.ty==='income'?'tg':'tr2')+'">'+(p.ty==='income'?'+':'-')+fmtN(p.amt)+' TL\x3C/td>';
+    h+='<td><span class="bg '+sc2+'">'+sl2+'\x3C/span>\x3C/td>';
+    h+='<td><div class="flex gap1">';
+    if(p.st!=='completed')h+='<button class="btn bsu btn-xs" data-id="'+p.id+'" onclick="markPaid(this.dataset.id)">Odendi\x3C/button>';
+    h+='<button class="btn bd btn-xs" data-id="'+p.id+'" onclick="delPay(this.dataset.id)">Sil\x3C/button>\x3C/div>\x3C/td>\x3C/tr>';
+  });
+  if(!filtered.length)h+='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text3)">Kayit bulunamadi\x3C/td>\x3C/tr>';
+  h+='\x3C/tbody>\x3C/table>';
+  el.innerHTML=h;
 }
+
 function showPayForm() {
-  var aopts = '<option value="">Sporcu (opsiyonel)\x3C/option>';
-  for (var i = 0; i < athletes.length; i++) { var a = athletes[i]; aopts += '<option value="' + a.id + '">' + esc(a.fn) + ' ' + esc(a.ln) + '\x3C/option>'; }
-  var h = '<div class="fg">';
-  h += '<div class="fgr"><label>Tur\x3C/label><select id="pf-ty"><option value="income">Gelir\x3C/option><option value="expense">Gider\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Tarih *\x3C/label><input id="pf-dt" type="date" value="' + tod() + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Sporcu\x3C/label><select id="pf-at">' + aopts + '\x3C/select>\x3C/div>';
-  h += '<div class="fgr"><label>Kategori\x3C/label><select id="pf-ct"><option>Aidat\x3C/option><option>Kayit Ucreti\x3C/option><option>Kira\x3C/option><option>Elektrik\x3C/option><option>Malzeme\x3C/option><option>Antrenor Maasi\x3C/option><option>Diger\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr full"><label>Aciklama *\x3C/label><input id="pf-ds" type="text" placeholder="Odeme aciklamasi"/>\x3C/div>';
-  h += '<div class="fgr"><label>Tutar (TL) *\x3C/label><input id="pf-am" type="number" placeholder="0"/>\x3C/div>';
-  h += '<div class="fgr"><label>Durum\x3C/label><select id="pf-st"><option value="completed">Tamamlandi\x3C/option><option value="pending">Bekliyor\x3C/option>\x3C/select>\x3C/div>';
-  h += '\x3C/div>';
-  modal('Yeni Odeme', h, [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Kaydet',cls:'bp',fn:'savePay()'}]);
+  var athOpts='<option value="">Sporcu Sec\x3C/option>';
+  athletes.forEach(function(a){athOpts+='<option value="'+a.id+'">'+esc(a.fn)+' '+esc(a.ln)+'\x3C/option>';});
+  var today=ATD;
+  var h='<div class="fg">'
+    +'<div class="fgr"><label>Sporcu\x3C/label><select id="pf-at">'+athOpts+'\x3C/select>\x3C/div>'
+    +'<div class="fgr"><label>Tur\x3C/label><select id="pf-ty"><option value="income">Gelir\x3C/option><option value="expense">Gider\x3C/option>\x3C/select>\x3C/div>'
+    +'<div class="fgr"><label>Kategori\x3C/label><select id="pf-ct"><option>Aidat\x3C/option><option>Lisans\x3C/option><option>Turnuva\x3C/option><option>Malzeme\x3C/option><option>Diger\x3C/option>\x3C/select>\x3C/div>'
+    +'<div class="fgr"><label>Tutar (TL) *\x3C/label><input id="pf-am" type="number" placeholder="0"/>\x3C/div>'
+    +'<div class="fgr"><label>Tarih\x3C/label><input id="pf-dt" type="date" value="'+today+'"/>\x3C/div>'
+    +'<div class="fgr"><label>Vade\x3C/label><input id="pf-dd" type="date"/>\x3C/div>'
+    +'<div class="fgr"><label>Durum\x3C/label><select id="pf-st"><option value="pending">Bekliyor\x3C/option><option value="completed">Tamamlandi\x3C/option><option value="overdue">Gecikti\x3C/option>\x3C/select>\x3C/div>'
+    +'<div class="fgr full"><label>Aciklama *\x3C/label><input id="pf-ds" type="text" placeholder="Odeme aciklamasi"/>\x3C/div>'
+    +'\x3C/div>';
+  modal('Odeme Ekle', h, [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Kaydet',cls:'bp',fn:'savePay()'}]);
 }
-function savePay() {
-  var ds = gv('pf-ds'), am = gvn('pf-am');
-  if (!ds || !am) { toast('Aciklama ve tutar zorunlu!', 'e'); return; }
-  var ty = gv('pf-ty'), aid = gv('pf-at');
-  var ath = null; for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === aid) { ath = athletes[i]; break; } }
-  payments.unshift({id:uid(),aid:aid,an:ath ? (ath.fn + ' ' + ath.ln) : '',amt:am,dt:gv('pf-dt'),ty:ty,cat:gv('pf-ct'),ds:ds,st:gv('pf-st'),inv:(ty === 'income' ? 'INV' : 'EXP') + '-' + Date.now()});
-  saveP(); closeModal(); go('payments'); toast('Odeme kaydedildi');
+
+async function savePay() {
+  var ds=gv('pf-ds'), am=gvn('pf-am');
+  if(!ds||!am){toast('Aciklama ve tutar zorunlu!','e');return;}
+  var ty=gv('pf-ty'), aid=gv('pf-at');
+  var ath=null; for(var i=0;i<athletes.length;i++){if(athletes[i].id===aid){ath=athletes[i];break;}}
+  var p={id:uid(),aid:aid,an:ath?(ath.fn+' '+ath.ln):'',amt:am,dt:gv('pf-dt'),dd:gv('pf-dd'),ty:ty,cat:gv('pf-ct'),ds:ds,st:gv('pf-st'),inv:(ty==='income'?'INV':'EXP')+'-'+Date.now()};
+  payments.unshift(p);
+  showLoading(); await dbSavePay(p); hideLoading();
+  closeModal(); go('payments'); toast('Odeme kaydedildi');
 }
-function delPay(id) {
-  confirm2('Odeme silinsin mi?', 'Bu islem geri alinamaz.', function () {
-    var np = []; for (var i = 0; i < payments.length; i++) { if (payments[i].id !== id) np.push(payments[i]); }
-    payments = np; saveP(); renderPayTbl(); toast('Odeme silindi');
+
+function delPay(id){
+  confirm2('Odeme silinsin mi?','Bu islem geri alinamaz.',async function(){
+    payments=payments.filter(function(p){return p.id!==id;});
+    await dbDelPay(id); renderPayTbl(); toast('Odeme silindi');
   });
 }
 
-var AM = new Date().getMonth(), AY = new Date().getFullYear();
+async function markPaid(id){
+  var p=null; for(var i=0;i<payments.length;i++){if(payments[i].id===id){payments[i].st='completed';p=payments[i];break;}}
+  if(p){showLoading();await dbSavePay(p);hideLoading();}
+  go(curPage); toast('Odeme tamamlandi');
+}
+
+async function approveHavale(id){
+  var p=null;
+  for(var i=0;i<payments.length;i++){if(payments[i].id===id){payments[i].st='completed';payments[i].needsApproval=false;payments[i].approvedBy=currentUser?currentUser.name:'Admin';payments[i].approvedAt=tod();p=payments[i];break;}}
+  if(p){showLoading();await dbSavePay(p);hideLoading();}
+  go(curPage); toast('Havale onaylandi!');
+}
+
+function rejectHavale(id){
+  confirm2('Havale reddedilsin mi?','Odeme reddedilecek.',async function(){
+    var p=null; for(var i=0;i<payments.length;i++){if(payments[i].id===id){payments[i].st='cancelled';payments[i].needsApproval=false;p=payments[i];break;}}
+    if(p){showLoading();await dbSavePay(p);hideLoading();}
+    go(curPage); toast('Havale reddedildi');
+  });
+}
+
+// ============================================================
+// PAGE: ACCOUNTING
+// ============================================================
 function pgAccounting() {
-  var i, mInc = 0, mExp = 0;
-  for (i = 0; i < payments.length; i++) {
-    var p = payments[i], d = new Date(p.dt);
-    if (p.st === 'completed' && d.getMonth() === AM && d.getFullYear() === AY) {
-      if (p.ty === 'income') mInc += p.amt; else mExp += p.amt;
+  var months=['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik'];
+  var now=new Date(), curY=now.getFullYear(), curM=now.getMonth();
+  var income=0, expense=0;
+  var monthly={};
+  for(var i=0;i<12;i++)monthly[i]={income:0,expense:0};
+  payments.forEach(function(p){
+    if(p.st!=='completed')return;
+    var d=new Date(p.dt);
+    if(d.getFullYear()===curY){
+      var m=d.getMonth();
+      if(p.ty==='income'){monthly[m].income+=Number(p.amt)||0;income+=Number(p.amt)||0;}
+      else{monthly[m].expense+=Number(p.amt)||0;expense+=Number(p.amt)||0;}
     }
+  });
+  var h='<div class="ph"><div class="stit">Muhasebe\x3C/div>\x3C/div>';
+  h+='<div class="g3 mb3">';
+  h+=sc('g','&#x1F4C8;',fmtN(income)+' TL','Toplam Gelir','');
+  h+=sc('r','&#x1F4C9;',fmtN(expense)+' TL','Toplam Gider','');
+  h+=sc('b','&#x1F4B0;',fmtN(income-expense)+' TL','Net','');
+  h+='\x3C/div>';
+  h+='<div class="card"><div class="tw6 mb3">'+curY+' Aylik Ozet\x3C/div><div class="tw"><table><thead><tr><th>Ay\x3C/th><th>Gelir\x3C/th><th>Gider\x3C/th><th>Net\x3C/th>\x3C/tr>\x3C/thead><tbody>';
+  for(var i=11;i>=0;i--){
+    var net=monthly[i].income-monthly[i].expense;
+    h+='<tr'+(i===curM?' style="background:rgba(88,166,255,.06)"':'')+
+      '><td class="tsm tw6">'+months[i]+'\x3C/td>'+
+      '<td class="tg tsm">'+fmtN(monthly[i].income)+' TL\x3C/td>'+
+      '<td class="tr2 tsm">'+fmtN(monthly[i].expense)+' TL\x3C/td>'+
+      '<td class="tsm tw6 '+(net>=0?'tg':'tr2')+'">'+fmtN(net)+' TL\x3C/td>\x3C/tr>';
   }
-  var catI = {}, catE = {};
-  for (i = 0; i < payments.length; i++) {
-    var p = payments[i], d = new Date(p.dt);
-    if (p.st === 'completed' && d.getMonth() === AM && d.getFullYear() === AY) {
-      if (p.ty === 'income') catI[p.cat] = (catI[p.cat] || 0) + p.amt;
-      else catE[p.cat] = (catE[p.cat] || 0) + p.amt;
-    }
-  }
-  var net = mInc - mExp;
-  var h = '<div class="ph"><div class="sh"><div><div class="stit">Muhasebe\x3C/div>\x3C/div>';
-  h += '<div class="mnav"><button onclick="AM--;if(AM<0){AM=11;AY--;}go(\'accounting\')">&lt;\x3C/button>';
-  h += '<span>' + mfull(AM) + ' ' + AY + '\x3C/span>';
-  h += '<button onclick="AM++;if(AM>11){AM=0;AY++;}go(\'accounting\')">&gt;\x3C/button>\x3C/div>\x3C/div>\x3C/div>';
-  h += '<div class="g3 mb3">';
-  h += '<div class="card" style="border-color:rgba(63,185,80,.3)"><div class="tsm tm mb1">Bu Ay Gelir\x3C/div><div style="font-size:26px;font-weight:800;color:var(--green)">' + fmtN(mInc) + ' TL\x3C/div>\x3C/div>';
-  h += '<div class="card" style="border-color:rgba(248,81,73,.3)"><div class="tsm tm mb1">Bu Ay Gider\x3C/div><div style="font-size:26px;font-weight:800;color:var(--red)">' + fmtN(mExp) + ' TL\x3C/div>\x3C/div>';
-  h += '<div class="card" style="border-color:rgba(88,166,255,.3)"><div class="tsm tm mb1">Net\x3C/div><div style="font-size:26px;font-weight:800;color:' + (net >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmtN(net) + ' TL\x3C/div>\x3C/div>';
-  h += '\x3C/div>';
-  h += '<div class="g2 mb3">';
-  h += '<div class="card"><div class="tw6 tg mb3">Gelir Kategorileri\x3C/div>';
-  var ik = Object.keys(catI).sort(function (a, b) { return catI[b] - catI[a]; });
-  if (!ik.length) h += '<div class="tsm tm">Bu ayda gelir yok\x3C/div>';
-  for (i = 0; i < ik.length; i++) { h += '<div class="flex fjb fca mb2"><span class="tsm">' + esc(ik[i]) + '\x3C/span><span class="tw6 tg tsm">' + fmtN(catI[ik[i]]) + ' TL\x3C/span>\x3C/div>'; }
-  h += '\x3C/div><div class="card"><div class="tw6 tr2 mb3">Gider Kategorileri\x3C/div>';
-  var ek = Object.keys(catE).sort(function (a, b) { return catE[b] - catE[a]; });
-  if (!ek.length) h += '<div class="tsm tm">Bu ayda gider yok\x3C/div>';
-  for (i = 0; i < ek.length; i++) { h += '<div class="flex fjb fca mb2"><span class="tsm">' + esc(ek[i]) + '\x3C/span><span class="tw6 tr2 tsm">' + fmtN(catE[ek[i]]) + ' TL\x3C/span>\x3C/div>'; }
-  h += '\x3C/div>\x3C/div>';
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">' + mfull(AM) + ' ' + AY + ' Islemleri\x3C/div><button class="btn bp btn-sm" onclick="showPayForm()">+ Ekle\x3C/button>\x3C/div>';
-  var mlist = [];
-  for (i = 0; i < payments.length; i++) { var d2 = new Date(payments[i].dt); if (d2.getMonth() === AM && d2.getFullYear() === AY) mlist.push(payments[i]); }
-  mlist.sort(function (a, b) { return new Date(b.dt) - new Date(a.dt); });
-  if (!mlist.length) h += '<div style="text-align:center;padding:20px;color:var(--text3)">Bu ayda islem yok\x3C/div>';
-  else {
-    h += '<div class="tw"><table><thead><tr><th>Tarih\x3C/th><th>Aciklama\x3C/th><th>Kategori\x3C/th><th>Sporcu\x3C/th><th>Tutar\x3C/th><th>Durum\x3C/th>\x3C/tr>\x3C/thead><tbody>';
-    for (i = 0; i < mlist.length; i++) {
-      var p2 = mlist[i];
-      h += '<tr><td class="tsm">' + fmtD(p2.dt) + '\x3C/td><td class="tsm">' + esc(p2.ds) + '\x3C/td>';
-      h += '<td><span class="bg ' + (p2.ty === 'income' ? 'bg-b' : 'bg-r') + '">' + esc(p2.cat) + '\x3C/span>\x3C/td>';
-      h += '<td class="tsm tm">' + esc(p2.an || '-') + '\x3C/td>';
-      h += '<td class="tw6 ' + (p2.ty === 'income' ? 'tg' : 'tr2') + '">' + (p2.ty === 'income' ? '+' : '-') + fmtN(p2.amt) + ' TL\x3C/td>';
-      h += '<td><span class="bg ' + stc(p2.st) + '">' + stl(p2.st) + '\x3C/span>\x3C/td>\x3C/tr>';
-    }
-    h += '\x3C/tbody>\x3C/table>\x3C/div>';
-  }
-  h += '\x3C/div>';
+  h+='\x3C/tbody>\x3C/table>\x3C/div>\x3C/div>';
   return h;
 }
 
-var ATD = tod(), ATSP = '';
+// ============================================================
+// PAGE: ATTENDANCE
+// ============================================================
 function pgAttendance() {
-  var i, sports = [];
-  for (i = 0; i < athletes.length; i++) { if (sports.indexOf(athletes[i].sp) < 0) sports.push(athletes[i].sp); }
-  var list = [];
-  for (i = 0; i < athletes.length; i++) { if (athletes[i].st === 'active') list.push(athletes[i]); }
-  if (ATSP) { var nl = []; for (i = 0; i < list.length; i++) { if (list[i].sp === ATSP) nl.push(list[i]); } list = nl; }
-  var day = attData[ATD] || {}, present = 0, absent = 0, late = 0;
-  for (i = 0; i < list.length; i++) { var v = day[list[i].id]; if (v === 'P') present++; else if (v === 'A') absent++; else if (v === 'L') late++; }
-  var h = '<div class="ph"><div class="sh"><div><div class="stit">Devam Takibi\x3C/div><div class="ssub">Gunluk yoklama\x3C/div>\x3C/div>';
-  h += '<div class="flex gap2 fwrap"><select class="fs" onchange="ATSP=this.value;go(\'attendance\')"><option value="">Tum Sporlar\x3C/option>';
-  for (i = 0; i < sports.length; i++) h += '<option value="' + esc(sports[i]) + '"' + (ATSP === sports[i] ? ' selected' : '') + '>' + esc(sports[i]) + '\x3C/option>';
-  h += '\x3C/select><input type="date" class="fs" value="' + ATD + '" onchange="ATD=this.value;go(\'attendance\')"/>\x3C/div>\x3C/div>\x3C/div>';
-  h += '<div class="g4 mb3">';
-  h += sc('g', 'OK', present, 'Katildi', '');
-  h += sc('r', 'X', absent, 'Katilmadi', '');
-  h += sc('y', '~', late, 'Gec Geldi', '');
-  h += sc('b', '?', list.length - present - absent - late, 'Isaretlenmedi', '');
-  h += '\x3C/div>';
-  h += '<div class="g21">';
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">' + fmtD(ATD) + ' Yoklamasi\x3C/div>';
-  h += '<div class="flex gap2"><button class="btn bsu btn-xs" onclick="markAllAtt(\'P\')">Tumunu Var\x3C/button>';
-  h += '<button class="btn bd btn-xs" onclick="markAllAtt(\'A\')">Tumunu Yok\x3C/button>\x3C/div>\x3C/div>';
-  if (!list.length) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Aktif sporcu yok\x3C/div>';
-  for (i = 0; i < list.length; i++) {
-    var a2 = list[i], s2 = day[a2.id] || '';
-    h += '<div class="att-row"><div class="ava" style="width:28px;height:28px;font-size:10px;flex-shrink:0">' + ini(a2.fn + ' ' + a2.ln) + '\x3C/div>';
-    h += '<div style="flex:1"><div class="tw6 tsm">' + esc(a2.fn) + ' ' + esc(a2.ln) + '\x3C/div><div class="ts tm">' + esc(a2.sp) + '\x3C/div>\x3C/div>';
-    h += '<div class="att-btns">';
-    h += '<button class="att-b' + (s2 === 'P' ? ' ap' : '') + '" data-id="' + a2.id + '" onclick="setAtt(this.dataset.id,\'P\')">VAR\x3C/button>';
-    h += '<button class="att-b' + (s2 === 'L' ? ' al2' : '') + '" data-id="' + a2.id + '" onclick="setAtt(this.dataset.id,\'L\')">GEC\x3C/button>';
-    h += '<button class="att-b' + (s2 === 'A' ? ' aa' : '') + '" data-id="' + a2.id + '" onclick="setAtt(this.dataset.id,\'A\')">YOK\x3C/button>';
-    h += '\x3C/div>\x3C/div>';
-  }
-  h += '\x3C/div>';
-  h += '<div class="card"><div class="tw6 mb3">Devam Oranlari\x3C/div>';
-  var actives = []; for (i = 0; i < athletes.length && actives.length < 10; i++) { if (athletes[i].st === 'active') actives.push(athletes[i]); }
-  for (i = 0; i < actives.length; i++) {
-    var a3 = actives[i], r3 = attRate(a3.id);
-    h += '<div class="flex fca gap2 mb2">';
-    h += '<div class="tsm tw6 trunc" style="width:95px">' + esc(a3.fn) + ' ' + (a3.ln[0] || '') + '.\x3C/div>';
-    h += '<div style="flex:1"><div class="pr"><div class="prb ' + (r3 >= 80 ? 'prb-g' : r3 >= 60 ? 'prb-y' : 'prb-r') + '" style="width:' + (r3 || 0) + '%">\x3C/div>\x3C/div>\x3C/div>';
-    h += '<div class="ts tw6" style="width:32px;text-align:right;color:' + (r3 >= 80 ? 'var(--green)' : r3 >= 60 ? 'var(--yellow)' : 'var(--text3)') + '">' + (r3 !== null ? r3 + '%' : '-') + '\x3C/div>';
-    h += '\x3C/div>';
-  }
-  h += '\x3C/div>\x3C/div>';
+  var sports=[]; athletes.forEach(function(a){if(a.sp&&sports.indexOf(a.sp)<0)sports.push(a.sp);});
+  var list=athletes.filter(function(a){return a.st==='active'&&(!ATSP||a.sp===ATSP);});
+  var day=attData[ATD]||{}, present=0, absent=0, late=0;
+  list.forEach(function(a){var v=day[a.id];if(v==='P')present++;else if(v==='A')absent++;else if(v==='L')late++;});
+  var h='<div class="ph"><div class="sh"><div><div class="stit">Devam Takibi\x3C/div><div class="ssub">Gunluk yoklama\x3C/div>\x3C/div>';
+  h+='<div class="flex gap2 fwrap"><select class="fs" onchange="ATSP=this.value;go(\'attendance\')"><option value="">Tum Sporlar\x3C/option>';
+  sports.forEach(function(s){h+='<option value="'+esc(s)+'"'+(ATSP===s?' selected':'')+'>'+esc(s)+'\x3C/option>';});
+  h+='<\/select><input type="date" class="fs" value="'+ATD+'" onchange="ATD=this.value;go(\'attendance\')"/>\x3C/div>\x3C/div>\x3C/div>';
+  h+='<div class="g4 mb3">';
+  h+=sc('g','OK',present,'Katildi',''); h+=sc('r','X',absent,'Katilmadi','');
+  h+=sc('y','~',late,'Gec Geldi',''); h+=sc('b','?',list.length-present-absent-late,'Isaretlenmedi','');
+  h+='\x3C/div>';
+  h+='<div class="g21">';
+  h+='<div class="card"><div class="flex fca fjb mb3"><div class="tw6">'+fmtD(ATD)+' Yoklamasi\x3C/div>';
+  h+='<div class="flex gap2"><button class="btn bsu btn-xs" onclick="markAllAtt(\'P\')">Tumunu Var\x3C/button>';
+  h+='<button class="btn bd btn-xs" onclick="markAllAtt(\'A\')">Tumunu Yok\x3C/button>\x3C/div>\x3C/div>';
+  if(!list.length)h+='<div style="text-align:center;padding:30px;color:var(--text3)">Aktif sporcu yok\x3C/div>';
+  list.forEach(function(a){
+    var s2=day[a.id]||'';
+    h+='<div class="att-row"><div class="ava" style="width:28px;height:28px;font-size:10px;flex-shrink:0">'+ini(a.fn+' '+a.ln)+'\x3C/div>';
+    h+='<div style="flex:1"><div class="tw6 tsm">'+esc(a.fn)+' '+esc(a.ln)+'\x3C/div><div class="ts tm">'+esc(a.sp)+'\x3C/div>\x3C/div>';
+    h+='<div class="att-btns">';
+    h+='<button class="att-b'+(s2==='P'?' ap':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,\'P\')">VAR\x3C/button>';
+    h+='<button class="att-b'+(s2==='L'?' al2':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,\'L\')">GEC\x3C/button>';
+    h+='<button class="att-b'+(s2==='A'?' aa':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,\'A\')">YOK\x3C/button>';
+    h+='\x3C/div>\x3C/div>';
+  });
+  h+='\x3C/div>';
+  // Attendance rates
+  h+='<div class="card"><div class="tw6 mb3">Devam Oranlari\x3C/div>';
+  var actives=[]; for(var i=0;i<athletes.length&&actives.length<10;i++){if(athletes[i].st==='active')actives.push(athletes[i]);}
+  actives.forEach(function(a){
+    var r=attRate(a.id);
+    h+='<div class="flex fca gap2 mb2">';
+    h+='<div class="tsm tw6 trunc" style="width:95px">'+esc(a.fn)+' '+(a.ln[0]||'')+'. \x3C/div>';
+    h+='<div style="flex:1"><div class="pr"><div class="prb '+(r>=80?'prb-g':r>=60?'prb-y':'prb-r')+'" style="width:'+(r||0)+'%">\x3C/div>\x3C/div>\x3C/div>';
+    h+='<div class="ts tw6" style="width:32px;text-align:right;color:'+(r>=80?'var(--green)':r>=60?'var(--yellow)':'var(--text3)')+'">'+  (r!==null?r+'%':'-')+'\x3C/div>\x3C/div>';
+  });
+  h+='\x3C/div>\x3C/div>';
   return h;
-}
-function setAtt(aid, s) {
-  if (!attData[ATD]) attData[ATD] = {};
-  if (attData[ATD][aid] === s) delete attData[ATD][aid]; else attData[ATD][aid] = s;
-  saveAtt(); go('attendance');
-}
-function markAllAtt(s) {
-  if (!attData[ATD]) attData[ATD] = {};
-  var list = []; for (var i = 0; i < athletes.length; i++) { if (athletes[i].st === 'active') list.push(athletes[i]); }
-  if (ATSP) { var nl = []; for (var i = 0; i < list.length; i++) { if (list[i].sp === ATSP) nl.push(list[i]); } list = nl; }
-  for (var i = 0; i < list.length; i++) attData[ATD][list[i].id] = s;
-  saveAtt(); go('attendance');
 }
 
+async function setAtt(aid, s) {
+  if(!attData[ATD])attData[ATD]={};
+  var removing=attData[ATD][aid]===s;
+  if(removing){delete attData[ATD][aid];await dbSaveAtt(ATD,aid,undefined);}
+  else{attData[ATD][aid]=s;await dbSaveAtt(ATD,aid,s);}
+  go('attendance');
+}
+
+async function markAllAtt(s) {
+  if(!attData[ATD])attData[ATD]={};
+  var list=athletes.filter(function(a){return a.st==='active'&&(!ATSP||a.sp===ATSP);});
+  showLoading();
+  for(var i=0;i<list.length;i++){attData[ATD][list[i].id]=s;await dbSaveAtt(ATD,list[i].id,s);}
+  hideLoading(); go('attendance');
+}
+
+// ============================================================
+// PAGE: COACHES
+// ============================================================
 function pgCoaches() {
-  var h = '<div class="ph"><div class="sh"><div><div class="stit">Antrenorler\x3C/div><div class="ssub">' + coaches.length + ' antrenor\x3C/div>\x3C/div>';
-  h += '<button class="btn bp btn-sm" onclick="showCoachForm(null)">+ Antrenor Ekle\x3C/button>\x3C/div>\x3C/div>';
-  h += '<div class="g3">';
-  for (var i = 0; i < coaches.length; i++) {
-    var c = coaches[i], myN = 0;
-    for (var j = 0; j < athletes.length; j++) { if (athletes[j].ci === c.id && athletes[j].st === 'active') myN++; }
-    h += '<div class="card"><div class="flex fca gap3 mb3">';
-    h += '<div class="ava" style="width:42px;height:42px;font-size:15px">' + ini(c.fn + ' ' + c.ln) + '\x3C/div>';
-    h += '<div><div class="tw6">' + esc(c.fn) + ' ' + esc(c.ln) + '\x3C/div><div class="tsm tm">' + esc(c.sp) + '\x3C/div>\x3C/div>';
-    h += '<span class="bg ' + (c.st === 'active' ? 'bg-g' : 'bg-r') + '" style="margin-left:auto">' + (c.st === 'active' ? 'Aktif' : 'Pasif') + '\x3C/span>\x3C/div>';
-    h += row('Telefon', esc(c.ph || '-')) + row('Maas', fmtN(c.sal) + ' TL') + row('Sporcu', myN + ' aktif') + row('Baslangic', fmtD(c.sd || ''));
-    if (c.nt) h += '<div class="tsm tm mt2" style="background:var(--bg3);padding:8px;border-radius:6px">' + esc(c.nt) + '\x3C/div>';
-    h += '<div class="flex gap1 mt3"><button class="btn bs btn-xs w100" data-id="' + c.id + '" onclick="showCoachForm(this.dataset.id)">Duzenle\x3C/button>';
-    h += '<button class="btn bd btn-xs" data-id="' + c.id + '" onclick="delCoach(this.dataset.id)">Sil\x3C/button>\x3C/div>';
-    h += '\x3C/div>';
-  }
-  h += '<div class="card" style="border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:180px;opacity:.4;cursor:pointer" onclick="showCoachForm(null)"><div style="text-align:center"><div style="font-size:28px">+\x3C/div><div class="tsm mt1">Antrenor Ekle\x3C/div>\x3C/div>\x3C/div>';
-  h += '\x3C/div>';
+  var h='<div class="ph"><div class="sh"><div><div class="stit">Antrenorler\x3C/div><div class="ssub">'+coaches.length+' antrenor\x3C/div>\x3C/div>';
+  h+='<button class="btn bp btn-sm" onclick="showCoachForm(null)">+ Antrenor Ekle\x3C/button>\x3C/div>\x3C/div>';
+  h+='<div class="g3">';
+  coaches.forEach(function(c){
+    var myN=0; athletes.forEach(function(a){if(a.ci===c.id&&a.st==='active')myN++;});
+    h+='<div class="card"><div class="flex fca gap3 mb3">';
+    h+='<div class="ava" style="width:42px;height:42px;font-size:15px">'+ini(c.fn+' '+c.ln)+'\x3C/div>';
+    h+='<div><div class="tw6">'+esc(c.fn)+' '+esc(c.ln)+'\x3C/div><div class="tsm tm">'+esc(c.sp)+'\x3C/div>\x3C/div>';
+    h+='<span class="bg '+(c.st==='active'?'bg-g':'bg-r')+'" style="margin-left:auto">'+(c.st==='active'?'Aktif':'Pasif')+'\x3C/span>\x3C/div>';
+    h+=row('Telefon',esc(c.ph||'-'))+row('Maas',fmtN(c.sal)+' TL')+row('Sporcu',myN+' aktif')+row('Baslangic',fmtD(c.sd||''));
+    if(c.nt)h+='<div class="tsm tm mt2" style="background:var(--bg3);padding:8px;border-radius:6px">'+esc(c.nt)+'\x3C/div>';
+    h+='<div class="flex gap1 mt3"><button class="btn bs btn-xs w100" data-id="'+c.id+'" onclick="showCoachForm(this.dataset.id)">Duzenle\x3C/button>';
+    h+='<button class="btn bd btn-xs" data-id="'+c.id+'" onclick="delCoach(this.dataset.id)">Sil\x3C/button>\x3C/div>';
+    h+='\x3C/div>';
+  });
+  h+='<div class="card" style="border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:180px;opacity:.4;cursor:pointer" onclick="showCoachForm(null)"><div style="text-align:center"><div style="font-size:28px">+\x3C/div><div class="tsm mt1">Antrenor Ekle\x3C/div>\x3C/div>\x3C/div>';
+  h+='\x3C/div>';
   return h;
 }
+
 function showCoachForm(id) {
-  var c = null; if (id) { for (var i = 0; i < coaches.length; i++) { if (coaches[i].id === id) { c = coaches[i]; break; } } }
-  var h = '<div class="fg">';
-  h += '<div class="fgr"><label>Ad *\x3C/label><input id="cf-fn" type="text" value="' + (c ? esc(c.fn) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Soyad *\x3C/label><input id="cf-ln" type="text" value="' + (c ? esc(c.ln) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Telefon\x3C/label><input id="cf-ph" type="tel" value="' + (c ? esc(c.ph) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>E-posta\x3C/label><input id="cf-em" type="email" value="' + (c ? esc(c.em) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Uzmanlik *\x3C/label><input id="cf-sp" type="text" value="' + (c ? esc(c.sp) : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Maas (TL)\x3C/label><input id="cf-sa" type="number" value="' + (c ? c.sal : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Baslangic\x3C/label><input id="cf-sd" type="date" value="' + (c ? c.sd : '') + '"/>\x3C/div>';
-  h += '<div class="fgr"><label>Durum\x3C/label><select id="cf-st"><option value="active"' + ((!c || c.st === 'active') ? ' selected' : '') + '>Aktif\x3C/option><option value="inactive"' + (c && c.st === 'inactive' ? ' selected' : '') + '>Pasif\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr full"><label>Notlar\x3C/label><textarea id="cf-nt">' + (c ? esc(c.nt) : '') + '\x3C/textarea>\x3C/div>';
-  h += '\x3C/div>';
-  modal(id ? 'Antrenor Duzenle' : 'Yeni Antrenor', h, [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:id ? 'Kaydet' : 'Ekle',cls:'bp',fn:'saveCoach("' + (id || '') + '")'}]);
+  var c=null; if(id){for(var i=0;i<coaches.length;i++){if(coaches[i].id===id){c=coaches[i];break;}}}
+  var h='<div class="fg">'
+    +'<div class="fgr"><label>Ad *\x3C/label><input id="cf-fn" type="text" value="'+(c?esc(c.fn):'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>Soyad *\x3C/label><input id="cf-ln" type="text" value="'+(c?esc(c.ln):'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>Telefon\x3C/label><input id="cf-ph" type="tel" value="'+(c?esc(c.ph||''):'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>E-posta\x3C/label><input id="cf-em" type="email" value="'+(c?esc(c.em||''):'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>Uzmanlik *\x3C/label><input id="cf-sp" type="text" value="'+(c?esc(c.sp||''):'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>Maas (TL)\x3C/label><input id="cf-sa" type="number" value="'+(c?c.sal||0:'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>Baslangic\x3C/label><input id="cf-sd" type="date" value="'+(c?c.sd||'':'')+'" />\x3C/div>'
+    +'<div class="fgr"><label>Durum\x3C/label><select id="cf-st"><option value="active"'+((!c||c.st==="active")?" selected":"")+'>Aktif\x3C/option><option value="inactive"'+(c&&c.st==="inactive"?" selected":"")+'>Pasif\x3C/option>\x3C/select>\x3C/div>'
+    +'<div class="fgr full"><label>Notlar\x3C/label><textarea id="cf-nt">'+(c?esc(c.nt||''):'')+'\x3C/textarea>\x3C/div>'
+    +'\x3C/div>';
+  modal(id?'Antrenor Duzenle':'Yeni Antrenor',h,[{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:id?'Kaydet':'Ekle',cls:'bp',fn:'saveCoach("'+(id||'')+'")'}]);
 }
-function saveCoach(id) {
-  var fn = gv('cf-fn'), ln = gv('cf-ln'), sp = gv('cf-sp');
-  if (!fn || !ln || !sp) { toast('Ad, soyad ve uzmanlik zorunlu!', 'e'); return; }
-  var d = {fn:fn,ln:ln,ph:gv('cf-ph'),em:gv('cf-em'),sp:sp,sal:gvn('cf-sa'),sd:gv('cf-sd'),st:gv('cf-st'),nt:gv('cf-nt')};
-  if (id) { for (var i = 0; i < coaches.length; i++) { if (coaches[i].id === id) { coaches[i] = Object.assign({}, coaches[i], d); break; } } toast('Antrenor guncellendi'); }
-  else { d.id = uid(); coaches.push(d); toast('Antrenor eklendi'); }
-  saveC(); closeModal(); go('coaches');
+
+async function saveCoach(id) {
+  var fn=gv('cf-fn'),ln=gv('cf-ln'),sp=gv('cf-sp');
+  if(!fn||!ln||!sp){toast('Ad, soyad ve uzmanlik zorunlu!','e');return;}
+  var d={fn:fn,ln:ln,ph:gv('cf-ph'),em:gv('cf-em'),sp:sp,sal:gvn('cf-sa'),sd:gv('cf-sd'),st:gv('cf-st'),nt:gv('cf-nt')};
+  showLoading();
+  if(id){
+    for(var i=0;i<coaches.length;i++){if(coaches[i].id===id){coaches[i]=Object.assign({},coaches[i],d);break;}}
+    await dbSaveCoach(coaches.find(function(c){return c.id===id;}));
+    toast('Antrenor guncellendi');
+  } else {
+    d.id=uid(); coaches.push(d);
+    await dbSaveCoach(d);
+    toast('Antrenor eklendi');
+  }
+  hideLoading(); closeModal(); go('coaches');
 }
-function delCoach(id) {
-  confirm2('Antrenor silinsin mi?', 'Bu islem geri alinamaz.', function () {
-    var nc = []; for (var i = 0; i < coaches.length; i++) { if (coaches[i].id !== id) nc.push(coaches[i]); }
-    coaches = nc; saveC(); toast('Antrenor silindi'); go('coaches');
+
+function delCoach(id){
+  confirm2('Antrenor silinsin mi?','Bu islem geri alinamaz.',async function(){
+    coaches=coaches.filter(function(c){return c.id!==id;});
+    await dbDelCoach(id); toast('Antrenor silindi'); go('coaches');
   });
 }
 
+// ============================================================
+// PAGE: MESSAGES
+// ============================================================
 function pgMessages() {
-  var i, unread = 0; for (i = 0; i < messages.length; i++) { if (!messages[i].rd) unread++; }
-  var h = '<div class="ph"><div class="sh"><div><div class="stit">Mesajlar\x3C/div><div class="ssub">' + unread + ' okunmamis\x3C/div>\x3C/div>';
-  h += '<button class="btn bp btn-sm" onclick="showMsgForm()">+ Yeni Mesaj\x3C/button>\x3C/div>\x3C/div>';
-  h += '<div class="g21"><div class="card" style="padding:0;overflow:hidden">';
-  if (!messages.length) h += '<div style="text-align:center;padding:40px;color:var(--text3)">Mesaj yok\x3C/div>';
-  for (i = 0; i < messages.length; i++) {
-    var m = messages[i];
-    h += '<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:' + (m.rd ? 'transparent' : 'rgba(88,166,255,.05)') + '" data-id="' + m.id + '" onclick="openMsg(this.dataset.id)">';
-    h += '<div class="flex fca gap2"><div class="ava" style="width:26px;height:26px;font-size:9px;flex-shrink:0">' + ini(m.fr) + '\x3C/div>';
-    h += '<div style="flex:1;min-width:0"><div class="flex fjb"><span class="' + (m.rd ? 'tm' : 'tw6') + ' tsm trunc">' + esc(m.fr) + '\x3C/span><span class="ts tm">' + fmtD(m.dt) + '\x3C/span>\x3C/div>';
-    h += '<div class="ts tm trunc">' + esc(m.sub) + '\x3C/div>\x3C/div>';
-    if (!m.rd) h += '<div style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0">\x3C/div>';
-    h += '\x3C/div>\x3C/div>';
-  }
-  h += '\x3C/div><div class="card" id="msg-det"><div style="text-align:center;padding:40px;color:var(--text3)">Mesaj secin\x3C/div>\x3C/div>\x3C/div>';
+  var unread=0; messages.forEach(function(m){if(!m.rd)unread++;});
+  var h='<div class="ph"><div class="sh"><div><div class="stit">Mesajlar\x3C/div><div class="ssub">'+unread+' okunmamis\x3C/div>\x3C/div>';
+  h+='<button class="btn bp btn-sm" onclick="showMsgForm()">+ Yeni Mesaj\x3C/button>\x3C/div>\x3C/div>';
+  h+='<div class="g21"><div class="card" style="padding:0;overflow:hidden">';
+  if(!messages.length)h+='<div style="text-align:center;padding:40px;color:var(--text3)">Mesaj yok\x3C/div>';
+  messages.forEach(function(m){
+    h+='<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:'+(m.rd?'transparent':'rgba(88,166,255,.05)')+'" data-id="'+m.id+'" onclick="openMsg(this.dataset.id)">';
+    h+='<div class="flex fca gap2"><div class="ava" style="width:26px;height:26px;font-size:9px;flex-shrink:0">'+ini(m.fr)+'\x3C/div>';
+    h+='<div style="flex:1;min-width:0"><div class="flex fjb"><span class="'+(m.rd?'tm':'tw6')+' tsm trunc">'+esc(m.fr)+'\x3C/span><span class="ts tm">'+fmtD(m.dt)+'\x3C/span>\x3C/div>';
+    h+='<div class="ts tm trunc">'+esc(m.sub)+'\x3C/div>\x3C/div>';
+    if(!m.rd)h+='<div style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0">\x3C/div>';
+    h+='\x3C/div>\x3C/div>';
+  });
+  h+='\x3C/div><div class="card" id="msg-det"><div style="text-align:center;padding:40px;color:var(--text3)">Mesaj secin\x3C/div>\x3C/div>\x3C/div>';
   return h;
 }
+
 function openMsg(id) {
-  var m = null; for (var i = 0; i < messages.length; i++) { if (messages[i].id === id) { m = messages[i]; break; } } if (!m) return;
-  m.rd = true; saveM(); updateBadges();
-  var el = document.getElementById('msg-det'); if (!el) return;
-  var h = '<div class="tw6" style="font-size:15px;margin-bottom:6px">' + esc(m.sub) + '\x3C/div>';
-  h += '<div class="flex fca gap2 mb3"><div class="ava" style="width:26px;height:26px;font-size:9px">' + ini(m.fr) + '\x3C/div>';
-  h += '<div><div class="tw6 tsm">' + esc(m.fr) + '\x3C/div><div class="ts tm">' + esc(m.role || '') + ' - ' + fmtD(m.dt) + '\x3C/div>\x3C/div>\x3C/div>';
-  h += '<div class="dv" style="margin:10px 0">\x3C/div>';
-  h += '<div class="tsm" style="line-height:1.7">' + esc(m.body) + '\x3C/div>';
-  h += '<div class="flex gap2 mt3"><button class="btn bs btn-sm" data-id="' + m.id + '" onclick="showReplyForm(this.dataset.id)">Yanitla\x3C/button>';
-  h += '<button class="btn bd btn-sm" data-id="' + m.id + '" onclick="delMsg(this.dataset.id)">Sil\x3C/button>\x3C/div>';
-  el.innerHTML = h;
+  var m=null; for(var i=0;i<messages.length;i++){if(messages[i].id===id){m=messages[i];break;}} if(!m)return;
+  m.rd=true; dbSaveMsg(m); updateBadges();
+  var el=document.getElementById('msg-det'); if(!el)return;
+  var h='<div class="tw6" style="font-size:15px;margin-bottom:6px">'+esc(m.sub)+'\x3C/div>';
+  h+='<div class="flex fca gap2 mb3"><div class="ava" style="width:26px;height:26px;font-size:9px">'+ini(m.fr)+'\x3C/div>';
+  h+='<div><div class="tw6 tsm">'+esc(m.fr)+'\x3C/div><div class="ts tm">'+esc(m.role||'')+' - '+fmtD(m.dt)+'\x3C/div>\x3C/div>\x3C/div>';
+  h+='<div class="dv" style="margin:10px 0">\x3C/div>';
+  h+='<div class="tsm" style="line-height:1.7">'+esc(m.body)+'\x3C/div>';
+  h+='<div class="flex gap2 mt3"><button class="btn bs btn-sm" data-id="'+m.id+'" onclick="showReplyForm(this.dataset.id)">Yanitla\x3C/button>';
+  h+='<button class="btn bd btn-sm" data-id="'+m.id+'" onclick="delMsg(this.dataset.id)">Sil\x3C/button>\x3C/div>';
+  el.innerHTML=h;
 }
+
 function showMsgForm() {
-  var h = '<div class="fg">';
-  h += '<div class="fgr"><label>Alici\x3C/label><input id="mf-to" type="text" placeholder="Ad Soyad"/>\x3C/div>';
-  h += '<div class="fgr"><label>Rol\x3C/label><select id="mf-role"><option>Veli\x3C/option><option>Antrenor\x3C/option><option>Sporcu\x3C/option>\x3C/select>\x3C/div>';
-  h += '<div class="fgr full"><label>Konu *\x3C/label><input id="mf-sub" type="text" placeholder="Mesaj konusu"/>\x3C/div>';
-  h += '<div class="fgr full"><label>Mesaj *\x3C/label><textarea id="mf-body" style="min-height:110px" placeholder="Mesaj...">\x3C/textarea>\x3C/div>';
-  h += '\x3C/div>';
-  modal('Yeni Mesaj', h, [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Gonder',cls:'bp',fn:'sendMsg()'}]);
+  var h='<div class="fg">'
+    +'<div class="fgr"><label>Alici\x3C/label><input id="mf-to" type="text" placeholder="Ad Soyad"/>\x3C/div>'
+    +'<div class="fgr"><label>Rol\x3C/label><select id="mf-role"><option>Veli\x3C/option><option>Antrenor\x3C/option><option>Sporcu\x3C/option>\x3C/select>\x3C/div>'
+    +'<div class="fgr full"><label>Konu *\x3C/label><input id="mf-sub" type="text" placeholder="Mesaj konusu"/>\x3C/div>'
+    +'<div class="fgr full"><label>Mesaj *\x3C/label><textarea id="mf-body" style="min-height:110px" placeholder="Mesaj...">\x3C/textarea>\x3C/div>'
+    +'\x3C/div>';
+  modal('Yeni Mesaj',h,[{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Gonder',cls:'bp',fn:'sendMsg()'}]);
 }
 function showReplyForm(id) {
-  var m = null; for (var i = 0; i < messages.length; i++) { if (messages[i].id === id) { m = messages[i]; break; } } if (!m) return;
-  var h = '<div class="fgr full"><label>Yanit *\x3C/label><textarea id="mf-body" style="min-height:110px" placeholder="Yanitiniz...">\x3C/textarea>\x3C/div>';
-  modal('RE: ' + m.sub, h, [{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Gonder',cls:'bp',fn:'sendReply("' + id + '")'}]);
+  var orig=null; for(var i=0;i<messages.length;i++){if(messages[i].id===id){orig=messages[i];break;}} if(!orig)return;
+  var h='<div class="fgr full"><label>Yanit *\x3C/label><textarea id="mf-body" style="min-height:110px" placeholder="Yanitiniz...">\x3C/textarea>\x3C/div>';
+  modal('RE: '+orig.sub,h,[{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Gonder',cls:'bp',fn:'sendReply("'+id+'")'}]);
 }
-function sendMsg() {
-  var sub = gv('mf-sub'), body = gv('mf-body');
-  if (!sub || !body) { toast('Konu ve mesaj zorunlu!', 'e'); return; }
-  messages.unshift({id:uid(),fr:'Admin',role:'Yonetici',to:gv('mf-to') || 'Tumu',sub:sub,body:body,dt:tod(),rd:true});
-  saveM(); closeModal(); go('messages'); toast('Mesaj gonderildi');
+async function sendMsg() {
+  var sub=gv('mf-sub'),body=gv('mf-body');
+  if(!sub||!body){toast('Konu ve mesaj zorunlu!','e');return;}
+  var m={id:uid(),fr:currentUser?currentUser.name:'Admin',role:'Yonetici',sub:sub,body:body,dt:tod(),rd:true};
+  messages.unshift(m); showLoading(); await dbSaveMsg(m); hideLoading();
+  closeModal(); go('messages'); toast('Mesaj gonderildi');
 }
-function sendReply(id) {
-  var m = null; for (var i = 0; i < messages.length; i++) { if (messages[i].id === id) { m = messages[i]; break; } } if (!m) return;
-  var body = gv('mf-body'); if (!body) { toast('Mesaj bos!', 'e'); return; }
-  messages.unshift({id:uid(),fr:'Admin',role:'Yonetici',to:m.fr,sub:'RE: ' + m.sub,body:body,dt:tod(),rd:true});
-  saveM(); closeModal(); go('messages'); toast('Yanit gonderildi');
+async function sendReply(id) {
+  var orig=null; for(var i=0;i<messages.length;i++){if(messages[i].id===id){orig=messages[i];break;}} if(!orig)return;
+  var body=gv('mf-body'); if(!body){toast('Mesaj bos!','e');return;}
+  var m={id:uid(),fr:currentUser?currentUser.name:'Admin',role:'Yonetici',sub:'RE: '+orig.sub,body:body,dt:tod(),rd:true};
+  messages.unshift(m); showLoading(); await dbSaveMsg(m); hideLoading();
+  closeModal(); go('messages'); toast('Yanit gonderildi');
 }
-function delMsg(id) {
-  var nm = []; for (var i = 0; i < messages.length; i++) { if (messages[i].id !== id) nm.push(messages[i]); }
-  messages = nm; saveM(); go('messages'); toast('Mesaj silindi');
+async function delMsg(id) {
+  messages=messages.filter(function(m){return m.id!==id;});
+  await dbDelMsg(id); go('messages'); toast('Mesaj silindi');
 }
 
+// ============================================================
+// PAGE: SETTINGS
+// ============================================================
 function pgSettings() {
-  var activeN = 0; for (var i = 0; i < athletes.length; i++) { if (athletes[i].st === 'active') activeN++; }
-  var h = '<div class="ph"><div class="stit">Ayarlar\x3C/div>\x3C/div>';
-  h += '<div class="g2">';
-  h += '<div class="card"><div class="tw6 mb3">Kurum Bilgileri\x3C/div>';
-  h += '<div class="fgr mb3"><label>Kurum Adi\x3C/label><input id="s-name" type="text" value="' + esc(settings.schoolName || '') + '"/>\x3C/div>';
-  h += '<button class="btn bp" onclick="saveSettings2()">Kaydet\x3C/button>\x3C/div>';
-  h += '<div class="card"><div class="tw6 mb3">Veri Yonetimi\x3C/div><div class="flex fcol gap2">';
-  h += '<button class="btn bs" onclick="exportAll()">Tum Veriyi Indir (JSON)\x3C/button>';
-  h += '<button class="btn bs" onclick="exportCSV(athletes,\'sporcular.csv\')">Sporcular CSV\x3C/button>';
-  h += '<button class="btn bs" onclick="exportCSV(payments,\'odemeler.csv\')">Odemeler CSV\x3C/button>';
-  h += '<button class="btn bs" onclick="importData()">Veri Yukle (JSON)\x3C/button>';
-  h += '<div class="dv">\x3C/div>';
-  h += '<button class="btn bd" onclick="resetAll()">Tum Verileri Sifirla\x3C/button>';
-  h += '\x3C/div>\x3C/div>';
-  h += '<div class="card"><div class="tw6 mb3">Istatistikler\x3C/div>';
-  h += row('Toplam Sporcu', athletes.length) + row('Aktif Sporcu', activeN) + row('Odeme Kaydi', payments.length) + row('Antrenor', coaches.length) + row('Mesaj', messages.length);
-  h += '\x3C/div>';
-  h += '<div class="card"><div class="tw6 mb3">Hesap\x3C/div>';
-  h += row('E-posta', 'admin@dragosfutbol.com') + row('Rol', 'Yonetici');
-  h += '<div class="dv">\x3C/div><button class="btn bd btn-sm" onclick="doLogout()">Cikis Yap\x3C/button>';
-  h += '\x3C/div>\x3C/div>';
+  var activeN=0; athletes.forEach(function(a){if(a.st==='active')activeN++;});
+  var orgUsers=getAllUsers().filter(function(u){return u.orgId===currentOrgId;});
+  var h='<div class="ph"><div class="stit">Ayarlar\x3C/div>\x3C/div>';
+  h+='<div class="g2">';
+  h+='<div class="card"><div class="tw6 mb3">Kurum Bilgileri\x3C/div>';
+  h+='<div class="fgr mb2"><label>Kurum Adi\x3C/label><input id="s-name" type="text" value="'+esc(settings.schoolName||'')+'"/>\x3C/div>';
+  h+='<div class="dv" style="margin:8px 0">\x3C/div>';
+  h+='<div class="tw6 tsm mb2" style="color:var(--yellow)">Havale / EFT Bilgileri</div>';
+  h+='<div class="fgr mb2"><label>Banka Adi\x3C/label><input id="s-bank" type="text" value="'+esc(settings.bankName||'')+'" placeholder="Ziraat Bankasi"/>\x3C/div>';
+  h+='<div class="fgr mb2"><label>Hesap Sahibi\x3C/label><input id="s-accname" type="text" value="'+esc(settings.accountName||'')+'" placeholder="Ad Soyad"/>\x3C/div>';
+  h+='<div class="fgr mb3"><label>IBAN\x3C/label><input id="s-iban" type="text" value="'+esc(settings.iban||'')+'" placeholder="TR00 0000..."/>\x3C/div>';
+  h+='<button class="btn bp" onclick="saveSettings2()">Kaydet\x3C/button>\x3C/div>';
+  h+='<div class="card"><div class="tw6 mb3">Istatistikler\x3C/div>';
+  h+=row('Toplam Sporcu',athletes.length)+row('Aktif Sporcu',activeN)+row('Odeme Kaydi',payments.length)+row('Antrenor',coaches.length)+row('Mesaj',messages.length);
+  h+='\x3C/div>';
+  // Users
+  h+='<div class="card" style="grid-column:1/-1"><div class="flex fca fjb mb3"><div class="tw6">Kurum Kullanicilari\x3C/div><button class="btn bp btn-sm" onclick="showAddUserForm()">+ Kullanici Ekle\x3C/button>\x3C/div>';
+  h+='<div class="tw"><table><thead><tr><th>Ad\x3C/th><th>E-posta\x3C/th><th>Rol\x3C/th><th>\x3C/th>\x3C/tr>\x3C/thead><tbody>';
+  orgUsers.forEach(function(u){
+    h+='<tr><td class="tsm tw6">'+esc(u.name||'-')+'\x3C/td><td class="tsm">'+esc(u.email)+'\x3C/td>';
+    h+='<td><span class="bg bg-b">'+esc(u.role)+'\x3C/span>\x3C/td>';
+    h+='<td>'+(u.id!==currentUser.id?'<button class="btn bd btn-xs" data-uid="'+u.id+'" onclick="delUser(this.dataset.uid)">Sil\x3C/button>':'<span class="ts tm">Aktif\x3C/span>')+'\x3C/td>\x3C/tr>';
+  });
+  h+='\x3C/tbody>\x3C/table>\x3C/div>\x3C/div>';
+  // Account
+  h+='<div class="card"><div class="tw6 mb3">Hesap Bilgileri\x3C/div>';
+  h+='<div class="fgr mb3"><label>E-posta\x3C/label><input id="s-email" type="email" value="'+esc(acct.email||'')+'"/>\x3C/div>';
+  h+='<div class="fgr mb3"><label>Yeni Sifre\x3C/label><input id="s-pass1" type="password" placeholder="Bos biraksan degismez"/>\x3C/div>';
+  h+='<div class="fgr mb3"><label>Sifre Tekrar\x3C/label><input id="s-pass2" type="password" placeholder="Sifreyi tekrar girin"/>\x3C/div>';
+  h+='<div class="flex gap2"><button class="btn bp" onclick="saveAcct()">Hesabi Kaydet\x3C/button> <button class="btn bd btn-sm" onclick="doLogout()">Cikis Yap\x3C/button>\x3C/div>';
+  h+='\x3C/div>\x3C/div>';
   return h;
 }
-function saveSettings2() {
-  settings.schoolName = gv('s-name') || settings.schoolName;
-  saveS();
-  var sn = document.getElementById('sn'); if (sn) sn.textContent = settings.schoolName.split(' ').slice(0, 2).join(' ');
+
+async function saveSettings2() {
+  settings.schoolName=gv('s-name')||settings.schoolName;
+  var b=gv('s-bank'); if(b)settings.bankName=b;
+  var an=gv('s-accname'); if(an)settings.accountName=an;
+  var ib=gv('s-iban'); if(ib)settings.iban=ib;
+  showLoading(); await saveS(); hideLoading();
+  var sn=document.getElementById('sn'); if(sn)sn.textContent=settings.schoolName.split(' ').slice(0,2).join(' ');
   toast('Ayarlar kaydedildi');
 }
-function resetAll() {
-  confirm2('TUM VERILER SIFIRLANSIN MI?', 'Bu islem geri alinamaz!', function () {
-    athletes = JSON.parse(JSON.stringify(DA));
-    payments = JSON.parse(JSON.stringify(DP));
-    coaches = JSON.parse(JSON.stringify(DC));
-    attData = {}; messages = JSON.parse(JSON.stringify(DM));
-    saveA(); saveP(); saveC(); saveAtt(); saveM();
-    go(curPage); toast('Veriler sifirlandi');
+
+async function saveAcct() {
+  var em=gv('s-email'),p1=gv('s-pass1'),p2=gv('s-pass2');
+  if(!em){toast('E-posta bos olamaz!','e');return;}
+  if(p1&&p1!==p2){toast('Sifreler eslesmiyor!','e');return;}
+  if(p1&&p1.length<4){toast('En az 4 karakter!','e');return;}
+  var upd={email:em}; if(p1)upd.pass=p1;
+  showLoading();
+  await supaPatch('users',upd,{id:currentUser.id});
+  currentUser.email=em; if(p1)currentUser.pass=p1;
+  acct.email=em; if(p1)acct.pass=p1;
+  hideLoading(); toast('Hesap guncellendi');
+}
+
+function showAddUserForm() {
+  var h='<div class="fg">'
+    +'<div class="fgr"><label>Ad Soyad *\x3C/label><input id="au-name" type="text"/>\x3C/div>'
+    +'<div class="fgr"><label>E-posta *\x3C/label><input id="au-em" type="email"/>\x3C/div>'
+    +'<div class="fgr"><label>Telefon\x3C/label><input id="au-phone" type="tel"/>\x3C/div>'
+    +'<div class="fgr"><label>Sifre *\x3C/label><input id="au-p1" type="password"/>\x3C/div>'
+    +'<div class="fgr"><label>Sifre Tekrar *\x3C/label><input id="au-p2" type="password"/>\x3C/div>'
+    +'<div class="fgr"><label>Rol\x3C/label><select id="au-role"><option value="admin">Admin\x3C/option><option value="staff">Personel\x3C/option>\x3C/select>\x3C/div>'
+    +'\x3C/div>';
+  modal('Yeni Kullanici',h,[{lbl:'Iptal',cls:'bs',fn:'closeModal()'},{lbl:'Ekle',cls:'bp',fn:'saveNewUser()'}]);
+}
+
+async function saveNewUser() {
+  var name=gv('au-name'),em=gv('au-em'),p1=gv('au-p1'),p2=gv('au-p2'),role=gv('au-role'),phone=gv('au-phone');
+  if(!name||!em||!p1){toast('Zorunlu alanlar eksik!','e');return;}
+  if(p1!==p2){toast('Sifreler eslesmiyor!','e');return;}
+  if(p1.length<4){toast('En az 4 karakter!','e');return;}
+  showLoading();
+  var existing=await supaGet('users',{email:em});
+  if(existing&&existing.length>0){hideLoading();toast('Bu e-posta kayitli!','e');return;}
+  var nu={id:'u-'+Date.now().toString(36),org_id:currentOrgId,email:em,pass:p1,role:role,name:name,phone:phone};
+  await supaPost('users',nu);
+  _usersCache.push({id:nu.id,orgId:currentOrgId,email:em,pass:p1,role:role,name:name,phone:phone});
+  hideLoading(); closeModal(); go('settings'); toast('Kullanici eklendi');
+}
+
+function delUser(uid2){
+  confirm2('Kullanici silinsin mi?','Bu islem geri alinamaz.',async function(){
+    await supaDelete('users',{id:uid2});
+    _usersCache=_usersCache.filter(function(u){return u.id!==uid2;});
+    go('settings'); toast('Kullanici silindi');
   });
 }
+
+// Sporcu portal - spChangePass with Supabase
+async function spChangePass() {
+  var p1=(document.getElementById('sp-p1')||{}).value||'';
+  var p2=(document.getElementById('sp-p2')||{}).value||'';
+  if(!p1){toast('Sifre bos olamaz!','e');return;}
+  if(p1!==p2){toast('Sifreler eslesmiyor!','e');return;}
+  if(p1.length<4){toast('En az 4 karakter!','e');return;}
+  for(var i=0;i<athletes.length;i++){
+    if(athletes[i].id===currentSporcu.id){athletes[i].spPass=p1;currentSporcu=athletes[i];break;}
+  }
+  showLoading(); await dbSaveAth(currentSporcu); hideLoading();
+  toast('Sifre guncellendi');
+}
+
+// Sporcu portal - havale submit with Supabase
+async function spSubmitHavale() {
+  var amt=parseFloat((document.getElementById('sp-amt')||{}).value||'0');
+  var desc=(document.getElementById('sp-desc')||{}).value||'Aidat';
+  var note=(document.getElementById('sp-havale-note')||{}).value||'';
+  if(!amt||amt<=0){toast('Gecerli bir tutar girin!','e');return;}
+  var a=currentSporcu;
+  var newPay={id:uid(),aid:a.id,an:a.fn+' '+a.ln,amt:amt,dt:tod(),ty:'income',cat:'Aidat',ds:desc,st:'pending',inv:'INV-'+Date.now(),payMethod:'havale',havaleNote:note,sporcuName:a.fn+' '+a.ln,sporcuTC:a.tc,needsApproval:true};
+  payments.unshift(newPay);
+  showLoading(); await dbSavePay(newPay); hideLoading();
+  toast('Havale bildirimi gonderildi! Admin onayini bekleyin.');
+  spTab('odemeler');
+}
+
+// Forgot password - update with Supabase
+async function fpSetNewPassword() {
+  var p1=(document.getElementById('fp-np1')||{}).value||'';
+  var p2=(document.getElementById('fp-np2')||{}).value||'';
+  var errEl=document.getElementById('fp-new-err');
+  function showErrFp(m){errEl.textContent=m;errEl.classList.remove('dn');}
+  if(!p1){showErrFp('Sifre bos!');return;}
+  if(p1!==p2){showErrFp('Sifreler eslesmiyor!');return;}
+  if(p1.length<4){showErrFp('En az 4 karakter!');return;}
+  showLoading();
+  if(_forgotCtx.type==='admin'){
+    await supaPatch('users',{pass:p1},{id:_forgotCtx.target.id});
+  } else {
+    await supaPatch('athletes',{sp_pass:p1},{id:_forgotCtx.target.id});
+  }
+  hideLoading(); _forgotCtx=null;
+  var box=document.getElementById('login');
+  box.innerHTML='<div class="lbox" style="max-width:400px"><div class="llogo"><div class="llogo-i">&#x2705;\x3C/div><h1 style="font-weight:800;font-size:18px">Sifre Guncellendi!\x3C/div><p style="color:var(--text3);font-size:13px;margin-top:3px">Yeni sifrenizle giris yapabilirsiniz.\x3C/p>\x3C/div><button class="btn bp w100" style="margin-top:16px" onclick="location.reload()">Giris Yap\x3C/button>\x3C/div>';
+}
+
+// Sporcu login - search Supabase
+async function doSporcuLogin() {
+  var tc=(document.getElementById('ls-tc')||{}).value||'';
+  var pass=(document.getElementById('ls-pass')||{}).value||'';
+  var errEl=document.getElementById('ls-err');
+  tc=tc.trim(); pass=pass.trim();
+  showLoading();
+  try {
+    var results=await supaGet('athletes',{tc:tc});
+    hideLoading();
+    var foundAth=null, foundOrgId=null;
+    (results||[]).forEach(function(r){
+      var expectedPass=r.sp_pass||tc.slice(-4);
+      if(pass===expectedPass){foundAth=dbToAth(r);foundOrgId=r.org_id;}
+    });
+    if(foundAth){
+      currentSporcu=foundAth; currentSporcuOrgId=foundOrgId;
+      currentOrgId=foundOrgId;
+      await loadOrgData();
+      document.getElementById('login').style.display='none';
+      document.getElementById('sporcu-portal').style.display='block';
+      var av=document.getElementById('sp-avatar'); if(av)av.textContent=(foundAth.fn[0]||'S').toUpperCase();
+      var orgs=await supaGet('orgs',{id:foundOrgId});
+      var orgName=orgs&&orgs[0]?orgs[0].name:'Akademi';
+      var on=document.getElementById('sp-orgname'); if(on)on.textContent=orgName;
+      errEl.classList.add('dn');
+      spTab('profil');
+    } else {
+      errEl.classList.remove('dn');
+    }
+  } catch(e){
+    hideLoading(); errEl.classList.remove('dn');
+  }
+}
+
 </script>
 </body>
 </html>
