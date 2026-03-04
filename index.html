@@ -143,6 +143,13 @@ textarea{resize:vertical;min-height:65px}
   .g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.g21{grid-template-columns:1fr}
   .fg{grid-template-columns:1fr}.fgr.full{grid-column:1}
 }
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-box{background:var(--bg2);border-radius:16px 16px 0 0;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column}
+.modal-hd{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-body{padding:16px;overflow-y:auto;flex:1}
+.modal-ft{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.modal-x{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px}
 </style>
 </head>
 <body>
@@ -180,7 +187,14 @@ textarea{resize:vertical;min-height:65px}
   <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite"></div>
   <div style="color:var(--text2);font-size:13px" id="loading-msg">Yukleniyor...</div>
 </div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<style>@keyframes spin{to{transform:rotate(360deg)}}.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-box{background:var(--bg2);border-radius:16px 16px 0 0;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column}
+.modal-hd{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-body{padding:16px;overflow-y:auto;flex:1}
+.modal-ft{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.modal-x{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px}
+</style>
 <div id="sporcu-portal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;overflow-y:auto;-webkit-overflow-scrolling:touch">
   <div style="max-width:600px;margin:0 auto;padding:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:16px;border-bottom:1px solid var(--border)">
@@ -194,10 +208,10 @@ textarea{resize:vertical;min-height:65px}
       </div>
     </div>
     <div id="sp-tabs" style="display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:16px;gap:2px">
-      <button class="sp-tab-btn active" onclick="spTab('profil')" id="sptab-profil" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--blue2);color:#fff">Profil</button>
-      <button class="sp-tab-btn" onclick="spTab('yoklama')" id="sptab-yoklama" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Yoklama</button>
-      <button class="sp-tab-btn" onclick="spTab('odemeler')" id="sptab-odemeler" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Odemeler</button>
-      <button class="sp-tab-btn" onclick="spTab('odeme-yap')" id="sptab-odeme-yap" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Odeme Yap</button>
+      <button class="sp-tab-btn active" onclick="spTab(&quot;profil&quot;)" id="sptab-profil" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:var(--blue2);color:#fff">Profil</button>
+      <button class="sp-tab-btn" onclick="spTab(&quot;yoklama&quot;)" id="sptab-yoklama" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Yoklama</button>
+      <button class="sp-tab-btn" onclick="spTab(&quot;odemeler&quot;)" id="sptab-odemeler" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Odemeler</button>
+      <button class="sp-tab-btn" onclick="spTab(&quot;odeme-yap&quot;)" id="sptab-odeme-yap" style="flex:1;padding:7px 4px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3)">Odeme Yap</button>
     </div>
     <div id="sp-content"></div>
   </div>
@@ -233,7 +247,7 @@ textarea{resize:vertical;min-height:65px}
   </div>
   <div id="main">
     <div id="bar">
-      <button class="hbg" onclick="toggleSide()"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <button class="hbg" onclick="openSide()"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="btitle" id="btit">Gosterge Paneli</div>
       <div style="position:relative">
         <button class="ibtn" onclick="toggleNotif()" id="nbtn"><svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span class="dot dn" id="ndot"></span></button>
@@ -251,6 +265,16 @@ textarea{resize:vertical;min-height:65px}
         <button class="bni-btn" id="bn-coaches" onclick="go('coaches')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Antrenor</button>
       </div>
     </div>
+  </div>
+</div>
+<div id="modal" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <div class="tw6" id="modal-title">Modal</div>
+      <button class="modal-x" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft" id="modal-footer"></div>
   </div>
 </div>
 <div id="mc"></div>
@@ -858,7 +882,7 @@ function spOdemeler() {
   var a = currentSporcu;
   var list = payments.filter(function(p){ return p.aid === a.id; }).sort(function(a,b){ return new Date(b.dt)-new Date(a.dt); });
   var h = '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Odeme Gecmisi</div>';
-  h += '<button class="btn bp btn-sm" onclick="spTab(\'odeme-yap\')">Odeme Yap</button></div>';
+  h += '<button class="btn bp btn-sm" onclick="spTab(&quot;odeme-yap&quot;)">Odeme Yap</button></div>';
   if (!list.length) { h += '<div style="text-align:center;padding:30px;color:var(--text3)">Odeme kaydi yok</div>'; }
   else {
     h += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Aciklama</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>';
@@ -897,9 +921,9 @@ function spOdemeYap() {
 
   h += '<div class="tw6 tsm mb2" style="margin-top:16px">Odeme Yontemi</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">';
-  h += '<div id="pm-kk" onclick="selectPayMethod(\'kk\')" style="border:2px solid var(--blue);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:rgba(88,166,255,.08)">';
+  h += '<div id="pm-kk" onclick="selectPayMethod(&quot;kk&quot;)" style="border:2px solid var(--blue);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:rgba(88,166,255,.08)">';
   h += '<div style="font-size:22px">&#x1F4B3;</div><div class="tsm tw6" style="margin-top:6px">Kredi/Banka Karti</div><div class="ts tm">(PayTR - Yakin zamanda)</div></div>';
-  h += '<div id="pm-havale" onclick="selectPayMethod(\'havale\')" style="border:2px solid var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer">';
+  h += '<div id="pm-havale" onclick="selectPayMethod(&quot;havale&quot;)" style="border:2px solid var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer">';
   h += '<div style="font-size:22px">&#x1F3E6;</div><div class="tsm tw6" style="margin-top:6px">Havale / EFT</div><div class="ts tm">Admin onayÄ± gerekir</div></div>';
   h += '</div>';
 
@@ -1082,9 +1106,13 @@ function go(pg) {
   else if (pg === 'coaches') main.innerHTML = pgCoaches();
   else if (pg === 'messages') main.innerHTML = pgMessages();
   else if (pg === 'settings') main.innerHTML = pgSettings();
-  // Update nav active states
-  document.querySelectorAll('[data-pg]').forEach(function(el){
-    el.classList.toggle('active', el.dataset.pg === pg);
+  // Update sidebar nav
+  document.querySelectorAll('.ni').forEach(function(el){
+    el.classList.toggle('on', el.getAttribute('onclick') === "go('"+pg+"')");
+  });
+  // Update bottom nav
+  document.querySelectorAll('.bni-btn').forEach(function(el){
+    el.classList.toggle('on', el.getAttribute('onclick') === "go('"+pg+"')");
   });
   closeSide();
 }
@@ -1134,10 +1162,12 @@ function closeModal() {
   if (m) m.classList.remove('show');
 }
 
+var _confirmCb = null;
 function confirm2(title, msg, cb) {
+  _confirmCb = cb;
   modal(title, '<p style="color:var(--text2);font-size:14px">' + msg + '</p>', [
     {lbl:'Vazgec', cls:'bs', fn:'closeModal()'},
-    {lbl:'Evet, Devam Et', cls:'bd', fn:'closeModal();(' + cb.toString() + ')()'}
+    {lbl:'Evet, Devam Et', cls:'bd', fn:'closeModal();if(_confirmCb){_confirmCb();_confirmCb=null;}'}
   ]);
 }
 
@@ -1171,7 +1201,7 @@ function pgDashboard() {
   h += '\x3C/div>';
   // Recent athletes
   h += '<div class="g21 mb3">';
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Sporcular\x3C/div><button class="btn bp btn-sm" onclick="go(\'athletes\')">Tumu\x3C/button>\x3C/div>';
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Sporcular\x3C/div><button class="btn bp btn-sm" onclick="go(&quot;athletes&quot;)">Tumu\x3C/button>\x3C/div>';
   var shown = 0;
   for (var i = 0; i < athletes.length && shown < 5; i++) {
     var a = athletes[i];
@@ -1183,7 +1213,7 @@ function pgDashboard() {
   if (!shown) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Sporcu yok\x3C/div>';
   h += '\x3C/div>';
   // Recent payments
-  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Odemeler\x3C/div><button class="btn bp btn-sm" onclick="go(\'payments\')">Tumu\x3C/button>\x3C/div>';
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Odemeler\x3C/div><button class="btn bp btn-sm" onclick="go(&quot;payments&quot;)">Tumu\x3C/button>\x3C/div>';
   var shownP = 0;
   for (var i = 0; i < payments.length && shownP < 5; i++) {
     var p = payments[i];
@@ -1198,7 +1228,7 @@ function pgDashboard() {
 
 function sc(color, icon, val, label, pg) {
   var cls = color === 'b' ? 'stat-b' : color === 'g' ? 'stat-g' : color === 'r' ? 'stat-r' : 'stat-y';
-  return '<div class="card stat-card ' + cls + '" ' + (pg?'onclick="go(\''+pg+'\')" style="cursor:pointer"':'') + '>'
+  return '<div class="card stat-card ' + cls + '" ' + (pg?'onclick="go(&quot;&quot;+pg+&quot;&quot;)" style="cursor:pointer"':'') + '>'
     + '<div class="stat-icon">' + icon + '\x3C/div>'
     + '<div class="stat-val">' + val + '\x3C/div>'
     + '<div class="stat-lbl">' + label + '\x3C/div>\x3C/div>';
@@ -1219,9 +1249,9 @@ function pgAthletes() {
   });
   var h = '<div class="ph"><div class="sh"><div><div class="stit">Sporcular\x3C/div><div class="ssub">' + filtered.length + ' / ' + athletes.length + ' sporcu\x3C/div>\x3C/div>';
   h += '<button class="btn bp btn-sm" onclick="showAthForm(null)">+ Sporcu Ekle\x3C/button>\x3C/div>\x3C/div>';
-  h += '<div class="filters mb3"><input class="fs" type="text" placeholder="Ara..." value="' + esc(_athFilter.q) + '" oninput="_athFilter.q=this.value;go(\'athletes\')">';
-  h += '<select class="fs" onchange="_athFilter.st=this.value;go(\'athletes\')"><option value="">Tum Durumlar\x3C/option><option value="active"' + (_athFilter.st==='active'?' selected':'') + '>Aktif\x3C/option><option value="inactive"' + (_athFilter.st==='inactive'?' selected':'') + '>Pasif\x3C/option>\x3C/select>';
-  h += '<select class="fs" onchange="_athFilter.sp=this.value;go(\'athletes\')"><option value="">Tum Sporlar\x3C/option>';
+  h += '<div class="filters mb3"><input class="fs" type="text" placeholder="Ara..." value="' + esc(_athFilter.q) + '" oninput="_athFilter.q=this.value;go(&quot;athletes&quot;)">';
+  h += '<select class="fs" onchange="_athFilter.st=this.value;go(&quot;athletes&quot;)"><option value="">Tum Durumlar\x3C/option><option value="active"' + (_athFilter.st==='active'?' selected':'') + '>Aktif\x3C/option><option value="inactive"' + (_athFilter.st==='inactive'?' selected':'') + '>Pasif\x3C/option>\x3C/select>';
+  h += '<select class="fs" onchange="_athFilter.sp=this.value;go(&quot;athletes&quot;)"><option value="">Tum Sporlar\x3C/option>';
   sports.forEach(function(s){ h += '<option value="'+esc(s)+'"'+((_athFilter.sp===s)?' selected':'')+'>'+esc(s)+'\x3C/option>'; });
   h += '\x3C/select>\x3C/div>';
   h += '<div class="tw mb3"><table><thead><tr><th>Sporcu\x3C/th><th>Dal\x3C/th><th>Antrenor\x3C/th><th>Ucret\x3C/th><th>Durum\x3C/th><th>\x3C/th>\x3C/tr>\x3C/thead><tbody>';
@@ -1457,26 +1487,26 @@ function pgAttendance() {
   var day=attData[ATD]||{}, present=0, absent=0, late=0;
   list.forEach(function(a){var v=day[a.id];if(v==='P')present++;else if(v==='A')absent++;else if(v==='L')late++;});
   var h='<div class="ph"><div class="sh"><div><div class="stit">Devam Takibi\x3C/div><div class="ssub">Gunluk yoklama\x3C/div>\x3C/div>';
-  h+='<div class="flex gap2 fwrap"><select class="fs" onchange="ATSP=this.value;go(\'attendance\')"><option value="">Tum Sporlar\x3C/option>';
+  h+='<div class="flex gap2 fwrap"><select class="fs" onchange="ATSP=this.value;go(&quot;attendance&quot;)"><option value="">Tum Sporlar\x3C/option>';
   sports.forEach(function(s){h+='<option value="'+esc(s)+'"'+(ATSP===s?' selected':'')+'>'+esc(s)+'\x3C/option>';});
-  h+='<\/select><input type="date" class="fs" value="'+ATD+'" onchange="ATD=this.value;go(\'attendance\')"/>\x3C/div>\x3C/div>\x3C/div>';
+  h+='<\/select><input type="date" class="fs" value="'+ATD+'" onchange="ATD=this.value;go(&quot;attendance&quot;)"/>\x3C/div>\x3C/div>\x3C/div>';
   h+='<div class="g4 mb3">';
   h+=sc('g','OK',present,'Katildi',''); h+=sc('r','X',absent,'Katilmadi','');
   h+=sc('y','~',late,'Gec Geldi',''); h+=sc('b','?',list.length-present-absent-late,'Isaretlenmedi','');
   h+='\x3C/div>';
   h+='<div class="g21">';
   h+='<div class="card"><div class="flex fca fjb mb3"><div class="tw6">'+fmtD(ATD)+' Yoklamasi\x3C/div>';
-  h+='<div class="flex gap2"><button class="btn bsu btn-xs" onclick="markAllAtt(\'P\')">Tumunu Var\x3C/button>';
-  h+='<button class="btn bd btn-xs" onclick="markAllAtt(\'A\')">Tumunu Yok\x3C/button>\x3C/div>\x3C/div>';
+  h+='<div class="flex gap2"><button class="btn bsu btn-xs" onclick="markAllAtt(&quot;P&quot;)">Tumunu Var\x3C/button>';
+  h+='<button class="btn bd btn-xs" onclick="markAllAtt(&quot;A&quot;)">Tumunu Yok\x3C/button>\x3C/div>\x3C/div>';
   if(!list.length)h+='<div style="text-align:center;padding:30px;color:var(--text3)">Aktif sporcu yok\x3C/div>';
   list.forEach(function(a){
     var s2=day[a.id]||'';
     h+='<div class="att-row"><div class="ava" style="width:28px;height:28px;font-size:10px;flex-shrink:0">'+ini(a.fn+' '+a.ln)+'\x3C/div>';
     h+='<div style="flex:1"><div class="tw6 tsm">'+esc(a.fn)+' '+esc(a.ln)+'\x3C/div><div class="ts tm">'+esc(a.sp)+'\x3C/div>\x3C/div>';
     h+='<div class="att-btns">';
-    h+='<button class="att-b'+(s2==='P'?' ap':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,\'P\')">VAR\x3C/button>';
-    h+='<button class="att-b'+(s2==='L'?' al2':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,\'L\')">GEC\x3C/button>';
-    h+='<button class="att-b'+(s2==='A'?' aa':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,\'A\')">YOK\x3C/button>';
+    h+='<button class="att-b'+(s2==='P'?' ap':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,&quot;P&quot;)">VAR\x3C/button>';
+    h+='<button class="att-b'+(s2==='L'?' al2':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,&quot;L&quot;)">GEC\x3C/button>';
+    h+='<button class="att-b'+(s2==='A'?' aa':'')+'" data-id="'+a.id+'" onclick="setAtt(this.dataset.id,&quot;A&quot;)">YOK\x3C/button>';
     h+='\x3C/div>\x3C/div>';
   });
   h+='\x3C/div>';
