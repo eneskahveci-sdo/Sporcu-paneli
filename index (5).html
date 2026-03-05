@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#080c14"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Sporcu Paneli</title>
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;Sporcu Paneli&quot;,&quot;short_name&quot;:&quot;Sporcu&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#080c14&quot;,&quot;theme_color&quot;:&quot;#3b82f6&quot;}"/>
+<style>
+:root{--bg:#080c14;--bg2:#0f1623;--bg3:#151e2d;--bg4:#1a2540;--border:#1e3352;--border2:#2a4a7f;--text:#e2e8f0;--text2:#94a3b8;--text3:#475569;--blue:#3b82f6;--blue2:#60a5fa;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--purple:#a855f7;--cyan:#06b6d4;--grad:linear-gradient(135deg,#3b82f6,#8b5cf6);--grad2:linear-gradient(135deg,#22c55e,#06b6d4);--shadow:0 4px 24px rgba(0,0,0,.4);--shadow2:0 8px 32px rgba(59,130,246,.2)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+input,select,textarea{background:var(--bg3);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;padding:10px 13px;width:100%;outline:none;font-family:inherit;transition:.2s}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);background:var(--bg4);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+textarea{resize:vertical;min-height:80px}
+label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.btn{border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;padding:9px 16px;transition:.15s;letter-spacing:.2px;white-space:nowrap}
+.bp{background:var(--grad);color:#fff;box-shadow:var(--shadow2)}.bp:active{transform:scale(.96)}
+.bs{background:var(--bg3);color:var(--text);border:1.5px solid var(--border)}.bs:hover{border-color:var(--blue2)}
+.bd{background:rgba(239,68,68,.1);color:var(--red);border:1.5px solid rgba(239,68,68,.2)}.bd:hover{background:rgba(239,68,68,.2)}
+.bsu{background:rgba(34,197,94,.1);color:var(--green);border:1.5px solid rgba(34,197,94,.2)}.bsu:hover{background:rgba(34,197,94,.2)}
+.by{background:rgba(245,158,11,.1);color:var(--yellow);border:1.5px solid rgba(245,158,11,.2)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}.btn-xs{padding:3px 9px;font-size:11px;border-radius:6px}
+.w100{width:100%}
+.card{background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px;transition:.2s}
+.dv{height:1px;background:var(--border);margin:12px 0}.dn{display:none!important}
+.flex{display:flex}.fca{align-items:center}.fjb{justify-content:space-between}.fwrap{flex-wrap:wrap}
+.gap1{gap:6px}.gap2{gap:10px}.gap3{gap:14px}.gap4{gap:20px}
+.mb2{margin-bottom:8px}.mb3{margin-bottom:14px}.mt2{margin-top:8px}.mt3{margin-top:14px}
+.tw{overflow-x:auto}.tw table{width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
+.tw th,.tw td{padding:11px 13px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.tw th{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:var(--bg3)}
+.tw td{font-size:13px}.tw tr:last-child td{border-bottom:none}.tw tr:hover td{background:rgba(59,130,246,.03)}
+.tsm{font-size:12px}.ts{font-size:11px}.tm{color:var(--text2)}.tw6{font-weight:600}
+.tg{color:var(--green)}.tr2{color:var(--red)}.ty{color:var(--yellow)}.tb{color:var(--blue2)}.tp{color:var(--purple)}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bg{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.bg-g{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.bg-r{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.bg-y{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.bg-b{background:rgba(59,130,246,.12);color:var(--blue2);border:1px solid rgba(59,130,246,.2)}
+.bg-p{background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+.ava{width:36px;height:36px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 2px 8px rgba(59,130,246,.25)}
+.stat-card{cursor:pointer;transition:.2s;position:relative;overflow:hidden}.stat-card:active{transform:scale(.97)}
+.stat-icon{font-size:24px;margin-bottom:8px}.stat-val{font-size:22px;font-weight:800;margin-bottom:3px}.stat-lbl{font-size:12px;color:var(--text2)}
+.stat-b{border-color:rgba(59,130,246,.3);background:linear-gradient(135deg,var(--bg2),rgba(59,130,246,.06))}
+.stat-g{border-color:rgba(34,197,94,.3);background:linear-gradient(135deg,var(--bg2),rgba(34,197,94,.06))}
+.stat-r{border-color:rgba(239,68,68,.3);background:linear-gradient(135deg,var(--bg2),rgba(239,68,68,.06))}
+.stat-y{border-color:rgba(245,158,11,.3);background:linear-gradient(135deg,var(--bg2),rgba(245,158,11,.06))}
+.al{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.al-r{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red)}
+.al-y{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--yellow)}
+.al-g{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:var(--green)}
+.al-b{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);color:var(--blue2)}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fgr{display:flex;flex-direction:column}.fgr.full{grid-column:1/-1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g21{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.fs{background:var(--bg3);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;padding:8px 11px;flex:1;min-width:120px;outline:none;transition:.2s}
+.fs:focus{border-color:var(--blue)}
+.att-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.att-row:last-child{border-bottom:none}
+.att-btns{display:flex;gap:4px}
+.att-b{border:1.5px solid var(--border);background:var(--bg3);color:var(--text2);border-radius:7px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.att-b.ap{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green)}
+.att-b.aa{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red)}
+.att-b.al2{background:rgba(245,158,11,.15);border-color:var(--yellow);color:var(--yellow)}
+.pr{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.prb{height:100%;border-radius:3px;transition:.5s}
+.prb-g{background:linear-gradient(90deg,#16a34a,var(--green))}.prb-y{background:linear-gradient(90deg,#d97706,var(--yellow))}.prb-r{background:linear-gradient(90deg,#dc2626,var(--red))}
+.dr{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.dr:last-child{border-bottom:none}.dl{font-size:13px}.dvl{font-size:14px}
+.ph{margin-bottom:18px}.stit{font-size:20px;font-weight:800;letter-spacing:-.3px}.ssub{font-size:13px;color:var(--text2);margin-top:3px}
+.sh{display:flex;align-items:center;justify-content:space-between}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);border:1.5px solid var(--border);border-radius:12px;padding:11px 20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-e{border-color:rgba(239,68,68,.4);color:var(--red)}.toast-g{border-color:rgba(34,197,94,.4);color:var(--green)}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-box{background:var(--bg2);border:1.5px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:600px;max-height:92vh;display:flex;flex-direction:column}
+.modal-hd{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-body{padding:16px 18px;overflow-y:auto;flex:1}
+.modal-ft{padding:13px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.modal-x{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-size:16px;cursor:pointer;padding:4px 9px;border-radius:8px}
+#wrap{display:flex;flex-direction:column;flex:1;overflow:hidden}
+#side{position:fixed;left:-270px;top:0;bottom:0;width:260px;background:var(--bg2);border-right:1.5px solid var(--border);z-index:200;transition:.28s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column}
+#side.open{left:0;box-shadow:4px 0 40px rgba(0,0,0,.6)}
+#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:150}
+#overlay.show{display:block}
+.slogo{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.slogo-icon{width:38px;height:38px;background:var(--grad);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.snav{padding:10px 8px;flex:1}
+.nsec{font-size:10px;color:var(--text3);font-weight:700;padding:10px 10px 5px;text-transform:uppercase;letter-spacing:1px}
+.ni{display:flex;align-items:center;gap:10px;width:100%;padding:10px 11px;border-radius:10px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;text-align:left;transition:.15s;margin-bottom:2px}
+.ni svg{width:17px;height:17px;flex-shrink:0}
+.ni:hover{background:rgba(59,130,246,.08);color:var(--text)}
+.ni.on{background:rgba(59,130,246,.12);color:var(--blue2);font-weight:600}
+.ni .badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px}
+#bar{display:flex;align-items:center;gap:10px;padding:11px 16px;background:rgba(8,12,20,.95);border-bottom:1.5px solid var(--border);flex-shrink:0}
+.hbg{background:var(--bg3);border:1.5px solid var(--border);color:var(--text2);cursor:pointer;padding:7px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:.15s}
+#bnav{background:rgba(8,12,20,.97);border-top:1.5px solid var(--border);flex-shrink:0;padding:4px 0 8px}
+.bni{display:flex;justify-content:space-around}
+.bni-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;padding:7px 8px;border-radius:10px;min-width:52px;transition:.15s}
+.bni-btn svg{width:21px;height:21px}
+.bni-btn.on{color:var(--blue2)}
+.bni-dot{display:none;width:7px;height:7px;border-radius:50%;background:var(--red);margin-top:-16px;margin-right:-14px;border:2px solid var(--bg);align-self:flex-end}
+#sporcu-portal{display:none;flex-direction:column;height:100vh;overflow:hidden}
+.sp-hd{background:var(--bg2);border-bottom:1.5px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.sp-tabs{display:flex;background:var(--bg3);border-bottom:1.5px solid var(--border);flex-shrink:0}
+.sp-tab{flex:1;padding:12px 4px;text-align:center;font-size:12px;font-weight:700;color:var(--text2);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+.sp-tab.on{color:var(--blue2);border-bottom-color:var(--blue)}
+.sp-body{flex:1;overflow-y:auto;padding:14px}
+#lbox-wrap{position:fixed;inset:0;background:radial-gradient(ellipse at top,#0d1f40,var(--bg));display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.lbox{background:var(--bg2);border:1.5px solid var(--border);border-radius:20px;padding:30px 24px;width:100%;max-width:420px;box-shadow:var(--shadow)}
+.llogo{text-align:center;margin-bottom:26px}
+.llogo-i{width:68px;height:68px;background:var(--grad);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 14px;box-shadow:var(--shadow2)}
+.ltabs{display:flex;background:var(--bg3);border-radius:12px;padding:3px;margin-bottom:20px;border:1px solid var(--border)}
+.ltab{flex:1;padding:9px;text-align:center;border-radius:9px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+.ltab.on{background:var(--bg4);color:var(--text)}
+.lerr{background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);color:var(--red);border-radius:10px;padding:10px 13px;font-size:13px;margin-bottom:12px}
+#loading-overlay{display:none;position:fixed;inset:0;background:rgba(8,12,20,.9);z-index:9990;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.spin{width:38px;height:38px;border:3px solid var(--bg3);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+.quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.qa-btn{background:var(--bg3);border:1.5px solid var(--border);border-radius:12px;padding:12px 6px;text-align:center;cursor:pointer;transition:.2s;display:flex;flex-direction:column;align-items:center;gap:6px}
+.qa-btn:active{transform:scale(.95)}
+.qa-icon{font-size:20px}.qa-lbl{font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.3px}
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:48px;padding-top:4px}
+.mc-bar{flex:1;border-radius:3px 3px 0 0;min-height:3px;transition:.5s}
+.profile-hero{background:linear-gradient(135deg,var(--bg3),var(--bg4));border:1.5px solid var(--border);border-radius:16px;padding:20px;margin-bottom:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.anim{animation:slideUp .2s ease-out}
+.sms-code{display:flex;gap:8px;justify-content:center;margin:16px 0}
+.sms-digit{width:44px;height:52px;background:var(--bg3);border:2px solid var(--border);border-radius:10px;color:var(--text);font-size:22px;font-weight:700;text-align:center;outline:none;transition:.2s}
+.sms-digit:focus{border-color:var(--blue);background:var(--bg4)}
+@media(max-width:600px){
+  .g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.g21{grid-template-columns:1fr}
+  .fg{grid-template-columns:1fr}.fgr.full{grid-column:1}
+}
+</style>
+</head>
+<body>
+<div id="loading-overlay"><div class="spin"></div><div style="color:var(--text2);font-size:13px;font-weight:600">Yukleniyor...</div></div>
+<div id="lbox-wrap">
+  <div class="lbox">
+    <div class="llogo">
+      <div class="llogo-i">&#x26BD;</div>
+      <h1 style="font-size:22px;font-weight:800;letter-spacing:-.5px">Sporcu Paneli</h1>
+      <p style="color:var(--text2);font-size:13px;margin-top:4px">Akademi Yonetim Sistemi</p>
+    </div>
+    <div class="ltabs">
+      <button class="ltab on" onclick="switchLoginTab('admin')">Kurum Girisi</button>
+      <button class="ltab" onclick="switchLoginTab('sporcu')">Sporcu / Veli</button>
+    </div>
+    <div id="login-admin">
+      <div class="fgr mb3"><label>E-posta</label><input id="le" type="email" placeholder="ornek@email.com" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div class="fgr mb3"><label>Sifre</label><input id="lp" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div id="lerr" class="lerr dn"></div>
+      <button class="btn bp w100 mb3" style="padding:12px" onclick="doLogin()">Giris Yap</button>
+      <div style="text-align:center;font-size:13px;color:var(--text2)">
+        <span onclick="showForgotPassword()" style="cursor:pointer;color:var(--blue2)">Sifremi Unuttum</span>
+        &nbsp;·&nbsp;
+        <span onclick="showRegister()" style="cursor:pointer;color:var(--blue2);font-weight:600">Kayit Ol</span>
+      </div>
+    </div>
+    <div id="login-sporcu" class="dn">
+      <div class="fgr mb3"><label>TC Kimlik No</label><input id="ls-tc" type="tel" maxlength="11" placeholder="11 haneli TC" onkeydown="if(event.key==='Enter')doSporcuLogin()"/></div>
+      <div class="fgr mb3"><label>Sifre</label><input id="ls-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSporcuLogin()"/></div>
+      <div id="ls-err" class="lerr dn">TC veya sifre hatali!</div>
+      <button class="btn bp w100 mb3" style="padding:12px" onclick="doSporcuLogin()">Giris Yap</button>
+      <div style="text-align:center;font-size:13px"><span onclick="showForgotPassword()" style="cursor:pointer;color:var(--blue2)">Sifremi Unuttum</span></div>
+    </div>
+  </div>
+</div>
+<div id="sporcu-portal">
+  <div class="sp-hd">
+    <div class="ava" id="sp-avatar">S</div>
+    <div style="flex:1"><div class="tw6" id="sp-name">Sporcu</div><div style="font-size:11px;color:var(--text2)" id="sp-orgname">Akademi</div></div>
+    <button class="btn bs btn-sm" onclick="doSporcuLogout()">Cikis</button>
+  </div>
+  <div class="sp-tabs">
+    <button class="sp-tab on" onclick="spTab('profil')">&#x1F464; Profil</button>
+    <button class="sp-tab" onclick="spTab('yoklama')">&#x1F4CB; Yoklama</button>
+    <button class="sp-tab" onclick="spTab('odemeler')">&#x1F4B3; Odemeler</button>
+    <button class="sp-tab" onclick="spTab('odeme-yap')">&#x1F4B8; Odeme Yap</button>
+    <button class="sp-tab" onclick="spTab('duyurular')">&#x1F4E3; Duyurular</button>
+  </div>
+  <div class="sp-body" id="sp-content"></div>
+</div>
+<div id="wrap" class="dn">
+  <div id="overlay" onclick="closeSide()"></div>
+  <div id="side">
+    <div class="slogo">
+      <div class="slogo-icon" id="side-logo-icon">&#x26BD;</div>
+      <img id="side-logo-img" style="display:none;height:34px;border-radius:9px;object-fit:contain" src="" alt="Logo"/>
+      <div><div style="font-weight:700;font-size:13px" id="sn">Akademi</div><div style="font-size:11px;color:var(--text3)" id="sn2">Yonetim</div></div>
+    </div>
+    <nav class="snav">
+      <div class="nsec">Ana Menu</div>
+      <button class="ni on" id="ni-dashboard" onclick="go('dashboard')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Gosterge</button>
+      <button class="ni" id="ni-athletes" onclick="go('athletes')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Sporcular</button>
+      <button class="ni" id="ni-payments" onclick="go('payments')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Odemeler<span class="badge dn" id="badge-pay">0</span></button>
+      <button class="ni" id="ni-accounting" onclick="go('accounting')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Muhasebe</button>
+      <button class="ni" id="ni-attendance" onclick="go('attendance')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Devam</button>
+      <button class="ni" id="ni-coaches" onclick="go('coaches')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>Antrenorler</button>
+      <button class="ni" id="ni-messages" onclick="go('messages')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Mesajlar<span class="badge dn" id="badge-msg">0</span></button>
+            <div class="nsec">Yonetim</div>
+      <button class="ni" id="ni-branches" onclick="go('branches')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>Subeler</button>
+      <button class="ni" id="ni-sports" onclick="go('sports')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/></svg>Branslar</button>
+      <button class="ni" id="ni-classes" onclick="go('classes')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>Siniflar</button>
+      <button class="ni" id="ni-announcements" onclick="go('announcements')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>Duyurular</button>
+      <button class="ni" id="ni-sms" onclick="go('sms')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>SMS Duyuru</button>
+      <div class="nsec">Sistem</div>
+      <button class="ni" id="ni-settings" onclick="go('settings')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>Ayarlar</button>
+      <div style="padding:14px 8px 8px;margin-top:8px;border-top:1px solid var(--border)">
+        <div class="flex fca gap2 mb3">
+          <div class="ava" style="width:30px;height:30px;font-size:11px" id="sava">A</div>
+          <div style="flex:1;min-width:0"><div class="tw6 tsm trunc" id="suname">Admin</div><div class="ts tm">Yonetici</div></div>
+        </div>
+        <button class="btn bs btn-sm w100" onclick="doLogout()">Cikis Yap</button>
+      </div>
+    </nav>
+  </div>
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div id="bar">
+      <button class="hbg" onclick="openSide()"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div style="flex:1;font-weight:700;font-size:15px;letter-spacing:-.2px" id="bar-title">Gosterge</div>
+      <div class="ava" style="width:30px;height:30px;font-size:11px" id="bar-ava">A</div>
+    </div>
+    <div id="main"></div>
+    <div id="bnav">
+      <div class="bni">
+        <button class="bni-btn on" id="bn-dashboard" onclick="go('dashboard')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Ana</button>
+        <button class="bni-btn" id="bn-athletes" onclick="go('athletes')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Sporcular</button>
+        <button class="bni-btn" id="bn-payments" onclick="go('payments')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Odeme</button>
+        <button class="bni-btn" id="bn-attendance" onclick="go('attendance')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Devam</button>
+        <button class="bni-btn" id="bn-settings" onclick="go('settings')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>Ayarlar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="modal" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="tw6" style="font-size:15px" id="modal-title"></div><button class="modal-x" onclick="closeModal()">&#x2715;</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft" id="modal-footer"></div>
+  </div>
+</div>
+
+
+<script>
+// ════════════════════════════════════════════════════════
+//  SPORCU PANELİ v3 — Multi-tenant / Şube Mimarisi
+// ════════════════════════════════════════════════════════
+
+var SUPA_URL = 'https://wfarbydojxtufnkjuhtc.supabase.co';
+var SUPA_KEY = 'sb_publishable_w1_nXk_7TM1ePWHMN2CDcQ_1ufk0kYC';
+var NETGSM_USER = '', NETGSM_PASS = '', NETGSM_HEADER = 'SPORCU';
+
+// ── Supabase ──────────────────────────────────────────────
+async function supaFetch(table, method, data, filters, extra) {
+  var url = SUPA_URL + '/rest/v1/' + table;
+  var params = [];
+  if (filters) Object.keys(filters).forEach(function(k) {
+    params.push(k + '=eq.' + encodeURIComponent(filters[k]));
+  });
+  if (extra) params.push(extra);
+  if (params.length) url += '?' + params.join('&');
+  if (method === 'GET') url += (url.indexOf('?') >= 0 ? '&' : '?') + 'order=created_at.desc&limit=2000';
+  var rm = method === 'UPSERT' ? 'POST' : method;
+  var hd = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' };
+  if (method === 'UPSERT') hd['Prefer'] = 'resolution=merge-duplicates,return=representation';
+  else if (method === 'POST' || method === 'PATCH') hd['Prefer'] = 'return=representation';
+  var opts = { method: rm, headers: hd, mode: 'cors' };
+  if (data && method !== 'GET') opts.body = JSON.stringify(data);
+  try {
+    var res = await fetch(url, opts);
+    if (!res.ok) { console.error('Supa ' + res.status, await res.text()); return null; }
+    var txt = await res.text(); return txt ? JSON.parse(txt) : [];
+  } catch(e) { console.error('Supa:', e.message || e); return null; }
+}
+async function supaGet(t, f, extra) { return await supaFetch(t, 'GET', null, f, extra); }
+async function supaPost(t, d) { return await supaFetch(t, 'POST', d); }
+async function supaUpsert(t, d) { return await supaFetch(t, 'UPSERT', Array.isArray(d) ? d : [d]); }
+async function supaDelete(t, f) {
+  var url = SUPA_URL + '/rest/v1/' + t + '?' + Object.keys(f).map(function(k) { return k + '=eq.' + encodeURIComponent(f[k]); }).join('&');
+  var res = await fetch(url, { method: 'DELETE', headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }, mode: 'cors' });
+  return res.ok;
+}
+async function supaPatch(t, d, f) {
+  var url = SUPA_URL + '/rest/v1/' + t + '?' + Object.keys(f).map(function(k) { return k + '=eq.' + encodeURIComponent(f[k]); }).join('&');
+  var res = await fetch(url, { method: 'PATCH', headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(d), mode: 'cors' });
+  return res.ok ? await res.json() : null;
+}
+
+// ── SMS ───────────────────────────────────────────────────
+async function sendSMS(phone, msg) {
+  if (!NETGSM_USER || !phone) return false;
+  var clean = phone.replace(/\D/g, '');
+  if (clean.startsWith('0')) clean = '90' + clean.slice(1);
+  else if (!clean.startsWith('90')) clean = '90' + clean;
+  try {
+    await fetch('https://api.netgsm.com.tr/sms/send/get/?usercode=' + encodeURIComponent(NETGSM_USER) + '&password=' + encodeURIComponent(NETGSM_PASS) + '&gsmno=' + clean + '&message=' + encodeURIComponent(msg) + '&msgheader=' + encodeURIComponent(NETGSM_HEADER), { mode: 'no-cors' });
+    return true;
+  } catch(e) { return false; }
+}
+
+// ── Bulk SMS ──────────────────────────────────────────────
+async function sendBulkSMS(phones, msg) {
+  var sent = 0;
+  for (var i = 0; i < phones.length; i++) {
+    if (await sendSMS(phones[i], msg)) sent++;
+    await new Promise(function(r) { setTimeout(r, 100); });
+  }
+  return sent;
+}
+
+// ── SHA-256 ───────────────────────────────────────────────
+async function sha256(str) {
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+// ── Loading ───────────────────────────────────────────────
+function showLoading() { document.getElementById('loading-overlay').style.display = 'flex'; }
+function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+var currentUser = null, currentOrgId = null, currentBranchId = null;
+var currentSporcu = null, currentSporcuOrgId = null, currentSporcuBranchId = null;
+var acct = { email: '', pass: '' };
+
+// Branch-scoped data
+var athletes = [], payments = [], coaches = [], attData = {}, messages = [], settings = {};
+var sports = [], classes = [];
+
+// Org-level caches
+var _orgsCache = [], _usersCache = [], _branchesCache = [];
+
+var curPage = 'dashboard';
+var ATD = tod(), ATSP = '', ATCLS = '';
+var _athFilter = { sp: '', st: '', cls: '', q: '' };
+var _payFilter = { st: '', q: '' };
+var _confirmCb = null, _forgotCtx = null;
+
+// ── Utils ─────────────────────────────────────────────────
+function tod() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function uid() { return 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function ini(s) { var p = (s || '').trim().split(' '); return (p[0] ? p[0][0] : '') + (p[1] ? p[1][0] : ''); }
+function fmtN(n) { return Number(n || 0).toLocaleString('tr-TR'); }
+function fmtD(s) { if (!s) return '-'; try { var d = new Date(s); return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear(); } catch(e) { return s; } }
+function age(bd) { if (!bd) return '-'; var d = new Date(bd), now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }
+function gv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function gvn(id) { return parseFloat(gv(id)) || 0; }
+function stl(s) { var m = { active: 'Aktif', inactive: 'Pasif', pending: 'Bekliyor', completed: 'Tamamlandi', overdue: 'Gecikti', cancelled: 'Iptal' }; return m[s] || s || '-'; }
+function stc(s) { var m = { active: 'bg-g', inactive: 'bg-r', pending: 'bg-y', completed: 'bg-g', overdue: 'bg-r', cancelled: 'bg-r' }; return m[s] || 'bg-b'; }
+function semi(sp) {
+  if (!sp) return '';
+  var sl = sp.toLowerCase();
+  if (sl.indexOf('futbol') >= 0) return '&#x26BD;';
+  if (sl.indexOf('basketbol') >= 0) return '&#x1F3C0;';
+  if (sl.indexOf('yuzme') >= 0 || sl.indexOf('yüzme') >= 0) return '&#x1F3CA;';
+  if (sl.indexOf('tenis') >= 0) return '&#x1F3BE;';
+  if (sl.indexOf('voleybol') >= 0) return '&#x1F3D0;';
+  if (sl.indexOf('gures') >= 0 || sl.indexOf('güreş') >= 0) return '&#x1F94B;';
+  if (sl.indexOf('boks') >= 0) return '&#x1F94A;';
+  if (sl.indexOf('jimnastik') >= 0) return '&#x1F938;';
+  if (sl.indexOf('atletizm') >= 0) return '&#x1F3C3;';
+  return '&#x1F3C5;';
+}
+function cname(ci) { for (var i = 0; i < coaches.length; i++) { if (coaches[i].id === ci) return coaches[i].fn + ' ' + coaches[i].ln; } return '-'; }
+function clsName(ci) { for (var i = 0; i < classes.length; i++) { if (classes[i].id === ci) return classes[i].name; } return '-'; }
+function attRate(aid) { var tot = 0, pres = 0; Object.keys(attData).forEach(function(d) { if (attData[d] && attData[d][aid]) { tot++; if (attData[d][aid] === 'P') pres++; } }); return tot ? Math.round(pres / tot * 100) : null; }
+function overdueCount() { var n = 0; payments.forEach(function(p) { if (p.st === 'overdue') n++; }); return n; }
+function pendingCount() { var n = 0; payments.forEach(function(p) { if (p.needsApproval && p.st === 'pending') n++; }); return n; }
+function unreadCount() { var n = 0; messages.forEach(function(m) { if (!m.rd) n++; }); return n; }
+function row(lbl, val) { return '<div class="dr"><span class="dl tm tsm">' + lbl + '</span><span class="dvl tw6 tsm">' + val + '</span></div>'; }
+function avatarColor(name) { var colors = ['var(--grad)', 'linear-gradient(135deg,#22c55e,#06b6d4)', 'linear-gradient(135deg,#f59e0b,#ef4444)', 'linear-gradient(135deg,#a855f7,#3b82f6)', 'linear-gradient(135deg,#06b6d4,#3b82f6)']; return colors[((name || 'A').charCodeAt(0)) % colors.length]; }
+function getBranch(id) { for (var i = 0; i < _branchesCache.length; i++) { if (_branchesCache[i].id === (id || currentBranchId)) return _branchesCache[i]; } return null; }
+function getOrgById(id) { for (var i = 0; i < _orgsCache.length; i++) { if (_orgsCache[i].id === id) return _orgsCache[i]; } return null; }
+function getBranchesByOrg(orgId) { return _branchesCache.filter(function(b) { return b.orgId === orgId; }); }
+
+// ── DB Mappers ────────────────────────────────────────────
+function dbToAth(r) { return { id: r.id, fn: r.fn, ln: r.ln, tc: r.tc, bd: r.bd, gn: r.gn, ph: r.ph, em: r.em || '', sp: r.sp, cat: r.cat, lic: r.lic, rd: r.rd, st: r.st || 'active', fee: r.fee || 0, vd: r.vd, nt: r.nt, ci: r.ci, clsId: r.cls_id, pn: r.pn, pph: r.pph, pem: r.pem, spPass: r.sp_pass }; }
+function athToDB(a) { return { id: a.id, org_id: currentOrgId, branch_id: currentBranchId, fn: a.fn, ln: a.ln, tc: a.tc, bd: a.bd, gn: a.gn, ph: a.ph, em: a.em || '', sp: a.sp, cat: a.cat, lic: a.lic, rd: a.rd, st: a.st, fee: a.fee, vd: a.vd, nt: a.nt, ci: a.ci, cls_id: a.clsId, pn: a.pn, pph: a.pph, pem: a.pem, sp_pass: a.spPass }; }
+function dbToPay(r) { return { id: r.id, aid: r.aid, an: r.an, amt: r.amt || 0, dt: r.dt, ty: r.ty, cat: r.cat, ds: r.ds, st: r.st || 'pending', inv: r.inv, dd: r.dd, payMethod: r.pay_method, havaleNote: r.havale_note, needsApproval: r.needs_approval, approvedBy: r.approved_by, approvedAt: r.approved_at }; }
+function payToDB(p) { return { id: p.id, org_id: currentOrgId, branch_id: currentBranchId, aid: p.aid, an: p.an, amt: p.amt, dt: p.dt, ty: p.ty, cat: p.cat, ds: p.ds, st: p.st, inv: p.inv, dd: p.dd, pay_method: p.payMethod, havale_note: p.havaleNote, needs_approval: p.needsApproval, approved_by: p.approvedBy, approved_at: p.approvedAt }; }
+function dbToCoach(r) { return { id: r.id, fn: r.fn, ln: r.ln, ph: r.ph, em: r.em, sp: r.sp, sal: r.sal || 0, st: r.st || 'active', sd: r.sd, nt: r.nt }; }
+function coachToDB(c) { return { id: c.id, org_id: currentOrgId, branch_id: currentBranchId, fn: c.fn, ln: c.ln, ph: c.ph, em: c.em, sp: c.sp, sal: c.sal, st: c.st, sd: c.sd, nt: c.nt }; }
+function dbToMsg(r) { return { id: r.id, fr: r.fr, role: r.role, sub: r.sub, body: r.body, dt: r.dt, rd: r.rd }; }
+function msgToDB(m) { return { id: m.id, org_id: currentOrgId, branch_id: currentBranchId, fr: m.fr, role: m.role, sub: m.sub, body: m.body, dt: m.dt, rd: m.rd }; }
+function dbToSport(r) { return { id: r.id, name: r.name, icon: r.icon }; }
+function dbToClass(r) { return { id: r.id, name: r.name, spId: r.sp_id, coachId: r.coach_id, cap: r.cap, schedule: r.schedule }; }
+function dbToSettings(r) { return { schoolName: r.school_name, logoUrl: r.logo_url, bankName: r.bank_name, accountName: r.account_name, iban: r.iban, ownerPhone: r.owner_phone, address: r.address, netgsmUser: r.netgsm_user, netgsmPass: r.netgsm_pass, netgsmHeader: r.netgsm_header }; }
+function settingsToDB(s) { return { org_id: currentOrgId, branch_id: currentBranchId, school_name: s.schoolName, logo_url: s.logoUrl, bank_name: s.bankName, account_name: s.accountName, iban: s.iban, owner_phone: s.ownerPhone, address: s.address, netgsm_user: s.netgsmUser, netgsm_pass: s.netgsmPass, netgsm_header: s.netgsmHeader, updated_at: new Date().toISOString() }; }
+
+// ── DB helpers ────────────────────────────────────────────
+async function dbSaveAth(a) { return await supaUpsert('athletes', athToDB(a)); }
+async function dbSavePay(p) { return await supaUpsert('payments', payToDB(p)); }
+async function dbSaveCoach(c) { return await supaUpsert('coaches', coachToDB(c)); }
+async function dbDelAth(id) { return await supaDelete('athletes', { id: id }); }
+async function dbDelPay(id) { return await supaDelete('payments', { id: id }); }
+async function dbDelCoach(id) { return await supaDelete('coaches', { id: id }); }
+async function dbSaveMsg(m) { return await supaUpsert('messages', msgToDB(m)); }
+async function dbDelMsg(id) { return await supaDelete('messages', { id: id }); }
+async function dbSaveAtt(date, aid, status) {
+  if (status === undefined) await supaDelete('attendance', { org_id: currentOrgId, branch_id: currentBranchId, athlete_id: aid, att_date: date });
+  else await supaUpsert('attendance', { org_id: currentOrgId, branch_id: currentBranchId, athlete_id: aid, att_date: date, status: status });
+}
+async function dbSaveSport(s) { return await supaUpsert('sports', { id: s.id, org_id: currentOrgId, branch_id: currentBranchId, name: s.name, icon: s.icon }); }
+async function dbDelSport(id) { return await supaDelete('sports', { id: id }); }
+async function dbSaveClass(c) { return await supaUpsert('classes', { id: c.id, org_id: currentOrgId, branch_id: currentBranchId, name: c.name, sp_id: c.spId, coach_id: c.coachId, cap: c.cap, schedule: c.schedule }); }
+async function dbDelClass(id) { return await supaDelete('classes', { id: id }); }
+async function saveS() { await supaUpsert('settings', settingsToDB(settings)); }
+
+// ── Auto overdue ──────────────────────────────────────────
+function checkOverdue() {
+  var today = tod();
+  payments.forEach(function(p) {
+    if (p.st === 'pending' && p.dd && p.dd < today && !p.needsApproval) { p.st = 'overdue'; dbSavePay(p); }
+  });
+}
+
+// ── Load Branch Data ──────────────────────────────────────
+async function loadBranchData() {
+  showLoading();
+  try {
+    var bid = currentBranchId;
+    var res = await Promise.all([
+      supaGet('athletes', { branch_id: bid }),
+      supaGet('payments', { branch_id: bid }),
+      supaGet('coaches', { branch_id: bid }),
+      supaGet('attendance', { branch_id: bid }),
+      supaGet('messages', { branch_id: bid }),
+      supaGet('settings', { branch_id: bid }),
+      supaGet('sports', { branch_id: bid }),
+      supaGet('classes', { branch_id: bid })
+    ]);
+    athletes = (res[0] || []).map(dbToAth);
+    payments = (res[1] || []).map(dbToPay);
+    coaches = (res[2] || []).map(dbToCoach);
+    attData = {};
+    (res[3] || []).forEach(function(r) { if (!attData[r.att_date]) attData[r.att_date] = {}; attData[r.att_date][r.athlete_id] = r.status; });
+    messages = (res[4] || []).map(dbToMsg);
+    var branch = getBranch(bid);
+    settings = res[5] && res[5][0] ? dbToSettings(res[5][0]) : { schoolName: branch ? branch.name : 'Sube' };
+    sports = (res[6] || []).map(dbToSport);
+    classes = (res[7] || []).map(dbToClass);
+    if (settings.netgsmUser) { NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader || 'SPORCU'; }
+    checkOverdue();
+  } catch(e) { console.error('loadBranchData:', e); }
+  hideLoading();
+}
+// ══════════════════════════════════════════════════════════
+//  UI HELPERS
+// ══════════════════════════════════════════════════════════
+function openSide() { document.getElementById('side').classList.add('open'); document.getElementById('overlay').classList.add('show'); }
+function closeSide() { document.getElementById('side').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
+function go(pg) {
+  curPage = pg;
+  var titles = { dashboard: 'Gosterge', athletes: 'Sporcular', payments: 'Odemeler', accounting: 'Muhasebe', attendance: 'Devam Takibi', coaches: 'Antrenorler', messages: 'Mesajlar', settings: 'Ayarlar', branches: 'Subeler', sports: 'Branslar', classes: 'Siniflar', announcements: 'Duyurular', sms: 'SMS Duyuru' };
+  var bt = document.getElementById('bar-title'); if (bt) bt.textContent = titles[pg] || pg;
+  var main = document.getElementById('main'); if (!main) return;
+  var fns = { dashboard: pgDashboard, athletes: pgAthletes, payments: pgPayments, accounting: pgAccounting, attendance: pgAttendance, coaches: pgCoaches, messages: pgMessages, settings: pgSettings, branches: pgBranches, sports: pgSports, classes: pgClasses, announcements: pgAnnouncements, sms: pgSMS };
+  main.style.opacity = '0';
+  setTimeout(function() {
+    if (fns[pg]) main.innerHTML = fns[pg]();
+    main.style.opacity = '1'; main.style.transition = 'opacity .15s';
+  }, 60);
+  document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-' + pg); });
+  document.querySelectorAll('.bni-btn').forEach(function(el) { el.classList.toggle('on', el.id === 'bn-' + pg); });
+  closeSide();
+}
+function toast(msg, type) {
+  var t = document.createElement('div');
+  t.className = 'toast' + (type === 'e' ? ' toast-e' : type === 'g' ? ' toast-g' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.classList.add('show'); }, 10);
+  setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 2800);
+}
+function modal(title, body, btns) {
+  var m = document.getElementById('modal');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = body;
+  var mf = document.getElementById('modal-footer'); mf.innerHTML = '';
+  (btns || []).forEach(function(b) { var btn = document.createElement('button'); btn.className = 'btn ' + b.cls; btn.innerHTML = b.lbl; btn.onclick = b.fn; mf.appendChild(btn); });
+  m.classList.add('show');
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+function confirm2(title, msg, cb) {
+  _confirmCb = cb;
+  modal(title, '<p style="color:var(--text2);font-size:14px;line-height:1.7">' + msg + '</p>', [
+    { lbl: 'Vazgec', cls: 'bs', fn: function() { closeModal(); } },
+    { lbl: 'Evet, Devam Et', cls: 'bd', fn: function() { closeModal(); if (_confirmCb) { _confirmCb(); _confirmCb = null; } } }
+  ]);
+}
+function updateBadges() {
+  var od = overdueCount() + pendingCount(), un = unreadCount();
+  var b1 = document.getElementById('badge-pay'), b2 = document.getElementById('badge-msg');
+  if (b1) { b1.textContent = od; b1.classList.toggle('dn', od === 0); }
+  if (b2) { b2.textContent = un; b2.classList.toggle('dn', un === 0); }
+}
+function sc(color, icon, val, label, pg) {
+  return '<div class="card stat-card stat-' + color + '" ' + (pg ? 'onclick="go(\'' + pg + '\')"' : '') + '>' +
+    '<div class="stat-icon">' + icon + '</div>' +
+    '<div class="stat-val">' + val + '</div>' +
+    '<div class="stat-lbl">' + label + '</div></div>';
+}
+function updateBranchUI() {
+  var b = getBranch();
+  var logoEl = document.getElementById('side-logo-img');
+  var nameEl = document.getElementById('sn');
+  var subEl = document.getElementById('sn2');
+  if (b) {
+    if (nameEl) nameEl.textContent = b.name.length > 22 ? b.name.slice(0, 20) + '...' : b.name;
+    if (subEl) subEl.textContent = settings.address || 'Sube';
+    if (logoEl) {
+      if (settings.logoUrl) { logoEl.src = settings.logoUrl; logoEl.style.display = 'block'; document.getElementById('side-logo-icon').style.display = 'none'; }
+      else { logoEl.style.display = 'none'; document.getElementById('side-logo-icon').style.display = 'flex'; }
+    }
+  }
+}
+
+// ── Export CSV ────────────────────────────────────────────
+function exportCSV(data, filename) {
+  if (!data || !data.length) { toast('Disa aktarilacak veri yok', 'e'); return; }
+  var cols = Object.keys(data[0]);
+  var csv = cols.join(';') + '\n' + data.map(function(r) { return cols.map(function(c) { var v = r[c] === null || r[c] === undefined ? '' : String(r[c]); return '"' + v.replace(/"/g, '""') + '"'; }).join(';'); }).join('\n');
+  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename + '.csv'; a.click();
+  toast('CSV indirildi!', 'g');
+}
+function exportAthletes() { exportCSV(athletes.map(function(a) { return { Ad: a.fn, Soyad: a.ln, TC: a.tc, Spor: a.sp, Sinif: clsName(a.clsId), Kategori: a.cat, Durum: stl(a.st), Ucret: a.fee, VeliAdi: a.pn || '', VeliTel: a.pph || '', VeliEmail: a.pem || '' }; }), 'sporcular'); }
+function exportPayments() { exportCSV(payments.map(function(p) { return { Tarih: p.dt, Sporcu: p.an, Aciklama: p.ds, Tutar: p.amt, Tur: p.ty === 'income' ? 'Gelir' : 'Gider', Durum: stl(p.st) }; }), 'odemeler'); }
+
+// ── QR Scanner ────────────────────────────────────────────
+var _qrStream = null;
+function showQRScanner() {
+  modal('QR ile Yoklama',
+    '<div id="qr-video-wrap" style="text-align:center"><video id="qr-video" style="width:100%;max-width:300px;border-radius:12px;background:#000" autoplay playsinline></video></div>' +
+    '<div id="qr-status" class="al al-b mt2" style="text-align:center">Kamera baslatiliyor...</div>' +
+    '<div class="mt2"><label>Manuel TC Giris</label><div class="flex gap2"><input class="fs" id="qr-manual" type="tel" maxlength="11" placeholder="11 haneli TC"/><button class="btn bp" onclick="onQRDetected(document.getElementById(\'qr-manual\').value)">Yoklama Al</button></div></div>',
+    [{ lbl: 'Kapat', cls: 'bs', fn: function() { stopQR(); closeModal(); } }]
+  );
+  setTimeout(startQR, 200);
+}
+async function startQR() {
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    _qrStream = stream;
+    var video = document.getElementById('qr-video'); if (!video) { stream.getTracks().forEach(function(t) { t.stop(); }); return; }
+    video.srcObject = stream; video.play();
+    var statusEl = document.getElementById('qr-status'); if (statusEl) statusEl.textContent = 'QR kodu veya TC okutun...';
+    scanQRFrame(video);
+  } catch(e) { var statusEl = document.getElementById('qr-status'); if (statusEl) { statusEl.className = 'al al-y mt2'; statusEl.textContent = 'Kamera izni yok — Manuel TC girebilirsiniz'; } }
+}
+function scanQRFrame(video) {
+  if (!document.getElementById('qr-video')) return;
+  if (typeof BarcodeDetector !== 'undefined') {
+    var bd = new BarcodeDetector({ formats: ['qr_code'] });
+    var canvas = document.createElement('canvas'); canvas.width = video.videoWidth || 320; canvas.height = video.videoHeight || 240;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    bd.detect(canvas).then(function(codes) { if (codes && codes.length > 0) onQRDetected(codes[0].rawValue); else setTimeout(function() { scanQRFrame(video); }, 200); }).catch(function() { setTimeout(function() { scanQRFrame(video); }, 200); });
+  }
+}
+function onQRDetected(val) {
+  if (!val) return;
+  stopQR();
+  var found = null;
+  athletes.forEach(function(a) { if (a.tc === val || a.id === val) found = a; });
+  var el = document.getElementById('qr-status');
+  if (!found) { if (el) { el.className = 'al al-r mt2'; el.textContent = 'Sporcu bulunamadi: ' + val; } return; }
+  if (!attData[ATD]) attData[ATD] = {};
+  attData[ATD][found.id] = 'P';
+  dbSaveAtt(ATD, found.id, 'P');
+  if (el) { el.className = 'al al-g mt2'; el.innerHTML = '&#x2705; ' + esc(found.fn) + ' ' + esc(found.ln) + ' — Yoklama alindi!'; }
+  setTimeout(startQR, 1500);
+}
+function stopQR() { if (_qrStream) { _qrStream.getTracks().forEach(function(t) { t.stop(); }); _qrStream = null; } }
+
+// ══════════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════════
+function switchLoginTab(tab) {
+  document.getElementById('login-admin').classList.toggle('dn', tab !== 'admin');
+  document.getElementById('login-sporcu').classList.toggle('dn', tab !== 'sporcu');
+  document.querySelectorAll('.ltab').forEach(function(el, i) { el.classList.toggle('on', (i === 0 && tab === 'admin') || (i === 1 && tab === 'sporcu')); });
+}
+
+async function doLogin() {
+  var e = gv('le'), p = gv('lp');
+  if (!e || !p) { showErr('lerr', 'E-posta ve sifre gerekli!'); return; }
+  showLoading();
+  try {
+    var allUsers = await supaGet('users'), allOrgs = await supaGet('orgs'), allBranches = await supaGet('branches');
+    _usersCache = (allUsers || []).map(function(u) { return { id: u.id, orgId: u.org_id, branchId: u.branch_id, email: u.email, pass: u.pass, role: u.role, name: u.name, phone: u.phone }; });
+    _orgsCache = (allOrgs || []).map(function(o) { return { id: o.id, name: o.name }; });
+    _branchesCache = (allBranches || []).map(function(b) { return { id: b.id, orgId: b.org_id, name: b.name, code: b.code }; });
+    var ph = await sha256(p);
+    var found = null;
+    for (var i = 0; i < _usersCache.length; i++) {
+      var u = _usersCache[i];
+      if (u.email === e && (u.pass === p || u.pass === ph)) { found = u; break; }
+    }
+    hideLoading();
+    if (found) {
+      currentUser = found; currentOrgId = found.orgId; currentBranchId = found.branchId; acct.email = found.email; acct.pass = found.pass;
+      await loadBranchData();
+      document.getElementById('lbox-wrap').style.display = 'none';
+      document.getElementById('wrap').classList.remove('dn');
+      document.getElementById('lerr').classList.add('dn');
+      var dname = found.name || found.email.split('@')[0];
+      var setEl = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+      setEl('suname', dname); setEl('sava', (dname[0] || 'A').toUpperCase()); setEl('bar-ava', (dname[0] || 'A').toUpperCase());
+      updateBranchUI(); updateBadges(); go('dashboard');
+    } else {
+      showErr('lerr', 'E-posta veya sifre hatali!');
+    }
+  } catch(err) { hideLoading(); console.error(err); showErr('lerr', 'Baglanti hatasi!'); }
+}
+
+function showErr(id, msg) { var el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.remove('dn'); } }
+
+function doLogout() {
+  currentUser = null; currentOrgId = null; currentBranchId = null;
+  athletes = []; payments = []; coaches = []; attData = {}; messages = []; settings = {}; sports = []; classes = [];
+  document.getElementById('wrap').classList.add('dn');
+  document.getElementById('lbox-wrap').style.display = 'flex';
+  var le = document.getElementById('le'), lp = document.getElementById('lp');
+  if (le) le.value = ''; if (lp) lp.value = '';
+}
+
+function showRegister() {
+  document.getElementById('lbox-wrap').innerHTML = '<div class="lbox"><div class="llogo"><div class="llogo-i">&#x26BD;</div><h1 style="font-size:20px;font-weight:800">Kurum Kaydi</h1><p style="color:var(--text2);font-size:13px;margin-top:4px">Yeni akademi hesabi olustur</p></div>' +
+    '<div class="fgr mb2"><label>Kurum Adi</label><input id="rg-org" type="text" placeholder="Dragos Futbol Akademisi"/></div>' +
+    '<div class="fgr mb2"><label>1. Sube Adi</label><input id="rg-branch" type="text" placeholder="Merkez Sube"/></div>' +
+    '<div class="fgr mb2"><label>Yetkili Ad Soyad</label><input id="rg-name" type="text"/></div>' +
+    '<div class="fgr mb2"><label>Telefon</label><input id="rg-phone" type="tel" placeholder="05xx..."/></div>' +
+    '<div class="fgr mb2"><label>E-posta</label><input id="rg-em" type="email"/></div>' +
+    '<div class="fgr mb2"><label>Sifre</label><input id="rg-p1" type="password"/></div>' +
+    '<div class="fgr mb3"><label>Sifre Tekrar</label><input id="rg-p2" type="password"/></div>' +
+    '<div id="rg-err" class="lerr dn"></div>' +
+    '<button class="btn bp w100 mb2" style="padding:12px" onclick="doRegister()">Kayit Ol</button>' +
+    '<button class="btn bs w100" onclick="location.reload()">Geri Don</button></div>';
+}
+
+async function doRegister() {
+  var orgName = gv('rg-org'), branchName = gv('rg-branch') || 'Merkez', name = gv('rg-name'), em = gv('rg-em'), phone = gv('rg-phone'), p1 = gv('rg-p1'), p2 = gv('rg-p2');
+  var errEl = document.getElementById('rg-err');
+  function showErr2(m) { errEl.textContent = m; errEl.classList.remove('dn'); }
+  if (!orgName || !name || !em || !p1) { showErr2('Tum alanlar zorunlu!'); return; }
+  if (p1 !== p2) { showErr2('Sifreler eslesmiyor!'); return; }
+  if (p1.length < 4) { showErr2('En az 4 karakter!'); return; }
+  showLoading();
+  var existing = await supaGet('users', { email: em });
+  if (existing && existing.length > 0) { hideLoading(); showErr2('Bu e-posta zaten kayitli!'); return; }
+  var ph = await sha256(p1);
+  var orgId = 'org-' + Date.now().toString(36);
+  var branchId = 'br-' + Date.now().toString(36);
+  var userId = 'u-' + Date.now().toString(36);
+  await supaPost('orgs', { id: orgId, name: orgName });
+  await supaPost('branches', { id: branchId, org_id: orgId, name: branchName, code: branchName.slice(0, 3).toUpperCase() });
+  await supaPost('users', { id: userId, org_id: orgId, branch_id: branchId, email: em, pass: ph, role: 'admin', name: name, phone: phone });
+  hideLoading();
+  alert('Kayit basarili! Giris yapabilirsiniz.'); location.reload();
+}
+
+// ── Sporcu Login ──────────────────────────────────────────
+async function doSporcuLogin() {
+  var tc = gv('ls-tc'), pass = gv('ls-pass');
+  var errEl = document.getElementById('ls-err');
+  showLoading();
+  try {
+    var res = await supaGet('athletes', { tc: tc });
+    hideLoading();
+    var found = null, foundBranch = null, foundOrg = null;
+    var ph = await sha256(pass);
+    (res || []).forEach(function(r) {
+      var exp = r.sp_pass || tc.slice(-4);
+      if (pass === exp || ph === exp) { found = dbToAth(r); foundBranch = r.branch_id; foundOrg = r.org_id; }
+    });
+    if (found) {
+      currentSporcu = found; currentSporcuBranchId = foundBranch; currentSporcuOrgId = foundOrg;
+      currentOrgId = foundOrg; currentBranchId = foundBranch;
+      await loadBranchData();
+      var orgs = await supaGet('orgs', { id: foundOrg });
+      var orgName = orgs && orgs[0] ? orgs[0].name : 'Akademi';
+      document.getElementById('lbox-wrap').style.display = 'none';
+      document.getElementById('sporcu-portal').style.display = 'flex';
+      var av = document.getElementById('sp-avatar'); if (av) { av.textContent = (found.fn[0] || 'S').toUpperCase(); av.style.background = avatarColor(found.fn); }
+      var sn = document.getElementById('sp-name'); if (sn) sn.textContent = found.fn + ' ' + found.ln;
+      var on = document.getElementById('sp-orgname'); if (on) on.textContent = settings.schoolName || orgName;
+      errEl.classList.add('dn'); spTab('profil');
+    } else { errEl.classList.remove('dn'); }
+  } catch(e) { hideLoading(); console.error(e); errEl.classList.remove('dn'); }
+}
+function doSporcuLogout() { currentSporcu = null; document.getElementById('sporcu-portal').style.display = 'none'; document.getElementById('lbox-wrap').style.display = 'flex'; }
+
+// ── Forgot Password ───────────────────────────────────────
+function showForgotPassword() {
+  document.getElementById('lbox-wrap').innerHTML = '<div class="lbox">' +
+    '<div class="llogo"><div class="llogo-i" style="font-size:28px">&#x1F511;</div><h1 style="font-size:18px;font-weight:800">Sifre Sifirlama</h1></div>' +
+    '<div id="fp-step1"><div class="fgr mb3"><label>TC Kimlik veya E-posta</label><input id="fp-id" type="text" placeholder="TC veya e-posta giriniz"/></div>' +
+    '<div id="fp-err" class="lerr dn"></div>' +
+    '<button class="btn bp w100 mb2" style="padding:12px" onclick="fpSendCode()">Dogrulama Kodu Gonder</button>' +
+    '<button class="btn bs w100" onclick="location.reload()">Geri Don</button></div>' +
+    '<div id="fp-step2" class="dn"><p style="color:var(--text2);font-size:13px;text-align:center;margin-bottom:12px" id="fp-phone-hint"></p>' +
+    '<div class="al al-b mb3" id="fp-demo-code" style="font-size:18px;text-align:center;font-weight:700;letter-spacing:6px"></div>' +
+    '<div class="fgr mb3"><label>6 Haneli Kod</label><input id="fp-code" type="tel" maxlength="6" placeholder="------" style="font-size:22px;letter-spacing:8px;text-align:center"/></div>' +
+    '<div id="fp-err2" class="lerr dn"></div>' +
+    '<button class="btn bp w100 mb2" style="padding:12px" onclick="fpVerifyCode()">Dogrula</button></div>' +
+    '<div id="fp-step3" class="dn"><div class="fgr mb2"><label>Yeni Sifre</label><input id="fp-np1" type="password"/></div>' +
+    '<div class="fgr mb3"><label>Sifre Tekrar</label><input id="fp-np2" type="password"/></div>' +
+    '<div id="fp-new-err" class="lerr dn"></div>' +
+    '<button class="btn bp w100" style="padding:12px" onclick="fpSetNewPassword()">Sifreyi Guncelle</button></div></div>';
+}
+async function fpSendCode() {
+  var val = gv('fp-id'), errEl = document.getElementById('fp-err');
+  if (!val) { errEl.textContent = 'Alan bos!'; errEl.classList.remove('dn'); return; }
+  showLoading();
+  var found = null, type = null, phone = null;
+  if (val.length === 11 && /^\d+$/.test(val)) { var r1 = await supaGet('athletes', { tc: val }); if (r1 && r1.length > 0) { found = r1[0]; type = 'sporcu'; phone = r1[0].ph || ''; } }
+  if (!found) { var r2 = await supaGet('users', { email: val }); if (r2 && r2.length > 0) { found = r2[0]; type = 'admin'; phone = r2[0].phone || ''; } }
+  hideLoading();
+  if (!found) { errEl.textContent = 'Kayit bulunamadi!'; errEl.classList.remove('dn'); return; }
+  var code = Math.floor(100000 + Math.random() * 900000).toString();
+  _forgotCtx = { code: code, expiry: Date.now() + 10 * 60 * 1000, target: found, type: type };
+  if (phone && NETGSM_USER) await sendSMS(phone, 'Sporcu Paneli dogrulama kodunuz: ' + code + '. 10 dk gecerlidir.');
+  document.getElementById('fp-step1').classList.add('dn'); document.getElementById('fp-step2').classList.remove('dn');
+  var hint = document.getElementById('fp-phone-hint'); if (hint) hint.textContent = phone ? 'Kod ' + phone.slice(0, 3) + '***' + phone.slice(-2) + ' numarasina gonderildi' : 'Kod hazir';
+  var demo = document.getElementById('fp-demo-code'); if (demo) { if (!NETGSM_USER) demo.textContent = code; else demo.style.display = 'none'; }
+}
+function fpVerifyCode() {
+  var code = gv('fp-code'), errEl = document.getElementById('fp-err2');
+  if (!_forgotCtx) { location.reload(); return; }
+  if (Date.now() > _forgotCtx.expiry) { errEl.textContent = 'Kod suresi doldu!'; errEl.classList.remove('dn'); return; }
+  if (code.trim() !== _forgotCtx.code) { errEl.textContent = 'Yanlis kod!'; errEl.classList.remove('dn'); return; }
+  document.getElementById('fp-step2').classList.add('dn'); document.getElementById('fp-step3').classList.remove('dn');
+}
+async function fpSetNewPassword() {
+  var p1 = gv('fp-np1'), p2 = gv('fp-np2'), errEl = document.getElementById('fp-new-err');
+  if (!p1) { errEl.textContent = 'Sifre bos!'; errEl.classList.remove('dn'); return; }
+  if (p1 !== p2) { errEl.textContent = 'Sifreler eslesmiyor!'; errEl.classList.remove('dn'); return; }
+  if (p1.length < 4) { errEl.textContent = 'En az 4 karakter!'; errEl.classList.remove('dn'); return; }
+  showLoading();
+  var ph = await sha256(p1);
+  if (_forgotCtx.type === 'admin') await supaPatch('users', { pass: ph }, { id: _forgotCtx.target.id });
+  else await supaPatch('athletes', { sp_pass: ph }, { id: _forgotCtx.target.id });
+  hideLoading(); _forgotCtx = null;
+  document.getElementById('lbox-wrap').innerHTML = '<div class="lbox" style="text-align:center"><div style="font-size:48px;margin-bottom:16px">&#x2705;</div><div style="font-size:20px;font-weight:800;margin-bottom:8px">Sifre Guncellendi!</div><button class="btn bp w100 mt3" style="padding:12px" onclick="location.reload()">Giris Yap</button></div>';
+}
+// ══════════════════════════════════════════════════════════
+//  SPORCU PORTAL
+// ══════════════════════════════════════════════════════════
+function spTab(tab) {
+  document.querySelectorAll('.sp-tab').forEach(function(el, i) {
+    var tabs = ['profil', 'yoklama', 'odemeler', 'odeme-yap', 'duyurular'];
+    el.classList.toggle('on', tabs[i] === tab);
+  });
+  var el = document.getElementById('sp-content');
+  var fns = { profil: spProfil, yoklama: spYoklama, odemeler: spOdemeler, 'odeme-yap': spOdemeYap, duyurular: spDuyurular };
+  if (fns[tab]) el.innerHTML = fns[tab]();
+}
+function spProfil() {
+  var a = currentSporcu, rate = attRate(a.id), totalPaid = 0, totalPending = 0;
+  payments.forEach(function(p) { if (p.aid === a.id) { if (p.st === 'completed') totalPaid += Number(p.amt) || 0; else if (p.st === 'pending') totalPending += Number(p.amt) || 0; } });
+  var myClass = a.clsId ? classes.find(function(c) { return c.id === a.clsId; }) : null;
+  var h = '<div class="profile-hero mb3"><div class="flex fca gap3 mb3">';
+  h += '<div class="ava" style="width:64px;height:64px;font-size:24px;background:' + avatarColor(a.fn) + '">' + ini(a.fn + ' ' + a.ln) + '</div>';
+  h += '<div><div style="font-size:20px;font-weight:800">' + esc(a.fn) + ' ' + esc(a.ln) + '</div>';
+  h += '<div style="color:var(--text2);margin-top:3px">' + semi(a.sp) + ' ' + esc(a.sp || '-') + '</div>';
+  if (myClass) h += '<div class="ts tm mt1">&#x1F4DA; ' + esc(myClass.name) + '</div>';
+  h += '<span class="bg ' + stc(a.st) + '" style="display:inline-block;margin-top:6px">' + stl(a.st) + '</span></div></div>';
+  h += '<div class="g2">' + sc('g', '&#x1F4CA;', rate !== null ? rate + '%' : '-', 'Devam Orani', '') + sc('b', '&#x1F4B0;', fmtN(totalPaid) + ' TL', 'Odenen', '') + '</div></div>';
+  if (totalPending > 0) h += '<div class="al al-y">&#x26A0; Bekleyen odeme: ' + fmtN(totalPending) + ' TL</div>';
+  h += '<div class="card mb3">';
+  h += row('TC Kimlik', esc(a.tc || '-')) + row('Dogum Tarihi', fmtD(a.bd) + ' (' + age(a.bd) + ' yas)') + row('Cinsiyet', esc(a.gn || '-')) + row('Telefon', esc(a.ph || '-')) + row('E-posta', esc(a.em || '-')) + row('Lisans No', esc(a.lic || '-')) + row('Antrenor', esc(cname(a.ci)));
+  if (a.pn) { h += '<div class="dv"></div>'; h += row('Veli Adi', esc(a.pn)); if (a.pph) h += row('Veli Telefon', esc(a.pph)); if (a.pem) h += row('Veli E-posta', esc(a.pem)); }
+  h += '</div>';
+  h += '<div class="card"><div class="tw6 mb3">&#x1F511; Sifre Degistir</div><div class="fgr mb2"><label>Yeni Sifre</label><input id="sp-p1" type="password"/></div><div class="fgr mb3"><label>Tekrar</label><input id="sp-p2" type="password"/></div><button class="btn bp" onclick="spChangePass()">Guncelle</button></div>';
+  return h;
+}
+async function spChangePass() {
+  var p1 = gv('sp-p1'), p2 = gv('sp-p2');
+  if (!p1) { toast('Sifre bos!', 'e'); return; }
+  if (p1 !== p2) { toast('Sifreler eslesmiyor!', 'e'); return; }
+  var ph = await sha256(p1);
+  for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === currentSporcu.id) { athletes[i].spPass = ph; currentSporcu = athletes[i]; break; } }
+  showLoading(); await dbSaveAth(currentSporcu); hideLoading(); toast('Sifre guncellendi', 'g');
+}
+function spYoklama() {
+  var a = currentSporcu, records = [], rate = attRate(a.id);
+  Object.keys(attData).sort().reverse().forEach(function(d) { if (attData[d] && attData[d][a.id]) records.push({ date: d, status: attData[d][a.id] }); });
+  var h = '<div class="card mb3"><div class="flex fca fjb mb2"><div class="tw6">Devam Durumu</div><div style="font-size:22px;font-weight:800;color:' + (rate >= 80 ? 'var(--green)' : rate >= 60 ? 'var(--yellow)' : 'var(--red)') + '">' + (rate !== null ? rate + '%' : '-') + '</div></div>';
+  if (rate !== null) h += '<div class="pr mb2"><div class="prb ' + (rate >= 80 ? 'prb-g' : rate >= 60 ? 'prb-y' : 'prb-r') + '" style="width:' + rate + '%"></div></div>';
+  h += '</div><div class="card"><div class="tw"><table><thead><tr><th>Tarih</th><th>Durum</th></tr></thead><tbody>';
+  if (!records.length) h += '<tr><td colspan="2" style="text-align:center;padding:30px;color:var(--text3)">Yoklama kaydi yok</td></tr>';
+  records.forEach(function(r) { h += '<tr><td class="tsm">' + fmtD(r.date) + '</td><td><span class="bg ' + (r.status === 'P' ? 'bg-g' : r.status === 'A' ? 'bg-r' : 'bg-y') + '">' + (r.status === 'P' ? '&#x2705; Var' : r.status === 'A' ? '&#x274C; Yok' : '&#x23F0; Gec') + '</span></td></tr>'; });
+  h += '</tbody></table></div></div>'; return h;
+}
+function spOdemeler() {
+  var a = currentSporcu, list = payments.filter(function(p) { return p.aid === a.id; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
+  var totalPaid = 0, totalPending = 0;
+  list.forEach(function(p) { if (p.st === 'completed') totalPaid += Number(p.amt) || 0; else if (p.st === 'pending') totalPending += Number(p.amt) || 0; });
+  var h = '<div class="g2 mb3">' + sc('g', '&#x2705;', fmtN(totalPaid) + ' TL', 'Odendi', '') + sc('y', '&#x23F3;', fmtN(totalPending) + ' TL', 'Bekliyor', '') + '</div>';
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Odeme Gecmisi</div><button class="btn bp btn-sm" onclick="spTab(\'odeme-yap\')">+ Odeme Yap</button></div>';
+  if (!list.length) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Odeme kaydi yok</div>';
+  else { h += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Aciklama</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>'; list.forEach(function(p) { var sc2 = stc(p.st), sl2 = stl(p.st); if (p.payMethod === 'havale' && p.st === 'pending') { sc2 = 'bg-y'; sl2 = 'Onay Bekliyor'; } h += '<tr><td class="tsm">' + fmtD(p.dt) + '</td><td class="tsm">' + esc(p.ds || '-') + '</td><td class="tw6 tg tsm">' + fmtN(p.amt) + ' TL</td><td><span class="bg ' + sc2 + '">' + sl2 + '</span></td></tr>'; }); h += '</tbody></table></div>'; }
+  h += '</div>'; return h;
+}
+function spOdemeYap() {
+  var h = '<div class="card"><div class="tw6 mb3">Odeme Yontemi Sec</div><div class="g2 mb3">';
+  h += '<div id="pm-kk" onclick="selectPayMethod(\'kk\')" style="border:2px solid var(--blue);border-radius:12px;padding:16px;text-align:center;cursor:pointer;background:rgba(59,130,246,.08);transition:.2s"><div style="font-size:32px;margin-bottom:8px">&#x1F4B3;</div><div class="tw6 tsm">Kredi / Banka Karti</div><div class="ts tm mt1">PayTR ile guvenli</div></div>';
+  h += '<div id="pm-havale" onclick="selectPayMethod(\'havale\')" style="border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:.2s"><div style="font-size:32px;margin-bottom:8px">&#x1F3E6;</div><div class="tw6 tsm">Havale / EFT</div><div class="ts tm mt1">Banka transferi</div></div></div>';
+  h += '<div class="fgr mb2"><label>Tutar (TL)</label><input id="sp-amt" type="number" placeholder="0"/></div>';
+  h += '<div class="fgr mb3"><label>Aciklama</label><input id="sp-desc" type="text" value="Aidat Odemesi"/></div>';
+  h += '<div id="pm-kk-info" class="dn"><div class="al al-b">&#x2139; PayTR entegrasyonu cok yakinda aktif!</div></div>';
+  h += '<div id="pm-havale-info" class="dn">';
+  if (settings.iban) h += '<div class="al al-g mb3">&#x1F3E6; <b>' + esc(settings.bankName || 'Banka') + '</b> — ' + esc(settings.accountName || '') + '<br><b>IBAN: ' + esc(settings.iban) + '</b></div>';
+  else h += '<div class="al al-y mb3">Kurum banka bilgisi henuz eklenmemis.</div>';
+  h += '<div class="fgr mb3"><label>Dekont / Aciklama</label><textarea id="sp-havale-note" placeholder="Havale aciklamasi..."></textarea></div>';
+  h += '<button class="btn bp w100" style="padding:12px" onclick="spSubmitHavale()">&#x1F4E8; Havale Bildirimi Gonder</button></div></div>';
+  return h;
+}
+function selectPayMethod(m) {
+  var kk = document.getElementById('pm-kk'), hv = document.getElementById('pm-havale');
+  if (kk) { kk.style.borderColor = m === 'kk' ? 'var(--blue)' : 'var(--border)'; kk.style.background = m === 'kk' ? 'rgba(59,130,246,.08)' : ''; }
+  if (hv) { hv.style.borderColor = m === 'havale' ? 'var(--blue)' : 'var(--border)'; hv.style.background = m === 'havale' ? 'rgba(59,130,246,.08)' : ''; }
+  document.getElementById('pm-kk-info').classList.toggle('dn', m !== 'kk');
+  document.getElementById('pm-havale-info').classList.toggle('dn', m !== 'havale');
+}
+async function spSubmitHavale() {
+  var amt = parseFloat((document.getElementById('sp-amt') || {}).value || '0');
+  var desc = gv('sp-desc') || 'Aidat', note = gv('sp-havale-note');
+  if (!amt || amt <= 0) { toast('Gecerli tutar girin!', 'e'); return; }
+  var a = currentSporcu;
+  var p = { id: uid(), aid: a.id, an: a.fn + ' ' + a.ln, amt: amt, dt: tod(), ty: 'income', cat: 'Aidat', ds: desc, st: 'pending', inv: 'INV-' + Date.now(), payMethod: 'havale', havaleNote: note, needsApproval: true };
+  payments.unshift(p); showLoading(); await dbSavePay(p); hideLoading();
+  if (settings.ownerPhone && NETGSM_USER) await sendSMS(settings.ownerPhone, a.fn + ' ' + a.ln + ' ' + fmtN(amt) + ' TL havale bildirimi gonderdi.');
+  toast('Havale bildirimi gonderildi!', 'g'); spTab('odemeler');
+}
+function spDuyurular() {
+  var anns = messages.filter(function(m) { return m.role === 'duyuru'; }).sort(function(a, b) { return new Date(b.dt) - new Date(a.dt); });
+  var h = '<div class="card"><div class="tw6 mb3">&#x1F4E3; Duyurular</div>';
+  if (!anns.length) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Henuz duyuru yok</div>';
+  anns.forEach(function(m) { h += '<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px"><div class="tw6 tsm mb1">' + esc(m.sub) + '</div><div class="ts tm mb2">' + fmtD(m.dt) + '</div><div class="tsm" style="line-height:1.7;color:var(--text2)">' + esc(m.body) + '</div></div>'; });
+  h += '</div>'; return h;
+}
+
+// ══════════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════════
+function pgDashboard() {
+  var activeA = 0, totalIncome = 0, totalExp = 0;
+  athletes.forEach(function(a) { if (a.st === 'active') activeA++; });
+  payments.forEach(function(p) { if (p.st === 'completed') { if (p.ty === 'income') totalIncome += Number(p.amt) || 0; else totalExp += Number(p.amt) || 0; } });
+  var branch = getBranch();
+  var h = '<div class="ph"><div class="sh"><div>';
+  if (settings.logoUrl) h += '<img src="' + esc(settings.logoUrl) + '" style="height:36px;border-radius:8px;margin-bottom:6px;display:block"/>';
+  h += '<div class="stit">' + esc(settings.schoolName || (branch ? branch.name : 'Gosterge')) + '</div>';
+  h += '<div class="ssub">' + new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) + '</div></div>';
+  h += '<div class="ts tm">' + (branch ? branch.name : '') + '</div></div></div>';
+  h += '<div class="quick-actions mb2">';
+  h += '<div class="qa-btn" onclick="showAthForm(null)"><div class="qa-icon">&#x2795;</div><div class="qa-lbl">Sporcu</div></div>';
+  h += '<div class="qa-btn" onclick="showPayForm()"><div class="qa-icon">&#x1F4B0;</div><div class="qa-lbl">Odeme</div></div>';
+  h += '<div class="qa-btn" onclick="go(\'attendance\')"><div class="qa-icon">&#x1F4CB;</div><div class="qa-lbl">Yoklama</div></div>';
+  h += '<div class="qa-btn" onclick="showQRScanner()"><div class="qa-icon">&#x1F4F7;</div><div class="qa-lbl">QR Tara</div></div>';
+  h += '</div>';
+  h += '<div class="g4 mb3">' + sc('b', '&#x1F3C5;', activeA, 'Aktif Sporcu', 'athletes') + sc('g', '&#x1F4C8;', fmtN(totalIncome) + ' TL', 'Gelir', 'accounting') + sc('r', '&#x1F4C9;', fmtN(totalExp) + ' TL', 'Gider', 'accounting') + sc('y', '&#x26A0;', overdueCount() + pendingCount(), 'Bekleyen', 'payments') + '</div>';
+  // Chart
+  var months = ['O', 'Şb', 'Mr', 'Ns', 'My', 'Hzr', 'Tm', 'Ag', 'Ey', 'Ek', 'Ks', 'Ar'];
+  var md = []; for (var i = 0; i < 12; i++) md.push({ inc: 0, exp: 0 });
+  var cy = new Date().getFullYear();
+  payments.forEach(function(p) { if (p.st !== 'completed') return; var d = new Date(p.dt); if (d.getFullYear() === cy) { var m = d.getMonth(); if (p.ty === 'income') md[m].inc += Number(p.amt) || 0; else md[m].exp += Number(p.amt) || 0; } });
+  var mx = Math.max.apply(null, md.map(function(m) { return Math.max(m.inc, m.exp); })) || 1;
+  h += '<div class="card mb3"><div class="flex fca fjb mb3"><div class="tw6">Aylik Gelir / Gider</div><div class="flex gap2 ts tm"><span class="tg">■ Gelir</span><span class="tr2">■ Gider</span></div></div>';
+  h += '<div style="display:flex;gap:2px;align-items:flex-end;height:80px;padding-bottom:20px;position:relative">';
+  for (var i = 0; i < 12; i++) {
+    var ih = Math.round(md[i].inc / mx * 70), eh = Math.round(md[i].exp / mx * 70), isNow = i === new Date().getMonth();
+    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative">';
+    h += '<div style="width:100%;display:flex;align-items:flex-end;gap:1px;height:70px"><div style="flex:1;background:rgba(34,197,94,.7);height:' + ih + 'px;border-radius:2px 2px 0 0;min-height:' + (md[i].inc > 0 ? 3 : 0) + 'px"></div><div style="flex:1;background:rgba(239,68,68,.7);height:' + eh + 'px;border-radius:2px 2px 0 0;min-height:' + (md[i].exp > 0 ? 3 : 0) + 'px"></div></div>';
+    h += '<div style="font-size:8px;color:' + (isNow ? 'var(--blue2)' : 'var(--text3)') + ';font-weight:' + (isNow ? '700' : '400') + ';position:absolute;bottom:-16px">' + months[i] + '</div></div>';
+  }
+  h += '</div></div>';
+  h += '<div class="g21">';
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">Son Sporcular</div><button class="btn bp btn-sm" onclick="go(\'athletes\')">Tumu</button></div>';
+  athletes.slice(0, 5).forEach(function(a) {
+    var rate = attRate(a.id);
+    h += '<div class="att-row"><div class="ava" style="width:30px;height:30px;font-size:10px;background:' + avatarColor(a.fn) + '">' + ini(a.fn + ' ' + a.ln) + '</div><div style="flex:1;min-width:0"><div class="tw6 tsm trunc">' + esc(a.fn) + ' ' + esc(a.ln) + '</div><div class="ts tm">' + semi(a.sp) + ' ' + esc(a.sp || '-') + '</div></div>';
+    h += (rate !== null ? '<div style="font-size:11px;font-weight:700;color:' + (rate >= 80 ? 'var(--green)' : rate >= 60 ? 'var(--yellow)' : 'var(--red)') + '">%' + rate + '</div>' : '<span class="bg ' + stc(a.st) + '">' + stl(a.st) + '</span>') + '</div>';
+  });
+  if (!athletes.length) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Sporcu yok</div>';
+  h += '</div>';
+  h += '<div class="card"><div class="flex fca fjb mb3"><div class="tw6">&#x26A0; Bekleyen</div><button class="btn bp btn-sm" onclick="go(\'payments\')">Tumu</button></div>';
+  var odPays = payments.filter(function(p) { return p.st === 'overdue' || p.needsApproval; }).slice(0, 5);
+  if (!odPays.length) h += '<div style="text-align:center;padding:30px;color:var(--text3)">Bekleyen yok &#x1F44D;</div>';
+  odPays.forEach(function(p) { var isHv = p.needsApproval && p.st === 'pending'; h += '<div class="dr"><div style="min-width:0;flex:1"><div class="tw6 tsm trunc">' + esc(p.an || '-') + '</div><div class="ts tm">' + esc(p.ds || '-') + '</div></div><div style="text-align:right"><div class="tw6 tsm ' + (p.ty === 'income' ? 'tg' : 'tr2') + '">' + fmtN(p.amt) + ' TL</div><span class="bg ' + (isHv ? 'bg-y' : 'bg-r') + '">' + (isHv ? 'Havale' : 'Gecikti') + '</span></div></div>'; });
+  h += '</div></div>';
+  updateBadges(); return h;
+}
+// ══════════════════════════════════════════════════════════
+//  ATHLETES
+// ══════════════════════════════════════════════════════════
+function pgAthletes() {
+  var spList = []; athletes.forEach(function(a) { if (a.sp && spList.indexOf(a.sp) < 0) spList.push(a.sp); });
+  var filtered = athletes.filter(function(a) {
+    if (_athFilter.st && a.st !== _athFilter.st) return false;
+    if (_athFilter.sp && a.sp !== _athFilter.sp) return false;
+    if (_athFilter.cls && a.clsId !== _athFilter.cls) return false;
+    if (_athFilter.q) { var q = _athFilter.q.toLowerCase(); if ((a.fn + ' ' + a.ln + a.tc).toLowerCase().indexOf(q) < 0) return false; }
+    return true;
+  });
+  var h = '<div class="ph"><div class="sh"><div><div class="stit">&#x1F3C5; Sporcular</div><div class="ssub">' + filtered.length + ' / ' + athletes.length + ' sporcu</div></div>';
+  h += '<div class="flex gap1"><button class="btn bs btn-sm" onclick="exportAthletes()">&#x1F4E5; CSV</button><button class="btn bp btn-sm" onclick="showAthForm(null)">+ Ekle</button></div></div></div>';
+  h += '<div class="filters mb3">';
+  h += '<input class="fs" type="search" placeholder="&#x1F50D; Ara..." value="' + esc(_athFilter.q) + '" oninput="_athFilter.q=this.value;go(\'athletes\')">';
+  h += '<select class="fs" style="flex:0 0 auto;width:130px" onchange="_athFilter.st=this.value;go(\'athletes\')"><option value="">Tum Durumlar</option><option value="active"' + (_athFilter.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (_athFilter.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select>';
+  h += '<select class="fs" style="flex:0 0 auto;width:130px" onchange="_athFilter.sp=this.value;go(\'athletes\')"><option value="">Tum Branslar</option>';
+  spList.forEach(function(s) { h += '<option value="' + esc(s) + '"' + (_athFilter.sp === s ? ' selected' : '') + '>' + semi(s) + ' ' + esc(s) + '</option>'; });
+  h += '</select>';
+  if (classes.length) {
+    h += '<select class="fs" style="flex:0 0 auto;width:130px" onchange="_athFilter.cls=this.value;go(\'athletes\')"><option value="">Tum Siniflar</option>';
+    classes.forEach(function(c) { h += '<option value="' + c.id + '"' + (_athFilter.cls === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; });
+    h += '</select>';
+  }
+  h += '</div>';
+  if (!filtered.length) { h += '<div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:12px">&#x1F50D;</div><div class="tw6">Sporcu bulunamadi</div></div>'; return h; }
+  h += '<div class="tw"><table><thead><tr><th>Sporcu</th><th>Brans / Sinif</th><th>Ant.</th><th>Ucret</th><th>Devam</th><th>Veli</th><th>Durum</th><th></th></tr></thead><tbody>';
+  filtered.forEach(function(a) {
+    var rate = attRate(a.id);
+    h += '<tr style="cursor:pointer" onclick="showAthProfile(\'' + a.id + '\')">';
+    h += '<td><div class="flex fca gap2"><div class="ava" style="width:28px;height:28px;font-size:10px;background:' + avatarColor(a.fn) + '">' + ini(a.fn + ' ' + a.ln) + '</div><div><div class="tw6 tsm">' + esc(a.fn) + ' ' + esc(a.ln) + '</div><div class="ts tm">' + esc(a.tc || '') + '</div></div></div></td>';
+    h += '<td class="tsm">' + semi(a.sp) + ' ' + esc(a.sp || '-') + (a.clsId ? '<div class="ts tm">&#x1F4DA; ' + esc(clsName(a.clsId)) + '</div>' : '') + '</td>';
+    h += '<td class="tsm tm">' + esc(cname(a.ci)) + '</td>';
+    h += '<td class="tsm tw6">' + fmtN(a.fee) + ' TL</td>';
+    h += '<td style="min-width:70px"><div style="display:flex;align-items:center;gap:6px"><div class="pr" style="flex:1;width:50px"><div class="prb ' + (rate >= 80 ? 'prb-g' : rate >= 60 ? 'prb-y' : 'prb-r') + '" style="width:' + (rate || 0) + '%"></div></div><span class="ts">' + (rate !== null ? rate + '%' : '-') + '</span></div></td>';
+    h += '<td class="tsm tm">' + (a.pn ? esc(a.pn) + (a.pph ? '<div class="ts">' + esc(a.pph) + '</div>' : '') : '-') + '</td>';
+    h += '<td><span class="bg ' + stc(a.st) + '">' + stl(a.st) + '</span></td>';
+    h += '<td onclick="event.stopPropagation()"><div class="flex gap1"><button class="btn bs btn-xs" onclick="showAthForm(\'' + a.id + '\')">&#x270F;</button><button class="btn bd btn-xs" onclick="delAth(\'' + a.id + '\')">&#x1F5D1;</button></div></td></tr>';
+  });
+  h += '</tbody></table></div>'; return h;
+}
+function showAthProfile(id) {
+  var a = null; for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } } if (!a) return;
+  var rate = attRate(a.id), totalPaid = 0, totalOverdue = 0;
+  payments.forEach(function(p) { if (p.aid === a.id) { if (p.st === 'completed') totalPaid += Number(p.amt) || 0; else if (p.st === 'overdue') totalOverdue += Number(p.amt) || 0; } });
+  var recentAtt = []; Object.keys(attData).sort().reverse().slice(0, 14).forEach(function(d) { if (attData[d] && attData[d][a.id]) recentAtt.push({ date: d, s: attData[d][a.id] }); });
+  var h = '<div style="text-align:center;padding:16px 0"><div class="ava" style="width:72px;height:72px;font-size:28px;background:' + avatarColor(a.fn) + ';margin:0 auto 12px">' + ini(a.fn + ' ' + a.ln) + '</div>';
+  h += '<div style="font-size:22px;font-weight:800">' + esc(a.fn) + ' ' + esc(a.ln) + '</div>';
+  h += '<div style="color:var(--text2);margin-top:4px">' + semi(a.sp) + ' ' + esc(a.sp || '-') + '</div>';
+  if (a.clsId) h += '<div class="ts tm mt1">&#x1F4DA; ' + esc(clsName(a.clsId)) + '</div>';
+  h += '<span class="bg ' + stc(a.st) + '" style="display:inline-block;margin-top:8px">' + stl(a.st) + '</span></div>';
+  h += '<div class="g3 mb3">' + sc('g', '&#x1F4CA;', rate !== null ? rate + '%' : '-', 'Devam', '') + sc('b', '&#x2705;', fmtN(totalPaid) + ' TL', 'Odendi', '') + sc('r', '&#x26A0;', fmtN(totalOverdue) + ' TL', 'Gecikti', '') + '</div>';
+  h += row('TC', esc(a.tc || '-')) + row('Dogum', fmtD(a.bd) + ' (' + age(a.bd) + ')') + row('Tel', esc(a.ph || '-')) + row('E-posta', esc(a.em || '-')) + row('Lisans', esc(a.lic || '-')) + row('Antrenor', esc(cname(a.ci)));
+  if (a.pn) { h += '<div class="dv"></div>' + row('Veli', esc(a.pn)); if (a.pph) h += row('Veli Tel', esc(a.pph)); if (a.pem) h += row('Veli Email', esc(a.pem)); }
+  if (a.nt) h += '<div class="al al-b mt2">' + esc(a.nt) + '</div>';
+  if (recentAtt.length) { h += '<div class="dv mb2 mt2"></div><div class="tw6 tsm mb2">Son Yoklamalar</div><div class="flex gap1 fwrap">'; recentAtt.forEach(function(r) { h += '<span class="bg ' + (r.s === 'P' ? 'bg-g' : r.s === 'A' ? 'bg-r' : 'bg-y') + '" title="' + fmtD(r.date) + '">' + (r.s === 'P' ? 'V' : r.s === 'A' ? 'Y' : 'G') + '</span>'; }); h += '</div>'; }
+  modal(a.fn + ' ' + a.ln + ' — Profil', h, [{ lbl: 'Kapat', cls: 'bs', fn: function() { closeModal(); } }, { lbl: '&#x270F; Duzenle', cls: 'bp', fn: function() { closeModal(); showAthForm(id); } }]);
+}
+function showAthForm(id) {
+  var a = null; if (id) for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } }
+  var coOpts = '<option value="">-- Antrenor --</option>';
+  coaches.forEach(function(c) { coOpts += '<option value="' + c.id + '"' + (a && a.ci === c.id ? ' selected' : '') + '>' + esc(c.fn) + ' ' + esc(c.ln) + '</option>'; });
+  var clsOpts = '<option value="">-- Sinif --</option>';
+  classes.forEach(function(c) { clsOpts += '<option value="' + c.id + '"' + (a && a.clsId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; });
+  var spOpts = '<option value="">Brans Sec</option>';
+  sports.forEach(function(s) { spOpts += '<option value="' + esc(s.name) + '"' + (a && a.sp === s.name ? ' selected' : '') + '>' + semi(s.name) + ' ' + esc(s.name) + '</option>'; });
+  var h = '<div class="fg">' +
+    '<div class="fgr"><label>Ad *</label><input id="af-fn" type="text" value="' + (a ? esc(a.fn) : '') + '"/></div>' +
+    '<div class="fgr"><label>Soyad *</label><input id="af-ln" type="text" value="' + (a ? esc(a.ln) : '') + '"/></div>' +
+    '<div class="fgr"><label>TC Kimlik *</label><input id="af-tc" type="text" maxlength="11" value="' + (a ? esc(a.tc || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>Dogum Tarihi</label><input id="af-bd" type="date" value="' + (a ? a.bd || '' : '') + '"/></div>' +
+    '<div class="fgr"><label>Cinsiyet</label><select id="af-gn"><option value="">-</option><option value="Erkek"' + (a && a.gn === 'Erkek' ? ' selected' : '') + '>Erkek</option><option value="Kadin"' + (a && a.gn === 'Kadin' ? ' selected' : '') + '>Kadin</option></select></div>' +
+    '<div class="fgr"><label>Telefon</label><input id="af-ph" type="tel" value="' + (a ? esc(a.ph || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>E-posta</label><input id="af-em" type="email" value="' + (a ? esc(a.em || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>Brans *</label><select id="af-sp">' + spOpts + '</select></div>' +
+    '<div class="fgr"><label>Kategori</label><input id="af-ct" type="text" value="' + (a ? esc(a.cat || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>Lisans No</label><input id="af-li" type="text" value="' + (a ? esc(a.lic || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>Antrenor</label><select id="af-ci">' + coOpts + '</select></div>' +
+    '<div class="fgr"><label>Sinif</label><select id="af-cls">' + clsOpts + '</select></div>' +
+    '<div class="fgr"><label>Durum</label><select id="af-st"><option value="active"' + ((!a || a.st === 'active') ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (a && a.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select></div>' +
+    '<div class="fgr"><label>Ucret (TL/ay)</label><input id="af-fe" type="number" value="' + (a ? a.fee || 0 : '') + '"/></div>' +
+    '<div class="fgr"><label>Vade Gunu</label><input id="af-vd" type="number" min="1" max="28" placeholder="5" value="' + (a ? a.vd || '' : '') + '"/></div>' +
+    '<div class="fgr full" style="border-top:1px solid var(--border);padding-top:10px"><div class="tw6 tsm mb2" style="color:var(--blue2)">&#x1F464; Veli Bilgileri</div></div>' +
+    '<div class="fgr"><label>Veli Adi</label><input id="af-pn" type="text" value="' + (a ? esc(a.pn || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>Veli Telefon</label><input id="af-pph" type="tel" value="' + (a ? esc(a.pph || '') : '') + '"/></div>' +
+    '<div class="fgr"><label>Veli E-posta</label><input id="af-pem" type="email" value="' + (a ? esc(a.pem || '') : '') + '"/></div>' +
+    '<div class="fgr full"><label>Notlar</label><textarea id="af-nt">' + (a ? esc(a.nt || '') + ' ' : '') + '</textarea></div>' +
+    '<div class="fgr full" style="background:rgba(59,130,246,.06);padding:12px;border-radius:10px;border:1px solid rgba(59,130,246,.2)">' +
+    '<label style="color:var(--blue2)">&#x1F511; Sporcu Portal Sifresi</label>' +
+    '<input id="af-spass" type="text" value="' + (a ? esc(a.spPass || '') : '') + '" placeholder="Bos = TC son 4 hane"/></div></div>';
+  modal(id ? 'Sporcu Duzenle' : 'Yeni Sporcu Ekle', h, [{ lbl: 'Iptal', cls: 'bs', fn: function() { closeModal(); } }, { lbl: id ? 'Kaydet' : 'Ekle', cls: 'bp', fn: function() { saveAth(id || null); } }]);
+}
+async function saveAth(id) {
+  var fn = gv('af-fn'), ln = gv('af-ln'), tc = gv('af-tc'), sp = gv('af-sp');
+  if (!fn || !ln || !tc || !sp) { toast('Ad, soyad, TC ve brans zorunlu!', 'e'); return; }
+  if (tc.length !== 11 || !/^\d+$/.test(tc)) { toast('TC 11 rakam olmali!', 'e'); return; }
+  var d = { fn: fn, ln: ln, tc: tc, bd: gv('af-bd'), gn: gv('af-gn'), ph: gv('af-ph'), em: gv('af-em'), sp: sp, cat: gv('af-ct'), lic: gv('af-li'), ci: gv('af-ci'), clsId: gv('af-cls'), st: gv('af-st'), fee: gvn('af-fe'), vd: gvn('af-vd') || undefined, pn: gv('af-pn'), pph: gv('af-pph'), pem: gv('af-pem'), nt: gv('af-nt'), spPass: gv('af-spass') || undefined };
+  showLoading();
+  if (id) {
+    for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { athletes[i] = Object.assign({}, athletes[i], d); break; } }
+    await dbSaveAth(athletes.find(function(a) { return a.id === id; })); toast('Sporcu guncellendi', 'g');
+  } else {
+    d.id = uid(); d.rd = tod(); athletes.unshift(d);
+    await dbSaveAth(d);
+    if (d.fee > 0) {
+      var dd2 = d.vd || 5, now = new Date(), dueDate = new Date(now.getFullYear(), now.getMonth(), dd2);
+      if (dueDate < now) dueDate = new Date(now.getFullYear(), now.getMonth() + 1, dd2);
+      var dds = dueDate.getFullYear() + '-' + String(dueDate.getMonth() + 1).padStart(2, '0') + '-' + String(dueDate.getDate()).padStart(2, '0');
+      var p = { id: uid(), aid: d.id, an: fn + ' ' + ln, amt: d.fee, dt: tod(), ty: 'income', cat: 'Aidat', ds: 'Aidat — ' + new Date().toLocaleString('tr-TR', { month: 'long', year: 'numeric' }), st: 'pending', inv: 'INV-' + Date.now(), dd: dds };
+      payments.unshift(p); await dbSavePay(p);
+    }
+    toast('Sporcu eklendi', 'g');
+  }
+  hideLoading(); closeModal(); go('athletes');
+}
+function delAth(id) {
+  var a = null; for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === id) { a = athletes[i]; break; } } if (!a) return;
+  confirm2(a.fn + ' ' + a.ln + ' silinsin mi?', 'Bu sporcu kalici olarak silinecek.', async function() {
+    athletes = athletes.filter(function(x) { return x.id !== id; }); await dbDelAth(id); toast('Sporcu silindi'); go('athletes');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  PAYMENTS
+// ══════════════════════════════════════════════════════════
+function pgPayments() {
+  var havaleList = payments.filter(function(p) { return p.payMethod === 'havale' && p.st === 'pending' && p.needsApproval; });
+  var totalInc = 0, totalExp = 0, totalPend = 0;
+  payments.forEach(function(p) { if (p.st === 'completed') { if (p.ty === 'income') totalInc += Number(p.amt) || 0; else totalExp += Number(p.amt) || 0; } else if (p.st === 'pending') totalPend += Number(p.amt) || 0; });
+  var h = '<div class="ph"><div class="sh"><div><div class="stit">&#x1F4B0; Odemeler</div></div><div class="flex gap1"><button class="btn bs btn-sm" onclick="exportPayments()">&#x1F4E5; CSV</button><button class="btn bp btn-sm" onclick="showPayForm()">+ Ekle</button></div></div></div>';
+  h += '<div class="g3 mb3">' + sc('g', '&#x2B06;', fmtN(totalInc) + ' TL', 'Toplam Gelir', '') + sc('r', '&#x2B07;', fmtN(totalExp) + ' TL', 'Toplam Gider', '') + sc('y', '&#x23F3;', fmtN(totalPend) + ' TL', 'Bekleyen', '') + '</div>';
+  if (havaleList.length) {
+    h += '<div class="card mb3" style="border-color:rgba(245,158,11,.35)"><div class="tw6 ty mb2">&#x1F3E6; Havale Onay Bekliyor (' + havaleList.length + ')</div>';
+    havaleList.forEach(function(p) { h += '<div class="flex fca fjb" style="background:var(--bg3);padding:10px 12px;border-radius:10px;margin-bottom:6px"><div><div class="tw6 tsm">' + esc(p.an) + ' — ' + fmtN(p.amt) + ' TL</div><div class="ts tm">' + esc(p.ds) + (p.havaleNote ? ' · ' + esc(p.havaleNote) : '') + '</div></div><div class="flex gap1"><button class="btn bsu btn-xs" onclick="approveHavale(\'' + p.id + '\')">&#x2705; Onayla</button><button class="btn bd btn-xs" onclick="rejectHavale(\'' + p.id + '\')">&#x274C; Reddet</button></div></div>'; });
+    h += '</div>';
+  }
+  if (overdueCount()) h += '<div class="al al-r mb3">&#x26A0; ' + overdueCount() + ' gecikmis odeme var</div>';
+  h += '<div class="filters mb3"><input class="fs" type="search" placeholder="&#x1F50D; Ara..." value="' + esc(_payFilter.q) + '" oninput="_payFilter.q=this.value;renderPayTbl()">';
+  h += '<select class="fs" style="flex:0 0 auto;width:150px" onchange="_payFilter.st=this.value;renderPayTbl()"><option value="">Tum Durumlar</option>';
+  ['pending', 'completed', 'overdue', 'cancelled'].forEach(function(s) { h += '<option value="' + s + '"' + (_payFilter.st === s ? ' selected' : '') + '>' + stl(s) + '</option>'; });
+  h += '</select></div><div id="pay-tbl"></div>';
+  setTimeout(renderPayTbl, 0); return h;
+}
+function renderPayTbl() {
+  var el = document.getElementById('pay-tbl'); if (!el) return;
+  var filtered = payments.filter(function(p) {
+    if (_payFilter.st && p.st !== _payFilter.st) return false;
+    if (_payFilter.q) { var q = _payFilter.q.toLowerCase(); if ((p.an || '').toLowerCase().indexOf(q) < 0 && (p.ds || '').toLowerCase().indexOf(q) < 0) return false; }
+    return true;
+  });
+  var h = '<div class="tw"><table><thead><tr><th>Tarih</th><th>Sporcu</th><th>Aciklama</th><th>Tutar</th><th>Vade</th><th>Durum</th><th></th></tr></thead><tbody>';
+  filtered.forEach(function(p) {
+    var sc2 = stc(p.st), sl2 = stl(p.st);
+    if (p.payMethod === 'havale' && p.st === 'pending') { sc2 = 'bg-y'; sl2 = '&#x1F3E6; Onay'; }
+    h += '<tr' + (p.st === 'overdue' ? ' style="background:rgba(239,68,68,.03)"' : '') + '>';
+    h += '<td class="tsm">' + fmtD(p.dt) + '</td><td class="tsm tw6">' + esc(p.an || '-') + '</td><td class="tsm tm">' + esc(p.ds) + '</td>';
+    h += '<td class="tw6 ' + (p.ty === 'income' ? 'tg' : 'tr2') + '">' + (p.ty === 'income' ? '↑' : '↓') + fmtN(p.amt) + ' TL</td>';
+    h += '<td class="tsm ' + (p.dd && p.dd < tod() && p.st !== 'completed' ? 'tr2' : 'tm') + '">' + fmtD(p.dd) + '</td>';
+    h += '<td><span class="bg ' + sc2 + '">' + sl2 + '</span></td>';
+    h += '<td><div class="flex gap1">' + (p.st !== 'completed' ? '<button class="btn bsu btn-xs" onclick="markPaid(\'' + p.id + '\')">&#x2705;</button>' : '') + '<button class="btn bd btn-xs" onclick="delPay(\'' + p.id + '\')">&#x1F5D1;</button></div></td></tr>';
+  });
+  if (!filtered.length) h += '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text3)">Kayit bulunamadi</td></tr>';
+  el.innerHTML = h + '</tbody></table></div>';
+}
+function showPayForm() {
+  var aOpts = '<option value="">-- Sporcu Sec --</option>';
+  athletes.forEach(function(a) { aOpts += '<option value="' + a.id + '">' + esc(a.fn) + ' ' + esc(a.ln) + '</option>'; });
+  var h = '<div class="fg">' +
+    '<div class="fgr"><label>Sporcu</label><select id="pf-at">' + aOpts + '</select></div>' +
+    '<div class="fgr"><label>Tur</label><select id="pf-ty"><option value="income">Gelir</option><option value="expense">Gider</option></select></div>' +
+    '<div class="fgr"><label>Kategori</label><select id="pf-ct"><option>Aidat</option><option>Lisans</option><option>Turnuva</option><option>Malzeme</option><option>Antrenor Maas</option><option>Kira</option><option>Diger</option></select></div>' +
+    '<div class="fgr"><label>Tutar (TL) *</label><input id="pf-am" type="number" placeholder="0"/></div>' +
+    '<div class="fgr"><label>Tarih</label><input id="pf-dt" type="date" value="' + tod() + '"/></div>' +
+    '<div class="fgr"><label>Vade Tarihi</label><input id="pf-dd" type="date"/></div>' +
+    '<div class="fgr"><label>Durum</label><select id="pf-st"><option value="pending">Bekliyor</option><option value="completed">Tamamlandi</option><option value="overdue">Gecikti</option></select></div>' +
+    '<div class="fgr full"><label>Aciklama *</label><input id="pf-ds" type="text" placeholder="Odeme aciklamasi"/></div></div>';
+  modal('Odeme Ekle', h, [{ lbl: 'Iptal', cls: 'bs', fn: function() { closeModal(); } }, { lbl: 'Kaydet', cls: 'bp', fn: function() { savePay(); } }]);
+}
+async function savePay() {
+  var ds = gv('pf-ds'), am = gvn('pf-am');
+  if (!ds || !am) { toast('Aciklama ve tutar zorunlu!', 'e'); return; }
+  var ty = gv('pf-ty'), aid = gv('pf-at');
+  var ath = null; for (var i = 0; i < athletes.length; i++) { if (athletes[i].id === aid) { ath = athletes[i]; break; } }
+  var p = { id: uid(), aid: aid, an: ath ? (ath.fn + ' ' + ath.ln) : '', amt: am, dt: gv('pf-dt'), dd: gv('pf-dd'), ty: ty, cat: gv('pf-ct'), ds: ds, st: gv('pf-st'), inv: (ty === 'income' ? 'INV' : 'EXP') + '-' + Date.now() };
+  payments.unshift(p); showLoading(); await dbSavePay(p); hideLoading(); closeModal(); renderPayTbl(); toast('Odeme kaydedildi', 'g');
+}
+function delPay(id) { confirm2('Odeme silinsin mi?', 'Bu islem geri alinamaz.', async function() { payments = payments.filter(function(p) { return p.id !== id; }); await dbDelPay(id); renderPayTbl(); toast('Odeme silindi'); }); }
+async function markPaid(id) { var p = null; for (var i = 0; i < payments.length; i++) { if (payments[i].id === id) { payments[i].st = 'completed'; p = payments[i]; break; } } if (p) { showLoading(); await dbSavePay(p); hideLoading(); } updateBadges(); go(curPage); toast('Odeme tamamlandi', 'g'); }
+async function approveHavale(id) { var p = null; for (var i = 0; i < payments.length; i++) { if (payments[i].id === id) { payments[i].st = 'completed'; payments[i].needsApproval = false; payments[i].approvedBy = currentUser ? currentUser.name : 'Admin'; payments[i].approvedAt = tod(); p = payments[i]; break; } } if (p) { showLoading(); await dbSavePay(p); hideLoading(); } updateBadges(); go(curPage); toast('Havale onaylandi!', 'g'); }
+function rejectHavale(id) { confirm2('Havale Reddedilsin mi?', 'Odeme iptal edilecek.', async function() { var p = null; for (var i = 0; i < payments.length; i++) { if (payments[i].id === id) { payments[i].st = 'cancelled'; payments[i].needsApproval = false; p = payments[i]; break; } } if (p) { showLoading(); await dbSavePay(p); hideLoading(); } go(curPage); toast('Havale reddedildi'); }); }
+// ══════════════════════════════════════════════════════════
+//  ACCOUNTING
+// ══════════════════════════════════════════════════════════
+function pgAccounting() {
+  var months = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik'];
+  var now = new Date(), cy = now.getFullYear(), cm = now.getMonth();
+  var income = 0, expense = 0, monthly = {};
+  for (var i = 0; i < 12; i++) monthly[i] = { income: 0, expense: 0 };
+  payments.forEach(function(p) {
+    if (p.st !== 'completed') return;
+    var d = new Date(p.dt); if (d.getFullYear() === cy) { var m = d.getMonth(); if (p.ty === 'income') { monthly[m].income += Number(p.amt)||0; income += Number(p.amt)||0; } else { monthly[m].expense += Number(p.amt)||0; expense += Number(p.amt)||0; } }
+  });
+  var net = income - expense;
+  var h = '<div class="ph"><div class="sh"><div><div class="stit">&#x1F4CA; Muhasebe</div><div class="ssub">' + cy + ' yili</div></div><button class="btn bs btn-sm" onclick="exportPayments()">&#x1F4E5; CSV</button></div></div>';
+  h += '<div class="g3 mb3">' + sc('g','&#x2B06;',fmtN(income)+' TL','Toplam Gelir','') + sc('r','&#x2B07;',fmtN(expense)+' TL','Toplam Gider','') + sc(net>=0?'b':'r','&#x1F4B0;',fmtN(net)+' TL','Net','') + '</div>';
+  // Donut chart (SVG)
+  var total = income + expense || 1;
+  var incPct = Math.round(income/total*100);
+  var r = 52, circ = 2*Math.PI*r;
+  var incDash = circ * income/total, expDash = circ * expense/total;
+  h += '<div class="g21 mb3">';
+  h += '<div class="card" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px"><div class="tw6 mb2">Gelir / Gider Dagilimi</div>';
+  h += '<svg width="130" height="130" viewBox="0 0 130 130"><circle cx="65" cy="65" r="' + r + '" fill="none" stroke="var(--bg3)" stroke-width="18"/>';
+  h += '<circle cx="65" cy="65" r="' + r + '" fill="none" stroke="var(--green)" stroke-width="18" stroke-dasharray="' + incDash + ' ' + (circ-incDash) + '" stroke-dashoffset="' + (circ*0.25) + '" transform="rotate(-90 65 65)"/>';
+  if (expense > 0) h += '<circle cx="65" cy="65" r="' + r + '" fill="none" stroke="var(--red)" stroke-width="18" stroke-dasharray="' + expDash + ' ' + (circ-expDash) + '" stroke-dashoffset="' + (-(incDash - circ*0.25)) + '" transform="rotate(-90 65 65)"/>';
+  h += '<text x="65" y="60" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="800">' + incPct + '%</text>';
+  h += '<text x="65" y="76" text-anchor="middle" fill="var(--text2)" font-size="10">Gelir</text></svg>';
+  h += '<div class="flex gap3"><div class="flex fca gap1"><div style="width:10px;height:10px;border-radius:50%;background:var(--green)"></div><span class="ts">Gelir</span></div><div class="flex fca gap1"><div style="width:10px;height:10px;border-radius:50%;background:var(--red)"></div><span class="ts">Gider</span></div></div></div>';
+  // Bar chart
+  var mx = Math.max.apply(null, Object.keys(monthly).map(function(k){return Math.max(monthly[k].income,monthly[k].expense);})) || 1;
+  h += '<div class="card"><div class="tw6 mb3">Aylik Grafik</div>';
+  h += '<div style="display:flex;gap:3px;align-items:flex-end;height:100px;padding-bottom:24px;position:relative">';
+  for (var i = 0; i < 12; i++) {
+    var ih = Math.round(monthly[i].income/mx*90), eh = Math.round(monthly[i].expense/mx*90), isNow = i===cm;
+    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative">';
+    h += '<div style="width:100%;display:flex;align-items:flex-end;gap:1px;height:90px">';
+    h += '<div title="' + fmtN(monthly[i].income) + ' TL" style="flex:1;background:rgba(34,197,94,' + (isNow?'0.9':'0.55') + ');height:' + ih + 'px;border-radius:3px 3px 0 0;min-height:' + (monthly[i].income>0?3:0) + 'px"></div>';
+    h += '<div title="' + fmtN(monthly[i].expense) + ' TL" style="flex:1;background:rgba(239,68,68,' + (isNow?'0.9':'0.55') + ');height:' + eh + 'px;border-radius:3px 3px 0 0;min-height:' + (monthly[i].expense>0?3:0) + 'px"></div>';
+    h += '</div><div style="font-size:8px;color:' + (isNow?'var(--blue2)':'var(--text3)') + ';font-weight:' + (isNow?700:400) + ';position:absolute;bottom:-16px">' + months[i].slice(0,3) + '</div></div>';
+  }
+  h += '</div></div></div>';
+  h += '<div class="card mt3"><div class="tw6 mb3">Aylik Detay</div><div class="tw"><table><thead><tr><th>Ay</th><th>Gelir</th><th>Gider</th><th>Net</th></tr></thead><tbody>';
+  for (var i = 11; i >= 0; i--) {
+    var n2 = monthly[i].income - monthly[i].expense;
+    h += '<tr' + (i===cm?' style="background:rgba(59,130,246,.05)"':'') + '><td class="tsm tw6">' + months[i] + (i===cm?' <span class="bg bg-b" style="font-size:9px">Bu Ay</span>':'') + '</td><td class="tg tsm">' + fmtN(monthly[i].income) + ' TL</td><td class="tr2 tsm">' + fmtN(monthly[i].expense) + ' TL</td><td class="tw6 tsm ' + (n2>=0?'tg':'tr2') + '">' + fmtN(n2) + ' TL</td></tr>';
+  }
+  h += '</tbody></table></div></div>'; return h;
+}
+
+// ══════════════════════════════════════════════════════════
+//  ATTENDANCE
+// ══════════════════════════════════════════════════════════
+function pgAttendance() {
+  var spList = []; athletes.forEach(function(a){if(a.sp&&spList.indexOf(a.sp)<0)spList.push(a.sp);});
+  var list = athletes.filter(function(a){return a.st==='active'&&(!ATSP||a.sp===ATSP)&&(!ATCLS||a.clsId===ATCLS);});
+  var day = attData[ATD]||{}, present=0, absent=0, late=0;
+  list.forEach(function(a){var v=day[a.id];if(v==='P')present++;else if(v==='A')absent++;else if(v==='L')late++;});
+  var unmarked = list.length - present - absent - late;
+  var h = '<div class="ph"><div class="sh"><div><div class="stit">&#x1F4CB; Devam Takibi</div></div>';
+  h += '<div class="flex gap1"><button class="btn bp btn-sm" onclick="showQRScanner()">&#x1F4F7; QR</button></div></div></div>';
+  h += '<div class="filters mb3">';
+  h += '<input type="date" class="fs" style="flex:0 0 auto;width:155px" value="' + ATD + '" onchange="ATD=this.value;go(\'attendance\')">';
+  h += '<select class="fs" style="flex:0 0 auto;width:140px" onchange="ATSP=this.value;go(\'attendance\')"><option value="">Tum Branslar</option>';
+  spList.forEach(function(s){h+='<option value="'+esc(s)+'"'+(ATSP===s?' selected':'')+'>'+semi(s)+' '+esc(s)+'</option>';});
+  h += '</select>';
+  if(classes.length){
+    h += '<select class="fs" style="flex:0 0 auto;width:140px" onchange="ATCLS=this.value;go(\'attendance\')"><option value="">Tum Siniflar</option>';
+    classes.forEach(function(c){h+='<option value="'+c.id+'"'+(ATCLS===c.id?' selected':'')+'>'+esc(c.name)+'</option>';});
+    h += '</select>';
+  }
+  h += '</div>';
+  h += '<div class="g4 mb3">' + sc('g','&#x2705;',present,'Katildi','') + sc('r','&#x274C;',absent,'Katilmadi','') + sc('y','&#x23F0;',late,'Gec','') + sc('b','&#x2753;',unmarked,'Isaretlenmedi','') + '</div>';
+  if(list.length>0){var pct=Math.round(present/list.length*100);h+='<div class="card mb3"><div class="flex fca fjb mb2"><span class="tw6 tsm">Devam Orani — '+fmtD(ATD)+'</span><span class="tw6" style="color:'+(pct>=80?'var(--green)':pct>=60?'var(--yellow)':'var(--red)')+'">%'+pct+'</span></div><div class="pr"><div class="prb '+(pct>=80?'prb-g':pct>=60?'prb-y':'prb-r')+'" style="width:'+pct+'%"></div></div></div>';}
+  h += '<div class="g21">';
+  h += '<div class="card"><div class="flex fca fjb mb3"><div><div class="tw6">Yoklama Listesi</div><div class="ts tm">'+list.length+' sporcu</div></div>';
+  h += '<div class="flex gap1"><button class="btn bsu btn-xs" onclick="markAllAtt(\'P\')">Hepsi Var</button><button class="btn bd btn-xs" onclick="markAllAtt(\'A\')">Hepsi Yok</button></div></div>';
+  if(!list.length)h+='<div style="text-align:center;padding:30px;color:var(--text3)">Bu filtrede sporcu yok</div>';
+  list.forEach(function(a){
+    var s2=day[a.id]||'';
+    h+='<div class="att-row"><div class="ava" style="width:28px;height:28px;font-size:10px;flex-shrink:0;background:'+avatarColor(a.fn)+'">'+ini(a.fn+' '+a.ln)+'</div>';
+    h+='<div style="flex:1;min-width:0"><div class="tw6 tsm trunc">'+esc(a.fn)+' '+esc(a.ln)+'</div><div class="ts tm">'+semi(a.sp)+' '+esc(a.sp)+(a.clsId?' · '+esc(clsName(a.clsId)):'')+'</div></div>';
+    h+='<div class="att-btns"><button class="att-b'+(s2==='P'?' ap':'')+'" onclick="setAtt(\''+a.id+'\',\'P\')">VAR</button><button class="att-b'+(s2==='L'?' al2':'')+'" onclick="setAtt(\''+a.id+'\',\'L\')">GEC</button><button class="att-b'+(s2==='A'?' aa':'')+'" onclick="setAtt(\''+a.id+'\',\'A\')">YOK</button></div></div>';
+  });
+  h += '</div>';
+  h += '<div class="card"><div class="tw6 mb3">Devam Oranlari</div>';
+  var sorted = athletes.filter(function(a){return a.st==='active';}).map(function(a){return{a:a,r:attRate(a.id)||0};}).sort(function(x,y){return y.r-x.r;});
+  sorted.slice(0,15).forEach(function(item){
+    var a=item.a,r=item.r;
+    h+='<div class="flex fca gap2 mb2"><div class="ava" style="width:22px;height:22px;font-size:8px;flex-shrink:0;background:'+avatarColor(a.fn)+'">'+ini(a.fn+' '+a.ln)+'</div>';
+    h+='<div class="ts trunc" style="width:80px;flex-shrink:0">'+esc(a.fn)+' '+(a.ln[0]||'')+'.</div>';
+    h+='<div style="flex:1"><div class="pr"><div class="prb '+(r>=80?'prb-g':r>=60?'prb-y':'prb-r')+'" style="width:'+r+'%"></div></div></div>';
+    h+='<div class="ts tw6" style="width:32px;text-align:right;color:'+(r>=80?'var(--green)':r>=60?'var(--yellow)':'var(--text3)')+'">'+r+'%</div></div>';
+  });
+  if(!sorted.length)h+='<div style="text-align:center;padding:20px;color:var(--text3)">Veri yok</div>';
+  h += '</div></div>'; return h;
+}
+async function setAtt(aid,s){
+  if(!attData[ATD])attData[ATD]={};
+  var rem=attData[ATD][aid]===s;
+  if(rem){delete attData[ATD][aid];await dbSaveAtt(ATD,aid,undefined);}
+  else{attData[ATD][aid]=s;await dbSaveAtt(ATD,aid,s);}
+  go('attendance');
+}
+async function markAllAtt(s){
+  if(!attData[ATD])attData[ATD]={};
+  var list=athletes.filter(function(a){return a.st==='active'&&(!ATSP||a.sp===ATSP)&&(!ATCLS||a.clsId===ATCLS);});
+  showLoading();
+  for(var i=0;i<list.length;i++){attData[ATD][list[i].id]=s;await dbSaveAtt(ATD,list[i].id,s);}
+  hideLoading();go('attendance');toast('Yoklama guncellendi','g');
+}
+
+// ══════════════════════════════════════════════════════════
+//  COACHES
+// ══════════════════════════════════════════════════════════
+function pgCoaches(){
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F3CB; Antrenorler</div><div class="ssub">'+coaches.length+' antrenor</div></div><button class="btn bp btn-sm" onclick="showCoachForm(null)">+ Ekle</button></div></div>';
+  h+='<div class="g3">';
+  coaches.forEach(function(c){
+    var myN=0;athletes.forEach(function(a){if(a.ci===c.id&&a.st==='active')myN++;});
+    h+='<div class="card"><div class="flex fca gap2 mb3"><div class="ava" style="width:44px;height:44px;font-size:16px;background:'+avatarColor(c.fn)+'">'+ini(c.fn+' '+c.ln)+'</div>';
+    h+='<div style="flex:1;min-width:0"><div class="tw6 trunc">'+esc(c.fn)+' '+esc(c.ln)+'</div><div class="tsm tm">'+semi(c.sp)+' '+esc(c.sp)+'</div></div>';
+    h+='<span class="bg '+(c.st==='active'?'bg-g':'bg-r')+'">'+stl(c.st)+'</span></div>';
+    h+=row('Telefon',esc(c.ph||'-'))+row('E-posta',esc(c.em||'-'))+row('Maas',fmtN(c.sal)+' TL/ay')+row('Sporcu',myN+' aktif');
+    if(c.nt)h+='<div class="al al-b mt2 mb0">'+esc(c.nt)+'</div>';
+    h+='<div class="flex gap1 mt3"><button class="btn bs btn-sm" style="flex:1" onclick="showCoachForm(\''+c.id+'\')">&#x270F; Duzenle</button><button class="btn bd btn-sm" onclick="delCoach(\''+c.id+'\')">&#x1F5D1;</button></div></div>';
+  });
+  h+='<div class="card" style="border-style:dashed;opacity:.5;display:flex;align-items:center;justify-content:center;min-height:180px;cursor:pointer" onclick="showCoachForm(null)"><div style="text-align:center"><div style="font-size:32px">+</div><div class="tsm mt1 tm">Antrenor Ekle</div></div></div></div>';
+  return h;
+}
+function showCoachForm(id){
+  var c=null;if(id)for(var i=0;i<coaches.length;i++){if(coaches[i].id===id){c=coaches[i];break;}}
+  var h='<div class="fg">'+
+    '<div class="fgr"><label>Ad *</label><input id="cf-fn" type="text" value="'+(c?esc(c.fn):'')+'"/></div>'+
+    '<div class="fgr"><label>Soyad *</label><input id="cf-ln" type="text" value="'+(c?esc(c.ln):'')+'"/></div>'+
+    '<div class="fgr"><label>Telefon</label><input id="cf-ph" type="tel" value="'+(c?esc(c.ph||''):'')+'"/></div>'+
+    '<div class="fgr"><label>E-posta</label><input id="cf-em" type="email" value="'+(c?esc(c.em||''):'')+'"/></div>'+
+    '<div class="fgr"><label>Uzmanlik *</label><input id="cf-sp" type="text" value="'+(c?esc(c.sp||''):'')+'"/></div>'+
+    '<div class="fgr"><label>Maas (TL/ay)</label><input id="cf-sa" type="number" value="'+(c?c.sal||0:'')+'"/></div>'+
+    '<div class="fgr"><label>Baslangic</label><input id="cf-sd" type="date" value="'+(c?c.sd||'':'')+'"/></div>'+
+    '<div class="fgr"><label>Durum</label><select id="cf-st"><option value="active"'+((!c||c.st==='active')?' selected':'')+'>Aktif</option><option value="inactive"'+(c&&c.st==='inactive'?' selected':'')+'>Pasif</option></select></div>'+
+    '<div class="fgr full"><label>Notlar</label><textarea id="cf-nt">'+(c?esc(c.nt||'')+' ':'')+'</textarea></div></div>';
+  modal(id?'Antrenor Duzenle':'Yeni Antrenor',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:id?'Kaydet':'Ekle',cls:'bp',fn:function(){saveCoach(id||null);}}]);
+}
+async function saveCoach(id){
+  var fn=gv('cf-fn'),ln=gv('cf-ln'),sp=gv('cf-sp');
+  if(!fn||!ln||!sp){toast('Ad, soyad ve uzmanlik zorunlu!','e');return;}
+  var d={fn:fn,ln:ln,ph:gv('cf-ph'),em:gv('cf-em'),sp:sp,sal:gvn('cf-sa'),sd:gv('cf-sd'),st:gv('cf-st'),nt:gv('cf-nt')};
+  showLoading();
+  if(id){for(var i=0;i<coaches.length;i++){if(coaches[i].id===id){coaches[i]=Object.assign({},coaches[i],d);break;}}await dbSaveCoach(coaches.find(function(c){return c.id===id;}));toast('Antrenor guncellendi','g');}
+  else{d.id=uid();coaches.push(d);await dbSaveCoach(d);toast('Antrenor eklendi','g');}
+  hideLoading();closeModal();go('coaches');
+}
+function delCoach(id){confirm2('Antrenor silinsin mi?','',async function(){coaches=coaches.filter(function(c){return c.id!==id;});await dbDelCoach(id);toast('Antrenor silindi');go('coaches');});}
+
+// ══════════════════════════════════════════════════════════
+//  MESSAGES
+// ══════════════════════════════════════════════════════════
+function pgMessages(){
+  var unread=0;messages.forEach(function(m){if(!m.rd)unread++;});
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F4AC; Mesajlar</div><div class="ssub">'+unread+' okunmamis</div></div><button class="btn bp btn-sm" onclick="showMsgForm()">+ Yeni</button></div></div>';
+  h+='<div class="g21"><div class="card" style="padding:0;overflow:hidden">';
+  if(!messages.length)h+='<div style="text-align:center;padding:40px;color:var(--text3)">&#x1F4ED; Mesaj yok</div>';
+  messages.filter(function(m){return m.role!=='duyuru';}).forEach(function(m){
+    h+='<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;background:'+(m.rd?'transparent':'rgba(59,130,246,.04)')+'" onclick="openMsg(\''+m.id+'\')"><div class="flex fca gap2">';
+    h+='<div class="ava" style="width:28px;height:28px;font-size:10px;background:'+avatarColor(m.fr)+'">'+ini(m.fr)+'</div>';
+    h+='<div style="flex:1;min-width:0"><div class="flex fjb"><span class="'+(m.rd?'tm':'tw6')+' tsm trunc">'+esc(m.fr)+'</span><span class="ts tm">'+fmtD(m.dt)+'</span></div>';
+    h+='<div class="ts tm trunc">'+esc(m.sub)+'</div></div>';
+    if(!m.rd)h+='<div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0"></div>';
+    h+='</div></div>';
+  });
+  h+='</div><div class="card" id="msg-det"><div style="text-align:center;padding:40px;color:var(--text3)">Bir mesaj secin</div></div></div>';
+  return h;
+}
+function openMsg(id){
+  var m=null;for(var i=0;i<messages.length;i++){if(messages[i].id===id){m=messages[i];break;}}if(!m)return;
+  if(!m.rd){m.rd=true;dbSaveMsg(m);updateBadges();}
+  var el=document.getElementById('msg-det');if(!el)return;
+  el.innerHTML='<div class="tw6" style="font-size:16px;margin-bottom:8px">'+esc(m.sub)+'</div>'+
+    '<div class="flex fca gap2 mb3"><div class="ava" style="width:28px;height:28px;font-size:10px;background:'+avatarColor(m.fr)+'">'+ini(m.fr)+'</div>'+
+    '<div><div class="tw6 tsm">'+esc(m.fr)+'</div><div class="ts tm">'+esc(m.role||'')+(m.dt?' · '+fmtD(m.dt):'')+'</div></div></div>'+
+    '<div class="dv"></div><div class="tsm" style="line-height:1.8;white-space:pre-wrap;margin:12px 0">'+esc(m.body)+'</div>'+
+    '<div class="flex gap2 mt3"><button class="btn bp btn-sm" onclick="showReplyForm(\''+m.id+'\')">&#x21A9; Yanitla</button><button class="btn bd btn-sm" onclick="delMsg(\''+m.id+'\')">&#x1F5D1;</button></div>';
+}
+function showMsgForm(){
+  var h='<div class="fgr mb2"><label>Konu *</label><input id="mf-sub" type="text"/></div><div class="fgr"><label>Mesaj *</label><textarea id="mf-body" style="min-height:120px"></textarea></div>';
+  modal('Yeni Mesaj',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:'Gonder',cls:'bp',fn:function(){sendMsg();}}]);
+}
+function showReplyForm(id){
+  var orig=null;for(var i=0;i<messages.length;i++){if(messages[i].id===id){orig=messages[i];break;}}if(!orig)return;
+  var h='<div class="al al-b mb2 tsm">RE: '+esc(orig.sub)+'</div><div class="fgr"><label>Yanit *</label><textarea id="mf-body" style="min-height:100px"></textarea></div>';
+  modal('Yanitla',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:'Gonder',cls:'bp',fn:function(){sendReply(id);}}]);
+}
+async function sendMsg(){
+  var sub=gv('mf-sub'),body=gv('mf-body');
+  if(!sub||!body){toast('Konu ve mesaj zorunlu!','e');return;}
+  var m={id:uid(),fr:currentUser?currentUser.name:'Admin',role:'Yonetici',sub:sub,body:body,dt:tod(),rd:true};
+  messages.unshift(m);showLoading();await dbSaveMsg(m);hideLoading();closeModal();go('messages');toast('Mesaj gonderildi','g');
+}
+async function sendReply(id){
+  var orig=null;for(var i=0;i<messages.length;i++){if(messages[i].id===id){orig=messages[i];break;}}if(!orig)return;
+  var body=gv('mf-body');if(!body){toast('Mesaj bos!','e');return;}
+  var m={id:uid(),fr:currentUser?currentUser.name:'Admin',role:'Yonetici',sub:'RE: '+orig.sub,body:body,dt:tod(),rd:true};
+  messages.unshift(m);showLoading();await dbSaveMsg(m);hideLoading();closeModal();go('messages');toast('Yanit gonderildi','g');
+}
+async function delMsg(id){messages=messages.filter(function(m){return m.id!==id;});await dbDelMsg(id);go('messages');toast('Mesaj silindi');}
+// ══════════════════════════════════════════════════════════
+//  BRANSLAR (Sports)
+// ══════════════════════════════════════════════════════════
+function pgSports(){
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F3C5; Branslar</div><div class="ssub">'+sports.length+' brans</div></div><button class="btn bp btn-sm" onclick="showSportForm(null)">+ Ekle</button></div></div>';
+  h+='<div class="g3">';
+  sports.forEach(function(s){
+    var cnt=athletes.filter(function(a){return a.sp===s.name;}).length;
+    h+='<div class="card"><div class="flex fca gap2 mb3"><div style="width:44px;height:44px;background:var(--grad);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px">'+semi(s.name)+'</div>';
+    h+='<div style="flex:1"><div class="tw6">'+esc(s.name)+'</div><div class="ts tm">'+cnt+' sporcu</div></div></div>';
+    h+='<div class="flex gap1"><button class="btn bs btn-sm" style="flex:1" onclick="showSportForm(\''+s.id+'\')">&#x270F; Duzenle</button><button class="btn bd btn-sm" onclick="delSport(\''+s.id+'\')">&#x1F5D1;</button></div></div>';
+  });
+  h+='<div class="card" style="border-style:dashed;opacity:.5;display:flex;align-items:center;justify-content:center;min-height:120px;cursor:pointer" onclick="showSportForm(null)"><div style="text-align:center"><div style="font-size:28px">+</div><div class="tsm mt1 tm">Brans Ekle</div></div></div></div>';
+  return h;
+}
+function showSportForm(id){
+  var s=null;if(id)for(var i=0;i<sports.length;i++){if(sports[i].id===id){s=sports[i];break;}}
+  var h='<div class="fgr mb3"><label>Brans Adi *</label><input id="sf-name" type="text" value="'+(s?esc(s.name):'')+'" placeholder="Futbol, Basketbol..."/></div>';
+  modal(id?'Brans Duzenle':'Yeni Brans',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:id?'Kaydet':'Ekle',cls:'bp',fn:function(){saveSport(id||null);}}]);
+}
+async function saveSport(id){
+  var name=gv('sf-name');if(!name){toast('Brans adi zorunlu!','e');return;}
+  showLoading();
+  if(id){for(var i=0;i<sports.length;i++){if(sports[i].id===id){sports[i].name=name;break;}}await dbSaveSport(sports.find(function(s){return s.id===id;}));toast('Brans guncellendi','g');}
+  else{var d={id:uid(),name:name};sports.push(d);await dbSaveSport(d);toast('Brans eklendi','g');}
+  hideLoading();closeModal();go('sports');
+}
+function delSport(id){
+  confirm2('Brans silinsin mi?','Bu branstaki sporcular etkilenmez.',async function(){sports=sports.filter(function(s){return s.id!==id;});await dbDelSport(id);toast('Brans silindi');go('sports');});
+}
+
+// ══════════════════════════════════════════════════════════
+//  SINIFLAR (Classes)
+// ══════════════════════════════════════════════════════════
+function pgClasses(){
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F4DA; Siniflar</div><div class="ssub">'+classes.length+' sinif</div></div><button class="btn bp btn-sm" onclick="showClassForm(null)">+ Ekle</button></div></div>';
+  h+='<div class="g3">';
+  classes.forEach(function(c){
+    var cnt=athletes.filter(function(a){return a.clsId===c.id;}).length;
+    var coachName=c.coachId?cname(c.coachId):'-';
+    h+='<div class="card"><div class="flex fca gap2 mb2"><div style="width:40px;height:40px;background:linear-gradient(135deg,#a855f7,#3b82f6);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px">&#x1F4DA;</div>';
+    h+='<div style="flex:1;min-width:0"><div class="tw6 trunc">'+esc(c.name)+'</div><div class="ts tm">'+cnt+' sporcu</div></div></div>';
+    if(c.schedule)h+='<div class="ts tm mb2">&#x1F550; '+esc(c.schedule)+'</div>';
+    h+=row('Antrenor',esc(coachName));
+    if(c.cap)h+=row('Kapasite',c.cap+' kisi');
+    h+='<div class="flex gap1 mt3"><button class="btn bs btn-sm" style="flex:1" onclick="showClassForm(\''+c.id+'\')">&#x270F; Duzenle</button><button class="btn bd btn-sm" onclick="delClass(\''+c.id+'\')">&#x1F5D1;</button></div></div>';
+  });
+  h+='<div class="card" style="border-style:dashed;opacity:.5;display:flex;align-items:center;justify-content:center;min-height:120px;cursor:pointer" onclick="showClassForm(null)"><div style="text-align:center"><div style="font-size:28px">+</div><div class="tsm mt1 tm">Sinif Ekle</div></div></div></div>';
+  return h;
+}
+function showClassForm(id){
+  var c=null;if(id)for(var i=0;i<classes.length;i++){if(classes[i].id===id){c=classes[i];break;}}
+  var spOpts='<option value="">-- Brans --</option>';
+  sports.forEach(function(s){spOpts+='<option value="'+s.id+'"'+(c&&c.spId===s.id?' selected':'')+'>'+semi(s.name)+' '+esc(s.name)+'</option>';});
+  var coOpts='<option value="">-- Antrenor --</option>';
+  coaches.forEach(function(co){coOpts+='<option value="'+co.id+'"'+(c&&c.coachId===co.id?' selected':'')+'>'+esc(co.fn)+' '+esc(co.ln)+'</option>';});
+  var h='<div class="fg">'+
+    '<div class="fgr"><label>Sinif Adi *</label><input id="cl-name" type="text" value="'+(c?esc(c.name):'')+'"/></div>'+
+    '<div class="fgr"><label>Brans</label><select id="cl-sp">'+spOpts+'</select></div>'+
+    '<div class="fgr"><label>Antrenor</label><select id="cl-co">'+coOpts+'</select></div>'+
+    '<div class="fgr"><label>Kapasite</label><input id="cl-cap" type="number" value="'+(c?c.cap||'':'')+'" placeholder="Maks sporcu sayisi"/></div>'+
+    '<div class="fgr full"><label>Program (Gunler / Saat)</label><input id="cl-sch" type="text" value="'+(c?esc(c.schedule||''):'')+'" placeholder="Pazartesi-Carsamba 16:00-17:30"/></div></div>';
+  modal(id?'Sinif Duzenle':'Yeni Sinif',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:id?'Kaydet':'Ekle',cls:'bp',fn:function(){saveClass(id||null);}}]);
+}
+async function saveClass(id){
+  var name=gv('cl-name');if(!name){toast('Sinif adi zorunlu!','e');return;}
+  var d={name:name,spId:gv('cl-sp'),coachId:gv('cl-co'),cap:gvn('cl-cap')||undefined,schedule:gv('cl-sch')};
+  showLoading();
+  if(id){for(var i=0;i<classes.length;i++){if(classes[i].id===id){classes[i]=Object.assign({},classes[i],d);break;}}await dbSaveClass(classes.find(function(c){return c.id===id;}));toast('Sinif guncellendi','g');}
+  else{d.id=uid();classes.push(d);await dbSaveClass(d);toast('Sinif eklendi','g');}
+  hideLoading();closeModal();go('classes');
+}
+function delClass(id){confirm2('Sinif silinsin mi?','Bu sinifdaki sporcular etkilenmez.',async function(){classes=classes.filter(function(c){return c.id!==id;});await dbDelClass(id);toast('Sinif silindi');go('classes');});}
+
+// ══════════════════════════════════════════════════════════
+//  SUBELER
+// ══════════════════════════════════════════════════════════
+function pgBranches(){
+  // Only org admins (no branch restriction) see all branches
+  var orgBranches = getBranchesByOrg(currentOrgId);
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F3E2; Subeler</div><div class="ssub">'+orgBranches.length+' sube</div></div><button class="btn bp btn-sm" onclick="showBranchForm(null)">+ Sube Ekle</button></div></div>';
+  h+='<div class="g2">';
+  orgBranches.forEach(function(b){
+    var isCurrent=b.id===currentBranchId;
+    h+='<div class="card'+(isCurrent?' card-glow':'')+'">';
+    h+='<div class="flex fca gap3 mb3">';
+    h+='<div style="width:48px;height:48px;background:var(--grad);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">&#x1F3E2;</div>';
+    h+='<div style="flex:1;min-width:0"><div class="tw6">'+esc(b.name)+'</div><div class="ts tm">Kod: '+esc(b.code||'-')+'</div>';
+    if(isCurrent)h+='<span class="bg bg-b" style="margin-top:4px;display:inline-block">Aktif Sube</span>';
+    h+='</div></div>';
+    var userCount=_usersCache.filter(function(u){return u.branchId===b.id;}).length;
+    var athCount=0; // We don't have other branch data loaded
+    h+=row('Kullanici',userCount+' kisi');
+    if(isCurrent)h+=row('Sporcu',athletes.length+' kayitli')+row('Antrenor',coaches.length+' kisi');
+    h+='<div class="flex gap1 mt3">';
+    if(!isCurrent)h+='<button class="btn bp btn-sm" style="flex:1" onclick="switchBranch(\''+b.id+'\')">&#x1F504; Geç</button>';
+    h+='<button class="btn bs btn-sm" '+(isCurrent?'style="flex:1"':'')+' onclick="showBranchForm(\''+b.id+'\')">&#x270F; Duzenle</button>';
+    if(!isCurrent)h+='<button class="btn bd btn-sm" onclick="delBranch(\''+b.id+'\')">&#x1F5D1;</button>';
+    h+='</div></div>';
+  });
+  h+='</div>'; return h;
+}
+async function switchBranch(branchId){
+  showLoading();
+  currentBranchId=branchId;
+  // Update user's branch in session (not DB - just session switch)
+  athletes=[];payments=[];coaches=[];attData={};messages=[];settings={};sports=[];classes=[];
+  await loadBranchData();
+  updateBranchUI();
+  go('dashboard');
+  toast('Sube degistirildi','g');
+}
+function showBranchForm(id){
+  var b=null;if(id)for(var i=0;i<_branchesCache.length;i++){if(_branchesCache[i].id===id){b=_branchesCache[i];break;}}
+  var h='<div class="fg">'+
+    '<div class="fgr"><label>Sube Adi *</label><input id="bf-name" type="text" value="'+(b?esc(b.name):'')+'"/></div>'+
+    '<div class="fgr"><label>Kisa Kod</label><input id="bf-code" type="text" maxlength="6" value="'+(b?esc(b.code||''):'')+'"/></div>'+
+    '<div class="fgr full"><label>Adres</label><input id="bf-addr" type="text" value="'+(b?esc(b.address||''):'')+'"/></div></div>';
+  modal(id?'Sube Duzenle':'Yeni Sube',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:id?'Kaydet':'Ekle',cls:'bp',fn:function(){saveBranch(id||null);}}]);
+}
+async function saveBranch(id){
+  var name=gv('bf-name');if(!name){toast('Sube adi zorunlu!','e');return;}
+  showLoading();
+  if(id){
+    await supaPatch('branches',{name:name,code:gv('bf-code'),address:gv('bf-addr')},{id:id});
+    for(var i=0;i<_branchesCache.length;i++){if(_branchesCache[i].id===id){_branchesCache[i].name=name;_branchesCache[i].code=gv('bf-code');break;}}
+    toast('Sube guncellendi','g');
+  }else{
+    var newBranch={id:'br-'+Date.now().toString(36),org_id:currentOrgId,name:name,code:gv('bf-code'),address:gv('bf-addr')};
+    await supaPost('branches',newBranch);
+    _branchesCache.push({id:newBranch.id,orgId:currentOrgId,name:name,code:newBranch.code});
+    toast('Sube eklendi','g');
+  }
+  hideLoading();closeModal();go('branches');
+}
+function delBranch(id){confirm2('Sube silinsin mi?','Bu subeye ait tum veriler etkilenebilir.',async function(){await supaDelete('branches',{id:id});_branchesCache=_branchesCache.filter(function(b){return b.id!==id;});go('branches');toast('Sube silindi');});}
+
+// ══════════════════════════════════════════════════════════
+//  DUYURULAR
+// ══════════════════════════════════════════════════════════
+function pgAnnouncements(){
+  var anns=messages.filter(function(m){return m.role==='duyuru';}).sort(function(a,b){return new Date(b.dt)-new Date(a.dt);});
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F4E3; Duyurular</div><div class="ssub">'+anns.length+' duyuru</div></div><button class="btn bp btn-sm" onclick="showAnnForm()">+ Yeni Duyuru</button></div></div>';
+  if(!anns.length)h+='<div class="card" style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px">&#x1F4E3;</div><div class="tw6">Henuz duyuru yok</div><div class="ts tm mt2">Sporculariniza duyuru gonderin</div></div>';
+  anns.forEach(function(m){
+    h+='<div class="card mb3"><div class="flex fca fjb mb2"><div class="tw6">'+esc(m.sub)+'</div><div class="flex gap1"><span class="ts tm">'+fmtD(m.dt)+'</span><button class="btn bd btn-xs" onclick="delMsg(\''+m.id+'\')">&#x1F5D1;</button></div></div>';
+    h+='<div class="tsm" style="line-height:1.7;color:var(--text2);white-space:pre-wrap">'+esc(m.body)+'</div></div>';
+  });
+  return h;
+}
+function showAnnForm(){
+  var h='<div class="fgr mb2"><label>Baslik *</label><input id="an-sub" type="text" placeholder="Duyuru basligi"/></div>'+
+    '<div class="fgr"><label>Icerik *</label><textarea id="an-body" style="min-height:120px" placeholder="Duyuru icerigi..."></textarea></div>';
+  modal('Yeni Duyuru',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:'&#x1F4E3; Yayinla',cls:'bp',fn:function(){saveAnn();}}]);
+}
+async function saveAnn(){
+  var sub=gv('an-sub'),body=gv('an-body');
+  if(!sub||!body){toast('Baslik ve icerik zorunlu!','e');return;}
+  var m={id:uid(),fr:currentUser?currentUser.name:'Admin',role:'duyuru',sub:sub,body:body,dt:tod(),rd:true};
+  messages.unshift(m);showLoading();await dbSaveMsg(m);hideLoading();closeModal();go('announcements');toast('Duyuru yayinlandi','g');
+}
+
+// ══════════════════════════════════════════════════════════
+//  SMS DUYURU
+// ══════════════════════════════════════════════════════════
+function pgSMS(){
+  var athCount=athletes.filter(function(a){return a.st==='active'&&a.ph;}).length;
+  var parentCount=athletes.filter(function(a){return a.pph;}).length;
+  var h='<div class="ph"><div class="sh"><div><div class="stit">&#x1F4F1; SMS Duyuru</div><div class="ssub">Toplu SMS gonder</div></div></div></div>';
+  if(!NETGSM_USER){
+    h+='<div class="al al-y mb3">&#x26A0; SMS gondermek icin once Ayarlar > SMS Ayarlari kismini doldurun.</div>';
+  }
+  h+='<div class="g2 mb3">'+sc('b','&#x1F3C5;',athCount,'SMS Alacak Sporcu','')+sc('p','&#x1F464;',parentCount,'SMS Alacak Veli','')+'</div>';
+  h+='<div class="card mb3"><div class="tw6 mb3">Mesaj Gonder</div>';
+  h+='<div class="fgr mb2"><label>Hedef Kitle</label><select id="sms-target" class="w100"><option value="all">Tum Aktif Sporcular ('+athCount+' kisi)</option><option value="parents">Veliler ('+parentCount+' kisi)</option><option value="both">Sporcu + Veli</option></select></div>';
+  // Sport filter
+  var spList=[]; athletes.forEach(function(a){if(a.sp&&spList.indexOf(a.sp)<0)spList.push(a.sp);});
+  h+='<div class="fgr mb2"><label>Brans Filtresi (Bos = Hepsi)</label><select id="sms-sp" class="w100"><option value="">Tum Branslar</option>';
+  spList.forEach(function(s){h+='<option value="'+esc(s)+'">'+semi(s)+' '+esc(s)+'</option>';});
+  h+='</select></div>';
+  h+='<div class="fgr mb3"><label>Mesaj *</label><textarea id="sms-body" style="min-height:100px" placeholder="SMS icerigini yazin... (maks 160 karakter)"></textarea><div id="sms-cnt" class="ts tm mt1">0 / 160 karakter</div></div>';
+  h+='<button class="btn bp w100" style="padding:12px" onclick="sendBulkSMSNow()">&#x1F4E4; SMS Gonder</button></div>';
+  // SMS log
+  h+='<div class="card"><div class="tw6 mb2">SMS Gecmisi</div><div class="ts tm">Yakin zamanda gonderilen SMS kayitlari burada gorunecek.</div></div>';
+  setTimeout(function(){ var ta=document.getElementById('sms-body'); if(ta)ta.addEventListener('input',function(){var cnt=document.getElementById('sms-cnt');if(cnt)cnt.textContent=ta.value.length+' / 160 karakter';});},100);
+  return h;
+}
+async function sendBulkSMSNow(){
+  var target=gv('sms-target'),sp=gv('sms-sp'),body=gv('sms-body');
+  if(!body){toast('Mesaj bos!','e');return;}
+  if(!NETGSM_USER){toast('SMS ayarlari eksik!','e');return;}
+  var phones=[];
+  athletes.forEach(function(a){
+    if(a.st!=='active')return;
+    if(sp&&a.sp!==sp)return;
+    if(target==='all'||target==='both'){if(a.ph)phones.push(a.ph);}
+    if(target==='parents'||target==='both'){if(a.pph)phones.push(a.pph);}
+  });
+  if(!phones.length){toast('Telefon numarasi bulunamadi!','e');return;}
+  confirm2(phones.length+' kisiye SMS',phones.length+' telefon numarasina SMS gonderilecek. Devam?', async function(){
+    showLoading();
+    var sent=await sendBulkSMS(phones,body);
+    hideLoading();
+    toast(sent+' SMS basariyla gonderildi!','g');
+  });
+}
+// ══════════════════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════════════════
+function pgSettings(){
+  var orgUsers=_usersCache.filter(function(u){return u.branchId===currentBranchId;});
+  var activeN=athletes.filter(function(a){return a.st==='active';}).length;
+  var totalFee=athletes.filter(function(a){return a.st==='active';}).reduce(function(s,a){return s+(Number(a.fee)||0);},0);
+  var branch=getBranch();
+  var h='<div class="ph"><div class="stit">&#x2699; Ayarlar</div><div class="ssub">'+(branch?branch.name:'')+'</div></div><div class="g2">';
+  // Branch profile
+  h+='<div class="card"><div class="tw6 mb3">&#x1F3E2; Sube Profili</div>';
+  // Logo upload
+  h+='<div style="text-align:center;margin-bottom:16px">';
+  if(settings.logoUrl)h+='<img src="'+esc(settings.logoUrl)+'" style="height:72px;border-radius:14px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto"/>';
+  else h+='<div style="width:72px;height:72px;background:var(--grad);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 10px">&#x26BD;</div>';
+  h+='<div class="fgr mb2"><label>Logo URL</label><input id="s-logo" type="url" value="'+esc(settings.logoUrl||'')+'" placeholder="https://... (resim linki)"/></div>';
+  h+='</div>';
+  h+='<div class="fgr mb2"><label>Kurum / Sube Adi</label><input id="s-name" type="text" value="'+esc(settings.schoolName||'')+'"/></div>';
+  h+='<div class="fgr mb2"><label>Adres</label><input id="s-addr" type="text" value="'+esc(settings.address||'')+'" placeholder="Sube adresi"/></div>';
+  h+='<div class="fgr mb3"><label>Yetkili Telefon</label><input id="s-phone" type="tel" value="'+esc(settings.ownerPhone||'')+'"/></div>';
+  h+='<div class="dv"></div><div class="tw6 tsm ty mt2 mb2">&#x1F3E6; Havale Bilgileri</div>';
+  h+='<div class="fgr mb2"><label>Banka</label><input id="s-bank" type="text" value="'+esc(settings.bankName||'')+'" placeholder="Ziraat Bankasi"/></div>';
+  h+='<div class="fgr mb2"><label>Hesap Sahibi</label><input id="s-accname" type="text" value="'+esc(settings.accountName||'')+'"/></div>';
+  h+='<div class="fgr mb3"><label>IBAN</label><input id="s-iban" type="text" value="'+esc(settings.iban||'')+'" placeholder="TR00 0000..."/></div>';
+  h+='<button class="btn bp w100" onclick="saveSettings2()">&#x1F4BE; Kaydet</button></div>';
+  // Stats
+  h+='<div class="card"><div class="tw6 mb3">&#x1F4CA; Istatistikler</div>'+row('Toplam Sporcu',athletes.length)+row('Aktif Sporcu',activeN)+row('Aylik Beklenen',fmtN(totalFee)+' TL')+row('Odeme Kaydi',payments.length)+row('Antrenor',coaches.length)+row('Brans',sports.length)+row('Sinif',classes.length)+'</div>';
+  // SMS settings
+  h+='<div class="card"><div class="tw6 mb3">&#x1F4F1; SMS Ayarlari (Netgsm)</div>';
+  h+='<div class="al al-b mb3">Netgsm hesabinizin kullanici kodu ve sifresi ile entegre edin.</div>';
+  h+='<div class="fgr mb2"><label>Kullanici Kodu</label><input id="s-ng-user" type="text" value="'+esc(settings.netgsmUser||'')+'"/></div>';
+  h+='<div class="fgr mb2"><label>Sifre</label><input id="s-ng-pass" type="password" value="'+esc(settings.netgsmPass||'')+'"/></div>';
+  h+='<div class="fgr mb3"><label>Mesaj Basligi (maks 11 krktr)</label><input id="s-ng-hdr" type="text" value="'+esc(settings.netgsmHeader||'SPORCU')+'" maxlength="11"/></div>';
+  h+='<button class="btn bp w100" onclick="saveSmsSettings()">SMS Ayarlarini Kaydet</button></div>';
+  // Users
+  h+='<div class="card" style="grid-column:1/-1"><div class="flex fca fjb mb3"><div class="tw6">&#x1F464; Kullanicilar — Bu Sube</div><button class="btn bp btn-sm" onclick="showAddUserForm()">+ Ekle</button></div>';
+  h+='<div class="tw"><table><thead><tr><th>Ad Soyad</th><th>E-posta</th><th>Rol</th><th></th></tr></thead><tbody>';
+  orgUsers.forEach(function(u){
+    h+='<tr><td><div class="flex fca gap2"><div class="ava" style="width:24px;height:24px;font-size:9px;background:'+avatarColor(u.name||u.email)+'">'+ini(u.name||u.email)+'</div><span class="tw6 tsm">'+esc(u.name||'-')+'</span></div></td>';
+    h+='<td class="tsm tm">'+esc(u.email)+'</td><td><span class="bg bg-b">'+esc(u.role)+'</span></td>';
+    h+='<td>'+(u.id!==currentUser.id?'<button class="btn bd btn-xs" onclick="delUser(\''+u.id+'\')">Sil</button>':'<span class="ts tm">Sen</span>')+'</td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  // Account
+  h+='<div class="card"><div class="tw6 mb3">&#x1F511; Hesabim</div>';
+  h+='<div class="fgr mb2"><label>Ad Soyad</label><input id="s-uname" type="text" value="'+esc(currentUser?currentUser.name||'':'')+'"/></div>';
+  h+='<div class="fgr mb2"><label>E-posta</label><input id="s-email" type="email" value="'+esc(acct.email||'')+'"/></div>';
+  h+='<div class="fgr mb2"><label>Yeni Sifre (bos = degismez)</label><input id="s-pass1" type="password"/></div>';
+  h+='<div class="fgr mb3"><label>Sifre Tekrar</label><input id="s-pass2" type="password"/></div>';
+  h+='<div class="flex gap2"><button class="btn bp" onclick="saveAcct()">Kaydet</button><button class="btn bd btn-sm" onclick="doLogout()">Cikis Yap</button></div></div></div>';
+  return h;
+}
+async function saveSettings2(){
+  settings.schoolName = gv('s-name') || settings.schoolName;
+  var v;
+  v=gv('s-logo'); if(v!==undefined)settings.logoUrl=v;
+  v=gv('s-addr'); if(v)settings.address=v;
+  v=gv('s-phone'); if(v)settings.ownerPhone=v;
+  v=gv('s-bank'); if(v)settings.bankName=v;
+  v=gv('s-accname'); if(v)settings.accountName=v;
+  v=gv('s-iban'); if(v)settings.iban=v;
+  showLoading(); await saveS(); hideLoading();
+  updateBranchUI();
+  toast('Ayarlar kaydedildi','g');
+}
+async function saveSmsSettings(){
+  settings.netgsmUser=gv('s-ng-user'); settings.netgsmPass=gv('s-ng-pass'); settings.netgsmHeader=gv('s-ng-hdr')||'SPORCU';
+  if(settings.netgsmUser){NETGSM_USER=settings.netgsmUser;NETGSM_PASS=settings.netgsmPass;NETGSM_HEADER=settings.netgsmHeader;}
+  showLoading();await saveS();hideLoading();toast('SMS ayarlari kaydedildi','g');
+}
+async function saveAcct(){
+  var name=gv('s-uname'),em=gv('s-email'),p1=gv('s-pass1'),p2=gv('s-pass2');
+  if(!em){toast('E-posta bos olamaz!','e');return;}
+  if(p1&&p1!==p2){toast('Sifreler eslesmiyor!','e');return;}
+  if(p1&&p1.length<4){toast('En az 4 karakter!','e');return;}
+  var upd={email:em,name:name};
+  if(p1)upd.pass=await sha256(p1);
+  showLoading();await supaPatch('users',upd,{id:currentUser.id});
+  currentUser.email=em;currentUser.name=name;acct.email=em;if(p1){currentUser.pass=upd.pass;acct.pass=upd.pass;}
+  hideLoading();toast('Hesap guncellendi','g');
+}
+function showAddUserForm(){
+  var h='<div class="fg">'+
+    '<div class="fgr"><label>Ad Soyad *</label><input id="au-name" type="text"/></div>'+
+    '<div class="fgr"><label>Telefon</label><input id="au-phone" type="tel"/></div>'+
+    '<div class="fgr"><label>E-posta *</label><input id="au-em" type="email"/></div>'+
+    '<div class="fgr"><label>Rol</label><select id="au-role"><option value="admin">Admin</option><option value="staff">Personel</option></select></div>'+
+    '<div class="fgr"><label>Sifre *</label><input id="au-p1" type="password"/></div>'+
+    '<div class="fgr"><label>Tekrar *</label><input id="au-p2" type="password"/></div></div>';
+  modal('Yeni Kullanici',h,[{lbl:'Iptal',cls:'bs',fn:function(){closeModal();}},{lbl:'Ekle',cls:'bp',fn:function(){saveNewUser();}}]);
+}
+async function saveNewUser(){
+  var name=gv('au-name'),em=gv('au-em'),p1=gv('au-p1'),p2=gv('au-p2'),role=gv('au-role'),phone=gv('au-phone');
+  if(!name||!em||!p1){toast('Zorunlu alanlar eksik!','e');return;}
+  if(p1!==p2){toast('Sifreler eslesmiyor!','e');return;}
+  if(p1.length<4){toast('En az 4 karakter!','e');return;}
+  showLoading();
+  var existing=await supaGet('users',{email:em});
+  if(existing&&existing.length>0){hideLoading();toast('Bu e-posta zaten kayitli!','e');return;}
+  var ph=await sha256(p1);
+  var nu={id:'u-'+Date.now().toString(36),org_id:currentOrgId,branch_id:currentBranchId,email:em,pass:ph,role:role,name:name,phone:phone};
+  await supaPost('users',nu);
+  _usersCache.push({id:nu.id,orgId:currentOrgId,branchId:currentBranchId,email:em,pass:ph,role:role,name:name,phone:phone});
+  hideLoading();closeModal();go('settings');toast('Kullanici eklendi','g');
+}
+function delUser(uid2){confirm2('Kullanici silinsin mi?','',async function(){await supaDelete('users',{id:uid2});_usersCache=_usersCache.filter(function(u){return u.id!==uid2;});go('settings');toast('Kullanici silindi');});}
+
+</script>
+</body>
+</html>
