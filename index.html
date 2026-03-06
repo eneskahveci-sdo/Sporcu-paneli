@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#080c14"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Sporcu Paneli</title>
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;Sporcu Paneli&quot;,&quot;short_name&quot;:&quot;Sporcu&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#080c14&quot;,&quot;theme_color&quot;:&quot;#3b82f6&quot;}"/>
+<style>
+:root{--bg:#080c14;--bg2:#0f1623;--bg3:#151e2d;--bg4:#1a2540;--border:#1e3352;--border2:#2a4a7f;--text:#e2e8f0;--text2:#94a3b8;--text3:#475569;--blue:#3b82f6;--blue2:#60a5fa;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--purple:#a855f7;--cyan:#06b6d4;--grad:linear-gradient(135deg,#3b82f6,#8b5cf6);--grad2:linear-gradient(135deg,#22c55e,#06b6d4);--shadow:0 4px 24px rgba(0,0,0,.4);--shadow2:0 8px 32px rgba(59,130,246,.2)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+input,select,textarea{background:var(--bg3);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;padding:10px 13px;width:100%;outline:none;font-family:inherit;transition:.2s}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);background:var(--bg4);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+textarea{resize:vertical;min-height:80px}
+label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.btn{border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;padding:9px 16px;transition:.15s;letter-spacing:.2px;white-space:nowrap}
+.bp{background:var(--grad);color:#fff;box-shadow:var(--shadow2)}.bp:active{transform:scale(.96)}
+.bs{background:var(--bg3);color:var(--text);border:1.5px solid var(--border)}.bs:hover{border-color:var(--blue2)}
+.bd{background:rgba(239,68,68,.1);color:var(--red);border:1.5px solid rgba(239,68,68,.2)}.bd:hover{background:rgba(239,68,68,.2)}
+.bsu{background:rgba(34,197,94,.1);color:var(--green);border:1.5px solid rgba(34,197,94,.2)}.bsu:hover{background:rgba(34,197,94,.2)}
+.by{background:rgba(245,158,11,.1);color:var(--yellow);border:1.5px solid rgba(245,158,11,.2)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}.btn-xs{padding:3px 9px;font-size:11px;border-radius:6px}
+.w100{width:100%}
+.card{background:var(--bg2);border:1.5px solid var(--border);border-radius:16px;padding:16px;transition:.2s}
+.dv{height:1px;background:var(--border);margin:12px 0}.dn{display:none!important}
+.flex{display:flex}.fca{align-items:center}.fjb{justify-content:space-between}.fwrap{flex-wrap:wrap}
+.gap1{gap:6px}.gap2{gap:10px}.gap3{gap:14px}.gap4{gap:20px}
+.mb2{margin-bottom:8px}.mb3{margin-bottom:14px}.mt2{margin-top:8px}.mt3{margin-top:14px}
+.tw{overflow-x:auto}.tw table{width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
+.tw th,.tw td{padding:11px 13px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.tw th{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:var(--bg3)}
+.tw td{font-size:13px}.tw tr:last-child td{border-bottom:none}.tw tr:hover td{background:rgba(59,130,246,.03)}
+.tsm{font-size:12px}.ts{font-size:11px}.tm{color:var(--text2)}.tw6{font-weight:600}
+.tg{color:var(--green)}.tr2{color:var(--red)}.ty{color:var(--yellow)}.tb{color:var(--blue2)}.tp{color:var(--purple)}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bg{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+.bg-g{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.bg-r{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.bg-y{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.bg-b{background:rgba(59,130,246,.12);color:var(--blue2);border:1px solid rgba(59,130,246,.2)}
+.bg-p{background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+.ava{width:36px;height:36px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;box-shadow:0 2px 8px rgba(59,130,246,.25)}
+.stat-card{cursor:pointer;transition:.2s;position:relative;overflow:hidden}.stat-card:active{transform:scale(.97)}
+.stat-icon{font-size:24px;margin-bottom:8px}.stat-val{font-size:22px;font-weight:800;margin-bottom:3px}.stat-lbl{font-size:12px;color:var(--text2)}
+.stat-b{border-color:rgba(59,130,246,.3);background:linear-gradient(135deg,var(--bg2),rgba(59,130,246,.06))}
+.stat-g{border-color:rgba(34,197,94,.3);background:linear-gradient(135deg,var(--bg2),rgba(34,197,94,.06))}
+.stat-r{border-color:rgba(239,68,68,.3);background:linear-gradient(135deg,var(--bg2),rgba(239,68,68,.06))}
+.stat-y{border-color:rgba(245,158,11,.3);background:linear-gradient(135deg,var(--bg2),rgba(245,158,11,.06))}
+.al{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.al-r{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red)}
+.al-y{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--yellow)}
+.al-g{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:var(--green)}
+.al-b{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);color:var(--blue2)}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fgr{display:flex;flex-direction:column}.fgr.full{grid-column:1/-1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g21{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.fs{background:var(--bg3);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;padding:8px 11px;flex:1;min-width:120px;outline:none;transition:.2s}
+.fs:focus{border-color:var(--blue)}
+.att-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.att-row:last-child{border-bottom:none}
+.att-btns{display:flex;gap:4px}
+.att-b{border:1.5px solid var(--border);background:var(--bg3);color:var(--text2);border-radius:7px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.att-b.ap{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green)}
+.att-b.aa{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red)}
+.att-b.al2{background:rgba(245,158,11,.15);border-color:var(--yellow);color:var(--yellow)}
+.pr{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.prb{height:100%;border-radius:3px;transition:.5s}
+.prb-g{background:linear-gradient(90deg,#16a34a,var(--green))}.prb-y{background:linear-gradient(90deg,#d97706,var(--yellow))}.prb-r{background:linear-gradient(90deg,#dc2626,var(--red))}
+.dr{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.dr:last-child{border-bottom:none}.dl{font-size:13px}.dvl{font-size:14px}
+.ph{margin-bottom:18px}.stit{font-size:20px;font-weight:800;letter-spacing:-.3px}.ssub{font-size:13px;color:var(--text2);margin-top:3px}
+.sh{display:flex;align-items:center;justify-content:space-between}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);border:1.5px solid var(--border);border-radius:12px;padding:11px 20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;white-space:nowrap;pointer-events:none;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-e{border-color:rgba(239,68,68,.4);color:var(--red)}.toast-g{border-color:rgba(34,197,94,.4);color:var(--green)}.toast-y{border-color:rgba(245,158,11,.4);color:var(--yellow)}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-box{background:var(--bg2);border:1.5px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:600px;max-height:92vh;display:flex;flex-direction:column}
+.modal-hd{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-body{padding:16px 18px;overflow-y:auto;flex:1}
+.modal-ft{padding:13px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+.modal-x{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-size:16px;cursor:pointer;padding:4px 9px;border-radius:8px}
+#wrap{display:flex;flex-direction:column;flex:1;overflow:hidden}
+#side{position:fixed;left:-270px;top:0;bottom:0;width:260px;background:var(--bg2);border-right:1.5px solid var(--border);z-index:200;transition:.28s cubic-bezier(.4,0,.2,1);overflow-y:auto;display:flex;flex-direction:column}
+#side.open{left:0;box-shadow:4px 0 40px rgba(0,0,0,.6)}
+#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:150}
+#overlay.show{display:block}
+.slogo{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.slogo-icon{width:38px;height:38px;background:var(--grad);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.snav{padding:10px 8px;flex:1}
+.nsec{font-size:10px;color:var(--text3);font-weight:700;padding:10px 10px 5px;text-transform:uppercase;letter-spacing:1px}
+.ni{display:flex;align-items:center;gap:10px;width:100%;padding:10px 11px;border-radius:10px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;text-align:left;transition:.15s;margin-bottom:2px}
+.ni svg{width:17px;height:17px;flex-shrink:0}
+.ni:hover{background:rgba(59,130,246,.08);color:var(--text)}
+.ni.on{background:rgba(59,130,246,.12);color:var(--blue2);font-weight:600}
+.ni .badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px}
+#bar{display:flex;align-items:center;gap:10px;padding:11px 16px;background:rgba(8,12,20,.95);border-bottom:1.5px solid var(--border);flex-shrink:0}
+.hbg{background:var(--bg3);border:1.5px solid var(--border);color:var(--text2);cursor:pointer;padding:7px;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:.15s}
+#bnav{background:rgba(8,12,20,.97);border-top:1.5px solid var(--border);flex-shrink:0;padding:4px 0 8px}
+.bni{display:flex;justify-content:space-around}
+.bni-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;padding:7px 8px;border-radius:10px;min-width:52px;transition:.15s}
+.bni-btn svg{width:21px;height:21px}
+.bni-btn.on{color:var(--blue2)}
+.bni-dot{display:none;width:7px;height:7px;border-radius:50%;background:var(--red);margin-top:-16px;margin-right:-14px;border:2px solid var(--bg);align-self:flex-end}
+#sporcu-portal{display:none;flex-direction:column;height:100vh;overflow:hidden}
+.sp-hd{background:var(--bg2);border-bottom:1.5px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.sp-tabs{display:flex;background:var(--bg3);border-bottom:1.5px solid var(--border);flex-shrink:0}
+.sp-tab{flex:1;padding:12px 4px;text-align:center;font-size:12px;font-weight:700;color:var(--text2);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+.sp-tab.on{color:var(--blue2);border-bottom-color:var(--blue)}
+.sp-body{flex:1;overflow-y:auto;padding:14px}
+#lbox-wrap{position:fixed;inset:0;background:radial-gradient(ellipse at top,#0d1f40,var(--bg));display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.lbox{background:var(--bg2);border:1.5px solid var(--border);border-radius:20px;padding:30px 24px;width:100%;max-width:420px;box-shadow:var(--shadow)}
+.llogo{text-align:center;margin-bottom:26px}
+.llogo-i{width:68px;height:68px;background:var(--grad);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 14px;box-shadow:var(--shadow2)}
+.ltabs{display:flex;background:var(--bg3);border-radius:12px;padding:3px;margin-bottom:20px;border:1px solid var(--border)}
+.ltab{flex:1;padding:9px;text-align:center;border-radius:9px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+.ltab.on{background:var(--bg4);color:var(--text)}
+.lerr{background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.25);color:var(--red);border-radius:10px;padding:10px 13px;font-size:13px;margin-bottom:12px}
+#loading-overlay{display:none;position:fixed;inset:0;background:rgba(8,12,20,.9);z-index:9990;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.spin{width:38px;height:38px;border:3px solid var(--bg3);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+.quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.qa-btn{background:var(--bg3);border:1.5px solid var(--border);border-radius:12px;padding:12px 6px;text-align:center;cursor:pointer;transition:.2s;display:flex;flex-direction:column;align-items:center;gap:6px}
+.qa-btn:active{transform:scale(.95)}
+.qa-icon{font-size:20px}.qa-lbl{font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.3px}
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:48px;padding-top:4px}
+.mc-bar{flex:1;border-radius:3px 3px 0 0;min-height:3px;transition:.5s}
+.profile-hero{background:linear-gradient(135deg,var(--bg3),var(--bg4));border:1.5px solid var(--border);border-radius:16px;padding:20px;margin-bottom:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.anim{animation:slideUp .2s ease-out}
+.sms-code{display:flex;gap:8px;justify-content:center;margin:16px 0}
+.sms-digit{width:44px;height:52px;background:var(--bg3);border:2px solid var(--border);border-radius:10px;color:var(--text);font-size:22px;font-weight:700;text-align:center;outline:none;transition:.2s}
+.sms-digit:focus{border-color:var(--blue);background:var(--bg4)}
+@media(max-width:600px){
+  .g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.g21{grid-template-columns:1fr}
+  .fg{grid-template-columns:1fr}.fgr.full{grid-column:1}
+}
+</style>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- SheetJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div id="loading-overlay"><div class="spin"></div><div style="color:var(--text2);font-size:13px;font-weight:600">Yukleniyor...</div></div>
+<div id="lbox-wrap">
+  <div class="lbox">
+    <div class="llogo">
+      <div class="llogo-i">&#x26BD;</div>
+      <h1 style="font-size:22px;font-weight:800;letter-spacing:-.5px">Sporcu Paneli</h1>
+      <p style="color:var(--text2);font-size:13px;margin-top:4px">Akademi Yonetim Sistemi</p>
+    </div>
+    <div class="ltabs">
+      <button class="ltab on" onclick="switchLoginTab('admin')">Kurum Girisi</button>
+      <button class="ltab" onclick="switchLoginTab('sporcu')">Sporcu / Veli</button>
+    </div>
+    <div id="login-admin">
+      <div class="fgr mb3"><label>E-posta</label><input id="le" type="email" placeholder="ornek@email.com" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div class="fgr mb3"><label>Sifre</label><input id="lp" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div id="lerr" class="lerr dn"></div>
+      <button class="btn bp w100 mb3" style="padding:12px" onclick="doLogin()">Giris Yap</button>
+      <div style="text-align:center;font-size:13px;color:var(--text2)">
+        <span onclick="showForgotPassword()" style="cursor:pointer;color:var(--blue2)">Sifremi Unuttum</span>
+        &nbsp;·&nbsp;
+        <span onclick="showRegister()" style="cursor:pointer;color:var(--blue2);font-weight:600">Kayit Ol</span>
+      </div>
+    </div>
+    <div id="login-sporcu" class="dn">
+      <div class="fgr mb3"><label>TC Kimlik No</label><input id="ls-tc" type="tel" maxlength="11" placeholder="11 haneli TC" onkeydown="if(event.key==='Enter')doSporcuLogin()"/></div>
+      <div class="fgr mb3"><label>Sifre</label><input id="ls-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSporcuLogin()"/></div>
+      <div id="ls-err" class="lerr dn">TC veya sifre hatali!</div>
+      <button class="btn bp w100 mb3" style="padding:12px" onclick="doSporcuLogin()">Giris Yap</button>
+      <div style="text-align:center;font-size:13px"><span onclick="showForgotPassword()" style="cursor:pointer;color:var(--blue2)">Sifremi Unuttum</span></div>
+    </div>
+  </div>
+</div>
+<div id="sporcu-portal">
+  <div class="sp-hd">
+    <div class="ava" id="sp-avatar">S</div>
+    <div style="flex:1"><div class="tw6" id="sp-name">Sporcu</div><div style="font-size:11px;color:var(--text2)" id="sp-orgname">Akademi</div></div>
+    <button class="btn bs btn-sm" onclick="doSporcuLogout()">Cikis</button>
+  </div>
+  <div class="sp-tabs">
+    <button class="sp-tab on" onclick="spTab('profil')">&#x1F464; Profil</button>
+    <button class="sp-tab" onclick="spTab('yoklama')">&#x1F4CB; Yoklama</button>
+    <button class="sp-tab" onclick="spTab('odemeler')">&#x1F4B3; Odemeler</button>
+    <button class="sp-tab" onclick="spTab('odeme-yap')">&#x1F4B8; Odeme Yap</button>
+    <button class="sp-tab" onclick="spTab('duyurular')">&#x1F4E3; Duyurular</button>
+  </div>
+  <div class="sp-body" id="sp-content"></div>
+</div>
+<div id="wrap" class="dn">
+  <div id="overlay" onclick="closeSide()"></div>
+  <div id="side">
+    <div class="slogo">
+      <div class="slogo-icon" id="side-logo-icon">&#x26BD;</div>
+      <img id="side-logo-img" style="display:none;height:34px;border-radius:9px;object-fit:contain" src="" alt="Logo"/>
+      <div><div style="font-weight:700;font-size:13px" id="sn">Akademi</div><div style="font-size:11px;color:var(--text3)" id="sn2">Yonetim</div></div>
+    </div>
+    <nav class="snav">
+      <div class="nsec">Ana Menu</div>
+      <button class="ni on" id="ni-dashboard" onclick="go('dashboard')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Gosterge</button>
+      <button class="ni" id="ni-athletes" onclick="go('athletes')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Sporcular</button>
+      <button class="ni" id="ni-payments" onclick="go('payments')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Odemeler<span class="badge dn" id="badge-pay">0</span></button>
+      <button class="ni" id="ni-accounting" onclick="go('accounting')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Muhasebe</button>
+      <button class="ni" id="ni-attendance" onclick="go('attendance')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Devam</button>
+      <button class="ni" id="ni-coaches" onclick="go('coaches')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>Antrenorler</button>
+      <button class="ni" id="ni-messages" onclick="go('messages')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Mesajlar<span class="badge dn" id="badge-msg">0</span></button>
+            <div class="nsec">Yonetim</div>
+      <button class="ni" id="ni-branches" onclick="go('branches')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>Subeler</button>
+      <button class="ni" id="ni-sports" onclick="go('sports')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/></svg>Branslar</button>
+      <button class="ni" id="ni-classes" onclick="go('classes')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>Siniflar</button>
+      <button class="ni" id="ni-announcements" onclick="go('announcements')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>Duyurular</button>
+      <button class="ni" id="ni-sms" onclick="go('sms')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>SMS Duyuru</button>
+      <div class="nsec" id="nav-sec-orgs" style="display:none">Platform</div>
+      <button class="ni" id="ni-pending-orgs" style="display:none" onclick="go('pending-orgs')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>Kurum Yönetimi<span class="badge" id="badge-orgs" style="display:none"></span></button>
+      <div class="nsec">Sistem</div>
+      <button class="ni" id="ni-settings" onclick="go('settings')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>Ayarlar</button>
+      <div style="padding:14px 8px 8px;margin-top:8px;border-top:1px solid var(--border)">
+        <div class="flex fca gap2 mb3">
+          <div class="ava" style="width:30px;height:30px;font-size:11px" id="sava">A</div>
+          <div style="flex:1;min-width:0"><div class="tw6 tsm trunc" id="suname">Admin</div><div class="ts tm">Yonetici</div></div>
+        </div>
+        <button class="btn bs btn-sm w100" onclick="doLogout()">Cikis Yap</button>
+      </div>
+    </nav>
+  </div>
+  <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div id="bar">
+      <button class="hbg" onclick="openSide()"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div style="flex:1;font-weight:700;font-size:15px;letter-spacing:-.2px" id="bar-title">Gosterge</div>
+      <div class="ava" style="width:30px;height:30px;font-size:11px" id="bar-ava">A</div>
+    </div>
+    <div id="main"></div>
+    <div id="bnav">
+      <div class="bni">
+        <button class="bni-btn on" id="bn-dashboard" onclick="go('dashboard')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Ana</button>
+        <button class="bni-btn" id="bn-athletes" onclick="go('athletes')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Sporcular</button>
+        <button class="bni-btn" id="bn-payments" onclick="go('payments')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Odeme</button>
+        <button class="bni-btn" id="bn-attendance" onclick="go('attendance')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>Devam</button>
+        <button class="bni-btn" id="bn-settings" onclick="go('settings')"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>Ayarlar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="modal" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="tw6" style="font-size:15px" id="modal-title"></div><button class="modal-x" onclick="closeModal()">&#x2715;</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft" id="modal-footer"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
