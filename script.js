@@ -1,22 +1,30 @@
 /* ============================================================
-   SPORCU PANELI — script.js (GUVENLIK DUZELTMELI)
+   SPORCU PANELI — script.js (GUVENLIK & PERFORMANS GUNCELLEMELI)
    Dragos Futbol Akademisi Yonetim Sistemi
-   
-   GUVENLIK DEGISIKLIKLERI:
-   - doLogin() artik Supabase Auth kullaniyor (signInWithPassword)
-   - Tum kullanicilar tarayiciya cekilmiyor, sifre sunucuda kontrol ediliyor
-   - Session yonetimi onAuthStateChange ile yapiliyor
    ============================================================ */
 
-// ════════════════════════════════════════════════════════
-//  SPORCU PANELI v3.1 — Guvenlik Guncellemeli
-// ════════════════════════════════════════════════════════
+// GUVENLIK & PERFORMANS: Production'da (Vercel) console.log'lari kapat
+if (window.location.hostname.includes('vercel.app')) {
+    console.log = function() {};
+    console.warn = function() {};
+}
+
+// Hata mesajlarini Turkcelestirme araci
+function translateAuthError(errMsg) {
+    var dict = {
+        'Invalid login credentials': 'E-posta adresiniz veya şifreniz hatalı.',
+        'Email not confirmed': 'Lütfen giriş yapmadan önce e-postanızı onaylayın.',
+        'User already registered': 'Bu e-posta adresi ile kayıtlı bir hesap zaten var.',
+        'Password should be at least 6 characters': 'Şifreniz en az 6 karakterden oluşmalıdır.'
+    };
+    return dict[errMsg] || 'İşlem başarısız. Lütfen tekrar deneyin.';
+}
 
 var SUPA_URL = 'https://wfarbydojxtufnkjuhtc.supabase.co';
 var SUPA_KEY = 'sb_publishable_w1_nXk_7TM1ePWHMN2CDcQ_1ufk0kYC';
 var SUPER_ADMIN_EMAIL = 'eneskahveci@spor.com';
 var SUPER_ADMIN_ORG = 'org-default';
-var DRAGOS_LOGO = '/assets/logo.png'; // Base64 kaldirildi, dosya yolu kullaniliyor
+var DRAGOS_LOGO = '/assets/logo.png';
 var NETGSM_USER = '', NETGSM_PASS = '', NETGSM_HEADER = 'SPORCU';
 
 // ── Supabase JS Client ──
@@ -37,23 +45,13 @@ var _authSession = null;
 function initAuth() {
   var sb = getSB();
   if (!sb) return;
-  
-  // Auth state listener
   sb.auth.onAuthStateChange(function(event, session) {
     _authSession = session;
-    if (event === 'SIGNED_IN' && session) {
-      console.log('Auth: Signed in');
-    } else if (event === 'SIGNED_OUT') {
-      console.log('Auth: Signed out');
-      currentUser = null;
-    }
+    if (event === 'SIGNED_OUT') { currentUser = null; }
   });
 }
 
-// Sayfa yuklenirken auth'i baslat
-document.addEventListener('DOMContentLoaded', function() {
-  initAuth();
-});
+document.addEventListener('DOMContentLoaded', function() { initAuth(); });
 
 async function supaGet(t, f, extra) {
   try {
@@ -68,18 +66,18 @@ async function supaGet(t, f, extra) {
       }
     }
     var { data, error } = await q;
-    if (error) { console.error('supaGet', t, error.message); return null; }
+    if (error) return null;
     return data || [];
-  } catch(e) { console.error('supaGet err:', e.message); return null; }
+  } catch(e) { return null; }
 }
 
 async function supaPost(t, d) {
   try {
     var db = getSB(); if (!db) return null;
     var { data, error } = await db.from(t).insert(d).select();
-    if (error) { console.error('supaPost', t, error.message); return null; }
+    if (error) return null;
     return data;
-  } catch(e) { console.error('supaPost err:', e.message); return null; }
+  } catch(e) { return null; }
 }
 
 async function supaUpsert(t, d) {
@@ -87,9 +85,9 @@ async function supaUpsert(t, d) {
     var db = getSB(); if (!db) return null;
     var arr = Array.isArray(d) ? d : [d];
     var { data, error } = await db.from(t).upsert(arr, { onConflict: 'id' }).select();
-    if (error) { console.error('supaUpsert', t, error.message); return null; }
+    if (error) return null;
     return data;
-  } catch(e) { console.error('supaUpsert err:', e.message); return null; }
+  } catch(e) { return null; }
 }
 
 async function supaDelete(t, f) {
@@ -98,9 +96,9 @@ async function supaDelete(t, f) {
     var q = db.from(t).delete();
     Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); });
     var { error } = await q;
-    if (error) { console.error('supaDelete', t, error.message); return false; }
+    if (error) return false;
     return true;
-  } catch(e) { console.error('supaDelete err:', e.message); return false; }
+  } catch(e) { return false; }
 }
 
 async function supaPatch(t, d, f) {
@@ -109,12 +107,11 @@ async function supaPatch(t, d, f) {
     var q = db.from(t).update(d);
     Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); });
     var { data, error } = await q.select();
-    if (error) { console.error('supaPatch', t, error.message); return null; }
+    if (error) return null;
     return data;
-  } catch(e) { console.error('supaPatch err:', e.message); return null; }
+  } catch(e) { return null; }
 }
 
-// ── SMS ───────────────────────────────────────────────────
 async function sendSMS(phone, msg) {
   if (!NETGSM_USER || !phone) return false;
   var clean = phone.replace(/\D/g, '');
@@ -126,7 +123,6 @@ async function sendSMS(phone, msg) {
   } catch(e) { return false; }
 }
 
-// ── Bulk SMS ──────────────────────────────────────────────
 async function sendBulkSMS(phones, msg) {
   var sent = 0;
   for (var i = 0; i < phones.length; i++) {
@@ -136,13 +132,11 @@ async function sendBulkSMS(phones, msg) {
   return sent;
 }
 
-// ── SHA-256 ───────────────────────────────────────────────
 async function sha256(str) {
   var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
 }
 
-// ── Loading ───────────────────────────────────────────────
 function showLoading() { document.getElementById('loading-overlay').style.display = 'flex'; }
 function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
 
@@ -152,14 +146,9 @@ function hideLoading() { document.getElementById('loading-overlay').style.displa
 var currentUser = null, currentOrgId = null, currentBranchId = null;
 var currentSporcu = null, currentSporcuOrgId = null, currentSporcuBranchId = null;
 var acct = { email: '', pass: '' };
-
-// Branch-scoped data
 var athletes = [], payments = [], coaches = [], attData = {}, messages = [], settings = {};
 var sports = [], classes = [];
-
-// Org-level caches
 var _orgsCache = [], _usersCache = [], _branchesCache = [];
-
 var curPage = 'dashboard';
 var ATD = tod(), ATSP = '', ATCLS = '';
 var _athFilter = { sp: '', st: '', cls: '', q: '' };
@@ -170,29 +159,22 @@ var _confirmCb = null, _forgotCtx = null;
 function tod() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function uid() { return 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function ini(s) { var p = (s || '').trim().split(' '); return (p[0] ? p[0][0] : '') + (p[1] ? p[1][0] : ''); }
 function fmtN(n) { return Number(n || 0).toLocaleString('tr-TR'); }
 function fmtD(s) { if (!s) return '-'; try { var d = new Date(s); return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear(); } catch(e) { return s; } }
 function age(bd) { if (!bd) return '-'; var d = new Date(bd), now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }
 function gv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
 function gvn(id) { return parseFloat(gv(id)) || 0; }
-function stl(s) { var m = { active: 'Aktif', inactive: 'Pasif', pending: 'Bekliyor', completed: 'Tamamlandi', overdue: 'Gecikti', cancelled: 'Iptal' }; return m[s] || s || '-'; }
+function stl(s) { var m = { active: 'Aktif', inactive: 'Pasif', pending: 'Bekliyor', completed: 'Tamamlandı', overdue: 'Gecikti', cancelled: 'İptal' }; return m[s] || s || '-'; }
 function stc(s) { var m = { active: 'bg-g', inactive: 'bg-r', pending: 'bg-y', completed: 'bg-g', overdue: 'bg-r', cancelled: 'bg-r' }; return m[s] || 'bg-b'; }
 function semi(sp) {
   if (!sp) return '';
   var sl = sp.toLowerCase();
-  if (sl.indexOf('futbol') >= 0) return '&#x26BD;';
-  if (sl.indexOf('basketbol') >= 0) return '&#x1F3C0;';
-  if (sl.indexOf('yuzme') >= 0 || sl.indexOf('yüzme') >= 0) return '&#x1F3CA;';
-  if (sl.indexOf('tenis') >= 0) return '&#x1F3BE;';
-  if (sl.indexOf('voleybol') >= 0) return '&#x1F3D0;';
-  if (sl.indexOf('gures') >= 0 || sl.indexOf('güreş') >= 0) return '&#x1F94B;';
-  if (sl.indexOf('boks') >= 0) return '&#x1F94A;';
-  if (sl.indexOf('jimnastik') >= 0) return '&#x1F938;';
-  if (sl.indexOf('atletizm') >= 0) return '&#x1F3C3;';
-  return '&#x1F3C5;';
+  if (sl.indexOf('futbol') >= 0) return '&#x26BD;'; if (sl.indexOf('basketbol') >= 0) return '&#x1F3C0;';
+  if (sl.indexOf('yuzme') >= 0 || sl.indexOf('yüzme') >= 0) return '&#x1F3CA;'; if (sl.indexOf('tenis') >= 0) return '&#x1F3BE;';
+  if (sl.indexOf('voleybol') >= 0) return '&#x1F3D0;'; if (sl.indexOf('gures') >= 0 || sl.indexOf('güreş') >= 0) return '&#x1F94B;';
+  if (sl.indexOf('boks') >= 0) return '&#x1F94A;'; if (sl.indexOf('jimnastik') >= 0) return '&#x1F938;';
+  if (sl.indexOf('atletizm') >= 0) return '&#x1F3C3;'; return '&#x1F3C5;';
 }
-function cname(ci) { for (var i = 0; i < coaches.length; i++) { if (coaches[i].id === ci) return coaches[i].fn + ' ' + coaches[i].ln; } return '-'; }
 function clsName(ci) { for (var i = 0; i < classes.length; i++) { if (classes[i].id === ci) return classes[i].name; } return '-'; }
 function attRate(aid) { var tot = 0, pres = 0; Object.keys(attData).forEach(function(d) { if (attData[d] && attData[d][aid]) { tot++; if (attData[d][aid] === 'P') pres++; } }); return tot ? Math.round(pres / tot * 100) : null; }
 function overdueCount() { var n = 0; payments.forEach(function(p) { if (p.st === 'overdue') n++; }); return n; }
@@ -201,8 +183,6 @@ function unreadCount() { var n = 0; messages.forEach(function(m) { if (!m.rd) n+
 function row(lbl, val) { return '<div class="dr"><span class="dl tm tsm">' + lbl + '</span><span class="dvl tw6 tsm">' + val + '</span></div>'; }
 function avatarColor(name) { var colors = ['var(--grad)', 'linear-gradient(135deg,#22c55e,#06b6d4)', 'linear-gradient(135deg,#f59e0b,#ef4444)', 'linear-gradient(135deg,#a855f7,#3b82f6)', 'linear-gradient(135deg,#06b6d4,#3b82f6)']; return colors[((name || 'A').charCodeAt(0)) % colors.length]; }
 function getBranch(id) { for (var i = 0; i < _branchesCache.length; i++) { if (_branchesCache[i].id === (id || currentBranchId)) return _branchesCache[i]; } return null; }
-function getOrgById(id) { for (var i = 0; i < _orgsCache.length; i++) { if (_orgsCache[i].id === id) return _orgsCache[i]; } return null; }
-function getBranchesByOrg(orgId) { return _branchesCache.filter(function(b) { return b.orgId === orgId; }); }
 
 // ── DB Mappers ────────────────────────────────────────────
 function dbToAth(r) { return { id: r.id, fn: r.fn, ln: r.ln, tc: r.tc, bd: r.bd, gn: r.gn, ph: r.ph, em: r.em || '', sp: r.sp, cat: r.cat, lic: r.lic, rd: r.rd, st: r.st || 'active', fee: r.fee || 0, vd: r.vd, nt: r.nt, ci: r.ci, clsId: r.cls_id, pn: r.pn, pph: r.pph, pem: r.pem, spPass: r.sp_pass }; }
@@ -218,26 +198,31 @@ function dbToClass(r) { return { id: r.id, name: r.name, spId: r.sp_id, coachId:
 function dbToSettings(r) { return { schoolName: r.school_name, logoUrl: r.logo_url, bankName: r.bank_name, accountName: r.account_name, iban: r.iban, ownerPhone: r.owner_phone, address: r.address, netgsmUser: r.netgsm_user, netgsmPass: r.netgsm_pass, netgsmHeader: r.netgsm_header }; }
 function settingsToDB(s) { return { org_id: currentOrgId, branch_id: currentBranchId, school_name: s.schoolName, logo_url: s.logoUrl, bank_name: s.bankName, account_name: s.accountName, iban: s.iban, owner_phone: s.ownerPhone, address: s.address, netgsm_user: s.netgsmUser, netgsm_pass: s.netgsmPass, netgsm_header: s.netgsmHeader, updated_at: new Date().toISOString() }; }
 
-// ── DB helpers ────────────────────────────────────────────
-async function dbSaveAth(a) { return await supaUpsert('athletes', athToDB(a)); }
-async function dbSavePay(p) { return await supaUpsert('payments', payToDB(p)); }
-async function dbSaveCoach(c) { return await supaUpsert('coaches', coachToDB(c)); }
-async function dbDelAth(id) { return await supaDelete('athletes', { id: id }); }
-async function dbDelPay(id) { return await supaDelete('payments', { id: id }); }
-async function dbDelCoach(id) { return await supaDelete('coaches', { id: id }); }
-async function dbSaveMsg(m) { return await supaUpsert('messages', msgToDB(m)); }
-async function dbDelMsg(id) { return await supaDelete('messages', { id: id }); }
+// YENI: Cache temizleyici
+function invalidateCache() {
+  if (currentBranchId) localStorage.removeItem('branchData_' + currentBranchId);
+}
+
+// ── DB helpers (Cache entegreli) ──────────────────────────
+async function dbSaveAth(a) { invalidateCache(); return await supaUpsert('athletes', athToDB(a)); }
+async function dbSavePay(p) { invalidateCache(); return await supaUpsert('payments', payToDB(p)); }
+async function dbSaveCoach(c) { invalidateCache(); return await supaUpsert('coaches', coachToDB(c)); }
+async function dbDelAth(id) { invalidateCache(); return await supaDelete('athletes', { id: id }); }
+async function dbDelPay(id) { invalidateCache(); return await supaDelete('payments', { id: id }); }
+async function dbDelCoach(id) { invalidateCache(); return await supaDelete('coaches', { id: id }); }
+async function dbSaveMsg(m) { invalidateCache(); return await supaUpsert('messages', msgToDB(m)); }
+async function dbDelMsg(id) { invalidateCache(); return await supaDelete('messages', { id: id }); }
 async function dbSaveAtt(date, aid, status) {
+  invalidateCache();
   if (status === undefined) await supaDelete('attendance', { org_id: currentOrgId, branch_id: currentBranchId, athlete_id: aid, att_date: date });
   else await supaUpsert('attendance', { org_id: currentOrgId, branch_id: currentBranchId, athlete_id: aid, att_date: date, status: status });
 }
-async function dbSaveSport(s) { return await supaUpsert('sports', { id: s.id, org_id: currentOrgId, branch_id: currentBranchId, name: s.name, icon: s.icon }); }
-async function dbDelSport(id) { return await supaDelete('sports', { id: id }); }
-async function dbSaveClass(c) { return await supaUpsert('classes', { id: c.id, org_id: currentOrgId, branch_id: currentBranchId, name: c.name, sp_id: c.spId, coach_id: c.coachId, cap: c.cap, schedule: c.schedule }); }
-async function dbDelClass(id) { return await supaDelete('classes', { id: id }); }
-async function saveS() { await supaUpsert('settings', settingsToDB(settings)); }
+async function dbSaveSport(s) { invalidateCache(); return await supaUpsert('sports', { id: s.id, org_id: currentOrgId, branch_id: currentBranchId, name: s.name, icon: s.icon }); }
+async function dbDelSport(id) { invalidateCache(); return await supaDelete('sports', { id: id }); }
+async function dbSaveClass(c) { invalidateCache(); return await supaUpsert('classes', { id: c.id, org_id: currentOrgId, branch_id: currentBranchId, name: c.name, sp_id: c.spId, coach_id: c.coachId, cap: c.cap, schedule: c.schedule }); }
+async function dbDelClass(id) { invalidateCache(); return await supaDelete('classes', { id: id }); }
+async function saveS() { invalidateCache(); await supaUpsert('settings', settingsToDB(settings)); }
 
-// ── Auto overdue ──────────────────────────────────────────
 function checkOverdue() {
   var today = tod();
   payments.forEach(function(p) {
@@ -245,47 +230,55 @@ function checkOverdue() {
   });
 }
 
-// ── Load Branch Data ──────────────────────────────────────
-async function loadBranchData() {
+// YENI: Performanslı Data Yükleme (Cache Destekli)
+async function loadBranchData(forceRefresh = false) {
   showLoading();
   try {
     var bid = currentBranchId;
-    var res = await Promise.all([
-      supaGet('athletes', { branch_id: bid }),
-      supaGet('payments', { branch_id: bid }),
-      supaGet('coaches', { branch_id: bid }),
-      supaGet('attendance', { branch_id: bid }),
-      supaGet('messages', { branch_id: bid }),
-      supaGet('settings', { branch_id: bid }),
-      supaGet('sports', { branch_id: bid }),
-      supaGet('classes', { branch_id: bid })
-    ]);
-    athletes = (res[0] || []).map(dbToAth);
-    payments = (res[1] || []).map(dbToPay);
-    coaches = (res[2] || []).map(dbToCoach);
-    attData = {};
-    (res[3] || []).forEach(function(r) { if (!attData[r.att_date]) attData[r.att_date] = {}; attData[r.att_date][r.athlete_id] = r.status; });
-    messages = (res[4] || []).map(dbToMsg);
-    var branch = getBranch(bid);
-    var localKey = 'settings_' + bid;
-    var localSettingsRaw = null;
-    try { localSettingsRaw = localStorage.getItem(localKey); } catch(e) {}
-    var localSettings = null;
-    if (localSettingsRaw) { try { localSettings = JSON.parse(localSettingsRaw); } catch(e) {} }
-    if (res[5] && res[5][0]) {
-      settings = dbToSettings(res[5][0]);
-      try { localStorage.setItem(localKey, JSON.stringify(settings)); } catch(e) {}
-    } else if (localSettings) {
-      settings = localSettings;
-    } else {
-      settings = { schoolName: branch ? branch.name : 'Sube' };
+    var cacheKey = 'branchData_' + bid;
+
+    // Cache kontrolü
+    if (!forceRefresh) {
+        var cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                var parsed = JSON.parse(cached);
+                if (Date.now() - parsed.timestamp < 5 * 60 * 1000) { // 5 dakika geçerli
+                    athletes = parsed.athletes; payments = parsed.payments; coaches = parsed.coaches;
+                    settings = parsed.settings; sports = parsed.sports; classes = parsed.classes;
+                    attData = parsed.attData; messages = parsed.messages;
+                    if (settings.netgsmUser) { NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader || 'SPORCU'; }
+                    updateBranchUI(); checkOverdue(); hideLoading();
+                    return;
+                }
+            } catch(e) {}
+        }
     }
+
+    var res = await Promise.all([
+      supaGet('athletes', { branch_id: bid }), supaGet('payments', { branch_id: bid }),
+      supaGet('coaches', { branch_id: bid }), supaGet('attendance', { branch_id: bid }),
+      supaGet('messages', { branch_id: bid }), supaGet('settings', { branch_id: bid }),
+      supaGet('sports', { branch_id: bid }), supaGet('classes', { branch_id: bid })
+    ]);
+
+    athletes = (res[0] || []).map(dbToAth); payments = (res[1] || []).map(dbToPay); coaches = (res[2] || []).map(dbToCoach);
+    attData = {}; (res[3] || []).forEach(function(r) { if (!attData[r.att_date]) attData[r.att_date] = {}; attData[r.att_date][r.athlete_id] = r.status; });
+    messages = (res[4] || []).map(dbToMsg);
+
+    var branch = getBranch(bid);
+    if (res[5] && res[5][0]) { settings = dbToSettings(res[5][0]); } else { settings = { schoolName: branch ? branch.name : 'Sube' }; }
     if (!settings.logoUrl) settings.logoUrl = '';
     if (!settings.schoolName || settings.schoolName === 'Sube') settings.schoolName = branch ? branch.name : 'Dragos Futbol Akademisi';
-    sports = (res[6] || []).map(dbToSport);
-    classes = (res[7] || []).map(dbToClass);
+    
+    sports = (res[6] || []).map(dbToSport); classes = (res[7] || []).map(dbToClass);
     if (settings.netgsmUser) { NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader || 'SPORCU'; }
-    checkOverdue();
+
+    // Yeni veriyi Cache'e yaz
+    var dataToCache = { timestamp: Date.now(), athletes: athletes, payments: payments, coaches: coaches, settings: settings, sports: sports, classes: classes, attData: attData, messages: messages };
+    try { localStorage.setItem(cacheKey, JSON.stringify(dataToCache)); } catch(e) {}
+
+    checkOverdue(); updateBranchUI();
   } catch(e) { console.error('loadBranchData:', e); }
   hideLoading();
 }
@@ -297,7 +290,7 @@ function openSide() { document.getElementById('side').classList.add('open'); doc
 function closeSide() { document.getElementById('side').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
 function go(pg) {
   curPage = pg;
-  var titles = { dashboard: 'Gosterge', athletes: 'Sporcular', payments: 'Odemeler', accounting: 'Muhasebe', attendance: 'Devam Takibi', coaches: 'Antrenorler', messages: 'Mesajlar', settings: 'Ayarlar', branches: 'Subeler', sports: 'Branslar', classes: 'Siniflar', announcements: 'Duyurular', sms: 'SMS Duyuru' };
+  var titles = { dashboard: 'Gösterge', athletes: 'Sporcular', payments: 'Ödemeler', accounting: 'Muhasebe', attendance: 'Devam Takibi', coaches: 'Antrenörler', messages: 'Mesajlar', settings: 'Ayarlar', branches: 'Şubeler', sports: 'Branşlar', classes: 'Sınıflar', announcements: 'Duyurular', sms: 'SMS Duyuru' };
   var bt = document.getElementById('bar-title'); if (bt) bt.textContent = titles[pg] || pg;
   var main = document.getElementById('main'); if (!main) return;
   var fns = { dashboard: pgDashboard, athletes: pgAthletes, payments: pgPayments, accounting: pgAccounting, attendance: pgAttendance, coaches: pgCoaches, messages: pgMessages, settings: pgSettings, branches: pgBranches, sports: pgSports, classes: pgClasses, announcements: pgAnnouncements, sms: pgSMS, 'pending-orgs': pgPendingOrgs };
@@ -313,12 +306,8 @@ function go(pg) {
 function toast(msg, type, duration) {
   var t = document.createElement('div');
   var cls = 'toast';
-  if (type === 'e' || type === 'r') cls += ' toast-e';
-  else if (type === 'g') cls += ' toast-g';
-  else if (type === 'y') cls += ' toast-y';
-  t.className = cls;
-  t.textContent = msg;
-  document.body.appendChild(t);
+  if (type === 'e' || type === 'r') cls += ' toast-e'; else if (type === 'g') cls += ' toast-g'; else if (type === 'y') cls += ' toast-y';
+  t.className = cls; t.textContent = msg; document.body.appendChild(t);
   var dur = duration || (type === 'y' ? 5000 : 2800);
   setTimeout(function() { t.classList.add('show'); }, 10);
   setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, dur);
@@ -335,7 +324,7 @@ function closeModal() { document.getElementById('modal').classList.remove('show'
 function confirm2(title, msg, cb) {
   _confirmCb = cb;
   modal(title, '<p style="color:var(--text2);font-size:14px;line-height:1.7">' + msg + '</p>', [
-    { lbl: 'Vazgec', cls: 'bs', fn: function() { closeModal(); } },
+    { lbl: 'Vazgeç', cls: 'bs', fn: function() { closeModal(); } },
     { lbl: 'Evet, Devam Et', cls: 'bd', fn: function() { closeModal(); if (_confirmCb) { _confirmCb(); _confirmCb = null; } } }
   ]);
 }
@@ -348,44 +337,23 @@ function updateBadges() {
   var pendingOrgCount = isSA ? _orgsCache.filter(function(o) { return o.status === 'pending'; }).length : 0;
   var b3 = document.getElementById('badge-orgs');
   if (b3) { b3.textContent = pendingOrgCount; b3.style.display = pendingOrgCount > 0 ? 'flex' : 'none'; }
-  var orgNavEl = document.getElementById('ni-pending-orgs');
-  var orgSecEl = document.getElementById('nav-sec-orgs');
+  var orgNavEl = document.getElementById('ni-pending-orgs'), orgSecEl = document.getElementById('nav-sec-orgs');
   if (orgNavEl) orgNavEl.style.display = isSA ? 'flex' : 'none';
   if (orgSecEl) orgSecEl.style.display = isSA ? 'block' : 'none';
 }
-function sc(color, icon, val, label, pg) {
-  return '<div class="card stat-card stat-' + color + '" ' + (pg ? 'onclick="go(\'' + pg + '\')"' : '') + '>' +
-    '<div class="stat-icon">' + icon + '</div>' +
-    '<div class="stat-val">' + val + '</div>' +
-    '<div class="stat-lbl">' + label + '</div></div>';
-}
+function sc(color, icon, val, label, pg) { return '<div class="card stat-card stat-' + color + '" ' + (pg ? 'onclick="go(\'' + pg + '\')"' : '') + '><div class="stat-icon">' + icon + '</div><div class="stat-val">' + val + '</div><div class="stat-lbl">' + label + '</div></div>'; }
 function updateBranchUI() {
   var b = getBranch();
-  var logoEl = document.getElementById('side-logo-img');
-  var nameEl = document.getElementById('sn');
-  var subEl = document.getElementById('sn2');
-  var iconEl = document.getElementById('side-logo-icon');
-  var logo = settings.logoUrl || '';
-  var name = (b && b.name) || settings.schoolName || 'Dragos Futbol Akademisi';
+  var logoEl = document.getElementById('side-logo-img'), nameEl = document.getElementById('sn'), subEl = document.getElementById('sn2'), iconEl = document.getElementById('side-logo-icon');
+  var logo = settings.logoUrl || ''; var name = (b && b.name) || settings.schoolName || 'Dragos Futbol Akademisi';
   if (nameEl) nameEl.textContent = name.length > 22 ? name.slice(0, 20) + '...' : name;
   if (subEl) subEl.textContent = settings.address || (b ? b.code || 'Merkez Sube' : 'Merkez Sube');
-  if (logoEl && logo) {
-    logoEl.src = logo;
-    logoEl.style.display = 'block';
-    logoEl.style.width = '42px';
-    logoEl.style.height = '42px';
-    logoEl.style.borderRadius = '50%';
-    logoEl.style.objectFit = 'cover';
-    if (iconEl) iconEl.style.display = 'none';
-  } else if (iconEl) {
-    if (logoEl) logoEl.style.display = 'none';
-    iconEl.style.display = 'flex';
-  }
+  if (logoEl && logo) { logoEl.src = logo; logoEl.style.display = 'block'; logoEl.style.width = '42px'; logoEl.style.height = '42px'; logoEl.style.borderRadius = '50%'; logoEl.style.objectFit = 'cover'; if (iconEl) iconEl.style.display = 'none'; } 
+  else if (iconEl) { if (logoEl) logoEl.style.display = 'none'; iconEl.style.display = 'flex'; }
 }
 
-// ── Export CSV ────────────────────────────────────────────
 function exportCSV(data, filename) {
-  if (!data || !data.length) { toast('Disa aktarilacak veri yok', 'e'); return; }
+  if (!data || !data.length) { toast('Dışa aktarılacak veri yok', 'e'); return; }
   var cols = Object.keys(data[0]);
   var csv = cols.join(';') + '\n' + data.map(function(r) { return cols.map(function(c) { var v = r[c] === null || r[c] === undefined ? '' : String(r[c]); return '"' + v.replace(/"/g, '""') + '"'; }).join(';'); }).join('\n');
   var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -408,8 +376,7 @@ function showQRScanner() {
 }
 async function startQR() {
   try {
-    var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    _qrStream = stream;
+    var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); _qrStream = stream;
     var video = document.getElementById('qr-video'); if (!video) { stream.getTracks().forEach(function(t) { t.stop(); }); return; }
     video.srcObject = stream; video.play();
     var statusEl = document.getElementById('qr-status'); if (statusEl) statusEl.textContent = 'QR kodu veya TC okutun...';
@@ -420,28 +387,23 @@ function scanQRFrame(video) {
   if (!document.getElementById('qr-video')) return;
   if (typeof BarcodeDetector !== 'undefined') {
     var bd = new BarcodeDetector({ formats: ['qr_code'] });
-    var canvas = document.createElement('canvas'); canvas.width = video.videoWidth || 320; canvas.height = video.videoHeight || 240;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    var canvas = document.createElement('canvas'); canvas.width = video.videoWidth || 320; canvas.height = video.videoHeight || 240; canvas.getContext('2d').drawImage(video, 0, 0);
     bd.detect(canvas).then(function(codes) { if (codes && codes.length > 0) onQRDetected(codes[0].rawValue); else setTimeout(function() { scanQRFrame(video); }, 200); }).catch(function() { setTimeout(function() { scanQRFrame(video); }, 200); });
   }
 }
 function onQRDetected(val) {
   if (!val) return;
-  stopQR();
-  var found = null;
-  athletes.forEach(function(a) { if (a.tc === val || a.id === val) found = a; });
+  stopQR(); var found = null; athletes.forEach(function(a) { if (a.tc === val || a.id === val) found = a; });
   var el = document.getElementById('qr-status');
-  if (!found) { if (el) { el.className = 'al al-r mt2'; el.textContent = 'Sporcu bulunamadi: ' + val; } return; }
-  if (!attData[ATD]) attData[ATD] = {};
-  attData[ATD][found.id] = 'P';
-  dbSaveAtt(ATD, found.id, 'P');
-  if (el) { el.className = 'al al-g mt2'; el.innerHTML = '&#x2705; ' + esc(found.fn) + ' ' + esc(found.ln) + ' — Yoklama alindi!'; }
+  if (!found) { if (el) { el.className = 'al al-r mt2'; el.textContent = 'Sporcu bulunamadı: ' + val; } return; }
+  if (!attData[ATD]) attData[ATD] = {}; attData[ATD][found.id] = 'P'; dbSaveAtt(ATD, found.id, 'P');
+  if (el) { el.className = 'al al-g mt2'; el.innerHTML = '&#x2705; ' + esc(found.fn) + ' ' + esc(found.ln) + ' — Yoklama alındı!'; }
   setTimeout(startQR, 1500);
 }
 function stopQR() { if (_qrStream) { _qrStream.getTracks().forEach(function(t) { t.stop(); }); _qrStream = null; } }
 
 // ══════════════════════════════════════════════════════════
-//  AUTH - GUVENLIK DUZELTMELI
+//  AUTH
 // ══════════════════════════════════════════════════════════
 function switchLoginTab(tab) {
   document.getElementById('login-admin').classList.toggle('dn', tab !== 'admin');
@@ -449,319 +411,130 @@ function switchLoginTab(tab) {
   document.querySelectorAll('.ltab').forEach(function(el, i) { el.classList.toggle('on', (i === 0 && tab === 'admin') || (i === 1 && tab === 'sporcu')); });
 }
 
-// GUVENLIK: Yeni doLogin - Supabase Auth + Eski Sistem Uyumlulugu
+function showErr(id, msg) { var el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.remove('dn'); } }
+
+// YENI GUVENLI GIRIS EKRANI
 async function doLogin() {
   var e = gv('le'), p = gv('lp');
-  if (!e || !p) { showErr('lerr', 'E-posta ve sifre gerekli!'); return; }
+  if (!e || !p) { showErr('lerr', 'E-posta ve şifre gerekli!'); return; }
   showLoading();
   
   try {
     var sb = getSB();
-    var ph = await sha256(p);
+    var { data: authData, error: authError } = await sb.auth.signInWithPassword({ email: e, password: p });
     
-    // ADIM 1: Supabase Auth dene
-    var { data: authData, error: authError } = await sb.auth.signInWithPassword({
-      email: e,
-      password: p
-    });
-    
-    // ADIM 2: Auth basarisiz olursa, ESKI SISTEM kontrolu (DUZ METIN + HASH)
-    if (authError) {
-      console.log('Supabase Auth basarisiz, eski sistem kontrol ediliyor...');
-      
-      var allUsers = await supaGet('users') || [];
-      var found = null;
-      
-      allUsers.forEach(function(u) {
-        if (u.email === e) {
-          // Duz metin sifre kontrolu (ORNEK: Admin1234)
-          if (u.pass === p) {
-            found = u;
-            console.log('Duz metin sifre bulundu!');
-          }
-          // SHA-256 hash kontrolu
-          else if (u.pass === ph) {
-            found = u;
-            console.log('Hash sifre bulundu!');
-          }
-        }
-      });
-      
-      if (!found) {
-        hideLoading();
-        showErr('lerr', 'E-posta veya sifre hatali!');
-        return;
-      }
-      
-      console.log('Eski sistemde kullanici bulundu, Supabase Auth\'a tasınıyor...');
-      
-      // ADIM 3: Eski kullaniciyi Supabase Auth'a kaydet
-      var { data: signUpData, error: signUpError } = await sb.auth.signUp({
-        email: e,
-        password: p
-      });
-      
-      if (signUpError && !signUpError.message.includes('already registered')) {
-        console.error('SignUp hatasi:', signUpError);
-      }
-      
-      // ADIM 4: Simdi normal login yap
-      var { data: finalAuth, error: finalError } = await sb.auth.signInWithPassword({
-        email: e,
-        password: p
-      });
-      
-      if (finalError) {
-        hideLoading();
-        showErr('lerr', 'Aktarım hatası: ' + finalError.message);
-        return;
-      }
-      
-      authData = finalAuth;
-      console.log('Kullanici basariyla aktarildi!');
+    if (authError || !authData.user) {
+      hideLoading();
+      showErr('lerr', translateAuthError(authError ? authError.message : ''));
+      return;
     }
     
-    // ADIM 5: Auth basarili, kullanici bilgilerini al
-    var userId = authData.user.id;
-    var userEmail = authData.user.email;
+    // Basarili giris logu (Hata verse de sistemi durdurmaz)
+    try { await supaPost('login_logs', { user_email: e, role: 'admin', user_agent: navigator.userAgent }); } catch(err){}
     
-    var { data: userData, error: userError } = await sb
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    var userId = authData.user.id; var userEmail = authData.user.email;
+    var { data: userData, error: userError } = await sb.from('users').select('*').eq('id', userId).single();
     
     if (userError || !userData) {
-      var allUsers = await supaGet('users') || [];
-      var oldUser = allUsers.find(function(u) { return u.email === userEmail; });
-      
-      if (oldUser) {
-        await supaUpsert('users', {
-          id: userId,
-          org_id: oldUser.org_id || 'org-default',
-          branch_id: oldUser.branch_id || 'br-default',
-          email: userEmail,
-          role: oldUser.role || 'admin',
-          name: oldUser.name || userEmail.split('@')[0],
-          phone: oldUser.phone || ''
-        });
-        
-        userData = {
-          id: userId,
-          org_id: oldUser.org_id || 'org-default',
-          branch_id: oldUser.branch_id || 'br-default',
-          email: userEmail,
-          role: oldUser.role || 'admin',
-          name: oldUser.name || userEmail.split('@')[0],
-          phone: oldUser.phone || ''
-        };
-      } else {
-        userData = {
-          id: userId,
-          org_id: 'org-default',
-          branch_id: 'br-default',
-          email: userEmail,
-          role: 'admin',
-          name: userEmail.split('@')[0]
-        };
-        await supaPost('users', userData);
-      }
+      userData = { id: userId, email: userEmail, org_id: 'org-default', branch_id: 'br-default', role: 'admin', name: userEmail.split('@')[0] };
     }
     
-    // Org ve sube bilgilerini cek
     var allOrgs = [], allBranches = [];
     try { allOrgs = await supaGet('orgs') || []; } catch(e2) {}
     try { allBranches = await supaGet('branches') || []; } catch(e2) {}
     
-    _orgsCache = allOrgs.map(function(o) { 
-      return { id: o.id, name: o.name, status: o.status || 'approved', registered_at: o.registered_at }; 
-    });
-    _branchesCache = allBranches.map(function(b) { 
-      return { id: b.id, orgId: b.org_id, name: b.name, code: b.code }; 
-    });
+    _orgsCache = allOrgs.map(function(o) { return { id: o.id, name: o.name, status: o.status || 'approved', registered_at: o.registered_at }; });
+    _branchesCache = allBranches.map(function(b) { return { id: b.id, orgId: b.org_id, name: b.name, code: b.code }; });
+    if (!_branchesCache.length) _branchesCache.push({ id: 'br-default', orgId: 'org-default', name: 'Dragos Futbol Akademisi', code: 'DFA' });
     
-    if (!_branchesCache.length) {
-      _branchesCache.push({ id: 'br-default', orgId: 'org-default', name: 'Dragos Futbol Akademisi', code: 'DFA' });
-    }
-    
-    var found = {
-      id: userData.id,
-      orgId: userData.org_id,
-      branchId: userData.branch_id,
-      email: userData.email,
-      role: userData.role,
-      name: userData.name,
-      phone: userData.phone
-    };
+    var found = { id: userData.id, orgId: userData.org_id, branchId: userData.branch_id, email: userData.email, role: userData.role, name: userData.name, phone: userData.phone };
     
     if (found.email !== SUPER_ADMIN_EMAIL) {
       var foundOrg = allOrgs.find(function(o) { return o.id === found.orgId; });
-      if (foundOrg && foundOrg.status === 'pending') {
-        hideLoading();
-        await sb.auth.signOut();
-        showErr('lerr', '⏳ Hesabiniz henüz onaylanmadi.');
-        return;
-      }
-      if (foundOrg && foundOrg.status === 'rejected') {
-        hideLoading();
-        await sb.auth.signOut();
-        showErr('lerr', '❌ Hesabiniz reddedildi.');
-        return;
-      }
+      if (foundOrg && foundOrg.status === 'pending') { hideLoading(); await sb.auth.signOut(); showErr('lerr', '⏳ Hesabınız henüz onaylanmadı. Yönetici onayı bekleniyor.'); return; }
+      if (foundOrg && foundOrg.status === 'rejected') { hideLoading(); await sb.auth.signOut(); showErr('lerr', '❌ Hesabınız reddedildi. Detay için yöneticiyle iletişime geçin.'); return; }
     }
     
-    currentUser = found;
-    currentOrgId = found.orgId || (allOrgs[0] && allOrgs[0].id) || 'org-default';
-    currentBranchId = found.branchId || (allBranches[0] && allBranches[0].id) || 'br-default';
-    
-    if (!getBranch(currentBranchId)) {
-      _branchesCache.push({ 
-        id: currentBranchId, 
-        orgId: currentOrgId, 
-        name: settings.schoolName || 'Merkez Sube', 
-        code: 'MRK' 
-      });
-    }
-    
+    currentUser = found; currentOrgId = found.orgId || (allOrgs[0] && allOrgs[0].id) || 'org-default'; currentBranchId = found.branchId || (allBranches[0] && allBranches[0].id) || 'br-default';
+    if (!getBranch(currentBranchId)) _branchesCache.push({ id: currentBranchId, orgId: currentOrgId, name: settings.schoolName || 'Merkez Sube', code: 'MRK' });
     acct.email = found.email;
+    
     await loadBranchData();
     
-    document.getElementById('lbox-wrap').style.display = 'none';
-    document.getElementById('wrap').classList.remove('dn');
-    document.getElementById('lerr').classList.add('dn');
-    
+    document.getElementById('lbox-wrap').style.display = 'none'; document.getElementById('wrap').classList.remove('dn'); document.getElementById('lerr').classList.add('dn');
     var dname = found.name || found.email.split('@')[0];
     var setEl = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-    setEl('suname', dname); 
-    setEl('sava', (dname[0] || 'A').toUpperCase()); 
-    setEl('bar-ava', (dname[0] || 'A').toUpperCase());
+    setEl('suname', dname); setEl('sava', (dname[0] || 'A').toUpperCase()); setEl('bar-ava', (dname[0] || 'A').toUpperCase());
     
-    updateBranchUI(); 
-    updateBadges(); 
-    go('dashboard'); 
-    resetSessionTimer();
-    
-    hideLoading();
-    
-  } catch(err) { 
-    hideLoading(); 
-    console.error('Login error:', err); 
-    showErr('lerr', 'Baglanti hatasi: ' + (err.message || err)); 
-  }
+    updateBranchUI(); updateBadges(); go('dashboard'); resetSessionTimer(); hideLoading();
+  } catch(err) { hideLoading(); showErr('lerr', 'Bağlantı hatası: ' + (err.message || err)); }
 }
 
-
-function showErr(id, msg) { var el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.remove('dn'); } }
-
-// GUVENLIK: Cikis yaparken auth session da temizleniyor
 async function doLogout() {
   var sb = getSB();
   if (sb) await sb.auth.signOut();
   
+  // Güvenlik için sadece branch datalarını temizle, kullanıcı logini vs temiz kalsın
+  Object.keys(localStorage).forEach(function(key){ if(key.startsWith('branchData_')) localStorage.removeItem(key); });
+
   currentUser = null; currentOrgId = null; currentBranchId = null;
   athletes = []; payments = []; coaches = []; attData = {}; messages = []; settings = {}; sports = []; classes = [];
-  document.getElementById('wrap').classList.add('dn');
-  document.getElementById('lbox-wrap').style.display = 'flex';
-  var le = document.getElementById('le'), lp = document.getElementById('lp');
-  if (le) le.value = ''; if (lp) lp.value = '';
+  document.getElementById('wrap').classList.add('dn'); document.getElementById('lbox-wrap').style.display = 'flex';
+  var le = document.getElementById('le'), lp = document.getElementById('lp'); if (le) le.value = ''; if (lp) lp.value = '';
   if (window._sessionTimer) { clearTimeout(window._sessionTimer); window._sessionTimer = null; }
 }
 
 // ── 15 Dakika Oturum Timeout ─────────────────────────────
 var SESSION_TIMEOUT_MS = 15 * 60 * 1000;
-window._sessionTimer = null;
-window._sessionWarningTimer = null;
+window._sessionTimer = null; window._sessionWarningTimer = null;
 
 function resetSessionTimer() {
   if (!currentUser) return;
   if (window._sessionTimer) clearTimeout(window._sessionTimer);
   if (window._sessionWarningTimer) clearTimeout(window._sessionWarningTimer);
-  window._sessionWarningTimer = setTimeout(function() {
-    if (!currentUser) return;
-    toast('⚠️ 1 dakika içinde oturumunuz kapanacak. Devam etmek için herhangi bir yere tiklayin.', 'y');
-  }, SESSION_TIMEOUT_MS - 60000);
-  window._sessionTimer = setTimeout(function() {
-    if (!currentUser) return;
-    toast('⏱️ Oturum süresi doldu. Tekrar giris yapin.', 'r');
-    setTimeout(function() { doLogout(); }, 2000);
-  }, SESSION_TIMEOUT_MS);
+  window._sessionWarningTimer = setTimeout(function() { if (!currentUser) return; toast('⚠️ 1 dakika içinde oturumunuz kapanacak. Devam etmek için herhangi bir yere tıklayın.', 'y'); }, SESSION_TIMEOUT_MS - 60000);
+  window._sessionTimer = setTimeout(function() { if (!currentUser) return; toast('⏱️ Oturum süresi doldu. Tekrar giriş yapın.', 'r'); setTimeout(function() { doLogout(); }, 2000); }, SESSION_TIMEOUT_MS);
 }
-
-function initSessionTimeout() {
-  var events = ['mousedown','mousemove','keydown','scroll','touchstart','click'];
-  events.forEach(function(evt) {
-    document.addEventListener(evt, function() { resetSessionTimer(); }, { passive: true });
-  });
-}
+function initSessionTimeout() { var events = ['mousedown','mousemove','keydown','scroll','touchstart','click']; events.forEach(function(evt) { document.addEventListener(evt, function() { resetSessionTimer(); }, { passive: true }); }); }
 initSessionTimeout();
 
 function showRegister() {
-  document.getElementById('lbox-wrap').innerHTML = '<div class="lbox"><div class="llogo"><div class="llogo-i">&#x26BD;</div><h1 style="font-size:20px;font-weight:800">Kurum Kaydi</h1><p style="color:var(--text2);font-size:13px;margin-top:4px">Yeni akademi hesabi olustur</p></div>' +
-    '<div class="fgr mb2"><label>Kurum Adi</label><input id="rg-org" type="text" placeholder="Dragos Futbol Akademisi"/></div>' +
-    '<div class="fgr mb2"><label>1. Sube Adi</label><input id="rg-branch" type="text" placeholder="Merkez Sube"/></div>' +
-    '<div class="fgr mb2"><label>Yetkili Ad Soyad</label><input id="rg-name" type="text"/></div>' +
-    '<div class="fgr mb2"><label>Telefon</label><input id="rg-phone" type="tel" placeholder="05xx..."/></div>' +
-    '<div class="fgr mb2"><label>E-posta</label><input id="rg-em" type="email"/></div>' +
-    '<div class="fgr mb2"><label>Sifre</label><input id="rg-p1" type="password"/></div>' +
-    '<div class="fgr mb3"><label>Sifre Tekrar</label><input id="rg-p2" type="password"/></div>' +
-    '<div id="rg-err" class="lerr dn"></div>' +
-    '<button class="btn bp w100 mb2" style="padding:12px" onclick="doRegister()">Kayit Ol</button>' +
-    '<button class="btn bs w100" onclick="location.reload()">Geri Don</button></div>';
+  document.getElementById('lbox-wrap').innerHTML = '<div class="lbox"><div class="llogo"><div class="llogo-i">&#x26BD;</div><h1 style="font-size:20px;font-weight:800">Kurum Kaydı</h1><p style="color:var(--text2);font-size:13px;margin-top:4px">Yeni akademi hesabı oluştur</p></div>' +
+    '<div class="fgr mb2"><label>Kurum Adı</label><input id="rg-org" type="text" placeholder="Dragos Futbol Akademisi"/></div><div class="fgr mb2"><label>1. Şube Adı</label><input id="rg-branch" type="text" placeholder="Merkez Şube"/></div>' +
+    '<div class="fgr mb2"><label>Yetkili Ad Soyad</label><input id="rg-name" type="text"/></div><div class="fgr mb2"><label>Telefon</label><input id="rg-phone" type="tel" placeholder="05xx..."/></div>' +
+    '<div class="fgr mb2"><label>E-posta</label><input id="rg-em" type="email"/></div><div class="fgr mb2"><label>Şifre</label><input id="rg-p1" type="password"/></div><div class="fgr mb3"><label>Şifre Tekrar</label><input id="rg-p2" type="password"/></div>' +
+    '<div id="rg-err" class="lerr dn"></div><button class="btn bp w100 mb2" style="padding:12px" onclick="doRegister()">Kayıt Ol</button><button class="btn bs w100" onclick="location.reload()">Geri Dön</button></div>';
 }
 
-// GUVENLIK: Kayit olurken Supabase Auth kullan
 async function doRegister() {
   var orgName = gv('rg-org'), branchName = gv('rg-branch') || 'Merkez', name = gv('rg-name'), em = gv('rg-em'), phone = gv('rg-phone'), p1 = gv('rg-p1'), p2 = gv('rg-p2');
-  var errEl = document.getElementById('rg-err');
-  function showErr2(m) { errEl.textContent = m; errEl.classList.remove('dn'); }
-  if (!orgName || !name || !em || !p1) { showErr2('Tum alanlar zorunlu!'); return; }
-  if (p1 !== p2) { showErr2('Sifreler eslesmiyor!'); return; }
-  if (p1.length < 6) { showErr2('En az 6 karakter!'); return; }
+  var errEl = document.getElementById('rg-err'); function showErr2(m) { errEl.textContent = m; errEl.classList.remove('dn'); }
+  if (!orgName || !name || !em || !p1) { showErr2('Tüm alanlar zorunlu!'); return; }
+  if (p1 !== p2) { showErr2('Şifreler eşleşmiyor!'); return; }
+  if (p1.length < 6) { showErr2('En az 6 karakter olmalı!'); return; }
   showLoading();
-  
   try {
     var sb = getSB();
+    var { data: authData, error: authError } = await sb.auth.signUp({ email: em, password: p1 });
+    if (authError) { hideLoading(); showErr2(translateAuthError(authError.message)); return; }
+    if (!authData.user) { hideLoading(); showErr2('Kayıt başarısız. Lütfen tekrar deneyin.'); return; }
     
-    // GUVENLIK: Supabase Auth ile kayit ol
-    var { data: authData, error: authError } = await sb.auth.signUp({
-      email: em,
-      password: p1
-    });
-    
-    if (authError) {
-      hideLoading();
-      showErr2(authError.message === 'User already registered' ? 'Bu e-posta zaten kayitli!' : 'Kayit hatasi: ' + authError.message);
-      return;
-    }
-    
-    if (!authData.user) {
-      hideLoading();
-      showErr2('Kayit basarisiz. Lütfen tekrar deneyin.');
-      return;
-    }
-    
-    var userId = authData.user.id;
-    var orgId = 'org-' + Date.now().toString(36);
-    var branchId = 'br-' + Date.now().toString(36);
-    
+    var userId = authData.user.id, orgId = 'org-' + Date.now().toString(36), branchId = 'br-' + Date.now().toString(36);
     await supaPost('orgs', { id: orgId, name: orgName, status: 'pending', registered_at: new Date().toISOString() });
     await supaPost('branches', { id: branchId, org_id: orgId, name: branchName, code: branchName.slice(0, 3).toUpperCase() });
     await supaPost('users', { id: userId, org_id: orgId, branch_id: branchId, email: em, role: 'admin', name: name, phone: phone });
-    
     hideLoading();
-    document.getElementById('lbox-wrap').innerHTML = '<div class="lbox" style="text-align:center"><div style="font-size:64px;margin-bottom:16px">⏳</div><h2 style="font-size:20px;font-weight:800;margin-bottom:8px">Kaydiniz Alindi!</h2><p style="color:var(--text2);line-height:1.6;margin-bottom:20px">Hesabiniz incelemeye alindi.<br>Onaylandiktan sonra giris yapabilirsiniz.<br><b style="color:var(--blue2)">'+esc(orgName)+'</b></p><div class="al al-y" style="text-align:left;margin-bottom:16px">📧 Onay durumu için yöneticiyle iletisime geçin.</div><button class="btn bp w100" onclick="location.reload()">Giris Sayfasina Dön</button></div>';
-  } catch(e) {
-    hideLoading();
-    showErr2('Bir hata olustu: ' + e.message);
-  }
+    document.getElementById('lbox-wrap').innerHTML = '<div class="lbox" style="text-align:center"><div style="font-size:64px;margin-bottom:16px">⏳</div><h2 style="font-size:20px;font-weight:800;margin-bottom:8px">Kaydınız Alındı!</h2><p style="color:var(--text2);line-height:1.6;margin-bottom:20px">Hesabınız incelemeye alındı.<br>Onaylandıktan sonra giriş yapabilirsiniz.<br><b style="color:var(--blue2)">'+esc(orgName)+'</b></p><div class="al al-y" style="text-align:left;margin-bottom:16px">📧 Onay durumu için yöneticiyle iletişime geçin.</div><button class="btn bp w100" onclick="location.reload()">Giriş Sayfasına Dön</button></div>';
+  } catch(e) { hideLoading(); showErr2('Bir hata oluştu: ' + e.message); }
 }
 
-// ── Sporcu Login ──────────────────────────────────────────
+// SPORCU GIRIS EKRANI GUNCELLEMESI (Guvenlik)
 async function doSporcuLogin() {
   var tc = gv('ls-tc'), pass = gv('ls-pass');
   var errEl = document.getElementById('ls-err');
   showLoading();
   try {
+    // Sadece TC ile arama yapilir, tum veritabanini client'a cekmez
     var res = await supaGet('athletes', { tc: tc });
     hideLoading();
     var found = null, foundBranch = null, foundOrg = null;
@@ -770,94 +543,71 @@ async function doSporcuLogin() {
       var exp = r.sp_pass || tc.slice(-4);
       if (pass === exp || ph === exp) { found = dbToAth(r); foundBranch = r.branch_id; foundOrg = r.org_id; }
     });
+    
     if (found) {
+      try { await supaPost('login_logs', { user_email: tc + '@sporcu', role: 'sporcu', user_agent: navigator.userAgent }); } catch(err){}
       currentSporcu = found; currentSporcuBranchId = foundBranch; currentSporcuOrgId = foundOrg;
       currentOrgId = foundOrg; currentBranchId = foundBranch;
       await loadBranchData();
-      var orgs = await supaGet('orgs', { id: foundOrg });
-      var orgName = orgs && orgs[0] ? orgs[0].name : 'Akademi';
-      document.getElementById('lbox-wrap').style.display = 'none';
-      document.getElementById('sporcu-portal').style.display = 'flex';
+      var orgs = await supaGet('orgs', { id: foundOrg }); var orgName = orgs && orgs[0] ? orgs[0].name : 'Akademi';
+      document.getElementById('lbox-wrap').style.display = 'none'; document.getElementById('sporcu-portal').style.display = 'flex';
       var av = document.getElementById('sp-avatar'); if (av) { av.textContent = (found.fn[0] || 'S').toUpperCase(); av.style.background = avatarColor(found.fn); }
       var sn = document.getElementById('sp-name'); if (sn) sn.textContent = found.fn + ' ' + found.ln;
       var on = document.getElementById('sp-orgname'); if (on) on.textContent = settings.schoolName || orgName;
       errEl.classList.add('dn'); spTab('profil');
     } else { errEl.classList.remove('dn'); }
-  } catch(e) { hideLoading(); console.error(e); errEl.classList.remove('dn'); }
+  } catch(e) { hideLoading(); errEl.classList.remove('dn'); }
 }
 function doSporcuLogout() { currentSporcu = null; document.getElementById('sporcu-portal').style.display = 'none'; document.getElementById('lbox-wrap').style.display = 'flex'; }
 
 // ── Forgot Password ───────────────────────────────────────
 function showForgotPassword() {
   document.getElementById('lbox-wrap').innerHTML = '<div class="lbox">' +
-    '<div class="llogo"><div class="llogo-i" style="font-size:28px">&#x1F511;</div><h1 style="font-size:18px;font-weight:800">Sifre Sifirlama</h1></div>' +
+    '<div class="llogo"><div class="llogo-i" style="font-size:28px">&#x1F511;</div><h1 style="font-size:18px;font-weight:800">Şifre Sıfırlama</h1></div>' +
     '<div id="fp-step1"><div class="fgr mb3"><label>TC Kimlik veya E-posta</label><input id="fp-id" type="text" placeholder="TC veya e-posta giriniz"/></div>' +
-    '<div id="fp-err" class="lerr dn"></div>' +
-    '<button class="btn bp w100 mb2" style="padding:12px" onclick="fpSendCode()">Dogrulama Kodu Gonder</button>' +
-    '<button class="btn bs w100" onclick="location.reload()">Geri Don</button></div>' +
+    '<div id="fp-err" class="lerr dn"></div><button class="btn bp w100 mb2" style="padding:12px" onclick="fpSendCode()">Doğrulama Kodu Gönder</button><button class="btn bs w100" onclick="location.reload()">Geri Dön</button></div>' +
     '<div id="fp-step2" class="dn"><p style="color:var(--text2);font-size:13px;text-align:center;margin-bottom:12px" id="fp-phone-hint"></p>' +
-    '<div class="al al-b mb3" id="fp-demo-code" style="font-size:18px;text-align:center;font-weight:700;letter-spacing:6px"></div>' +
-    '<div class="fgr mb3"><label>6 Haneli Kod</label><input id="fp-code" type="tel" maxlength="6" placeholder="------" style="font-size:22px;letter-spacing:8px;text-align:center"/></div>' +
-    '<div id="fp-err2" class="lerr dn"></div>' +
-    '<button class="btn bp w100 mb2" style="padding:12px" onclick="fpVerifyCode()">Dogrula</button></div>' +
-    '<div id="fp-step3" class="dn"><div class="fgr mb2"><label>Yeni Sifre</label><input id="fp-np1" type="password"/></div>' +
-    '<div class="fgr mb3"><label>Sifre Tekrar</label><input id="fp-np2" type="password"/></div>' +
-    '<div id="fp-new-err" class="lerr dn"></div>' +
-    '<button class="btn bp w100" style="padding:12px" onclick="fpSetNewPassword()">Sifreyi Guncelle</button></div></div>';
+    '<div class="al al-b mb3" id="fp-demo-code" style="font-size:18px;text-align:center;font-weight:700;letter-spacing:6px"></div><div class="fgr mb3"><label>6 Haneli Kod</label><input id="fp-code" type="tel" maxlength="6" placeholder="------" style="font-size:22px;letter-spacing:8px;text-align:center"/></div>' +
+    '<div id="fp-err2" class="lerr dn"></div><button class="btn bp w100 mb2" style="padding:12px" onclick="fpVerifyCode()">Doğrula</button></div>' +
+    '<div id="fp-step3" class="dn"><div class="fgr mb2"><label>Yeni Şifre</label><input id="fp-np1" type="password"/></div><div class="fgr mb3"><label>Şifre Tekrar</label><input id="fp-np2" type="password"/></div>' +
+    '<div id="fp-new-err" class="lerr dn"></div><button class="btn bp w100" style="padding:12px" onclick="fpSetNewPassword()">Şifreyi Güncelle</button></div></div>';
 }
 async function fpSendCode() {
-  var val = gv('fp-id'), errEl = document.getElementById('fp-err');
-  if (!val) { errEl.textContent = 'Alan bos!'; errEl.classList.remove('dn'); return; }
-  showLoading();
-  var found = null, type = null, phone = null;
+  var val = gv('fp-id'), errEl = document.getElementById('fp-err'); if (!val) { errEl.textContent = 'Alan boş!'; errEl.classList.remove('dn'); return; }
+  showLoading(); var found = null, type = null, phone = null;
   if (val.length === 11 && /^\d+$/.test(val)) { var r1 = await supaGet('athletes', { tc: val }); if (r1 && r1.length > 0) { found = r1[0]; type = 'sporcu'; phone = r1[0].ph || ''; } }
   if (!found) { var r2 = await supaGet('users', { email: val }); if (r2 && r2.length > 0) { found = r2[0]; type = 'admin'; phone = r2[0].phone || ''; } }
-  hideLoading();
-  if (!found) { errEl.textContent = 'Kayit bulunamadi!'; errEl.classList.remove('dn'); return; }
+  hideLoading(); if (!found) { errEl.textContent = 'Kayıt bulunamadı!'; errEl.classList.remove('dn'); return; }
   var code = Math.floor(100000 + Math.random() * 900000).toString();
   _forgotCtx = { code: code, expiry: Date.now() + 10 * 60 * 1000, target: found, type: type };
-  if (phone && NETGSM_USER) await sendSMS(phone, 'Sporcu Paneli dogrulama kodunuz: ' + code + '. 10 dk gecerlidir.');
+  if (phone && NETGSM_USER) await sendSMS(phone, 'Sporcu Paneli doğrulama kodunuz: ' + code + '. 10 dk geçerlidir.');
   document.getElementById('fp-step1').classList.add('dn'); document.getElementById('fp-step2').classList.remove('dn');
-  var hint = document.getElementById('fp-phone-hint'); if (hint) hint.textContent = phone ? 'Kod ' + phone.slice(0, 3) + '***' + phone.slice(-2) + ' numarasina gonderildi' : 'Kod hazir';
+  var hint = document.getElementById('fp-phone-hint'); if (hint) hint.textContent = phone ? 'Kod ' + phone.slice(0, 3) + '***' + phone.slice(-2) + ' numarasına gönderildi' : 'Kod hazır';
   var demo = document.getElementById('fp-demo-code'); if (demo) { if (!NETGSM_USER) demo.textContent = code; else demo.style.display = 'none'; }
 }
 function fpVerifyCode() {
-  var code = gv('fp-code'), errEl = document.getElementById('fp-err2');
-  if (!_forgotCtx) { location.reload(); return; }
-  if (Date.now() > _forgotCtx.expiry) { errEl.textContent = 'Kod suresi doldu!'; errEl.classList.remove('dn'); return; }
-  if (code.trim() !== _forgotCtx.code) { errEl.textContent = 'Yanlis kod!'; errEl.classList.remove('dn'); return; }
+  var code = gv('fp-code'), errEl = document.getElementById('fp-err2'); if (!_forgotCtx) { location.reload(); return; }
+  if (Date.now() > _forgotCtx.expiry) { errEl.textContent = 'Kod süresi doldu!'; errEl.classList.remove('dn'); return; }
+  if (code.trim() !== _forgotCtx.code) { errEl.textContent = 'Yanlış kod!'; errEl.classList.remove('dn'); return; }
   document.getElementById('fp-step2').classList.add('dn'); document.getElementById('fp-step3').classList.remove('dn');
 }
 async function fpSetNewPassword() {
   var p1 = gv('fp-np1'), p2 = gv('fp-np2'), errEl = document.getElementById('fp-new-err');
-  if (!p1) { errEl.textContent = 'Sifre bos!'; errEl.classList.remove('dn'); return; }
-  if (p1 !== p2) { errEl.textContent = 'Sifreler eslesmiyor!'; errEl.classList.remove('dn'); return; }
+  if (!p1) { errEl.textContent = 'Şifre boş!'; errEl.classList.remove('dn'); return; }
+  if (p1 !== p2) { errEl.textContent = 'Şifreler eşleşmiyor!'; errEl.classList.remove('dn'); return; }
   if (p1.length < 6) { errEl.textContent = 'En az 6 karakter!'; errEl.classList.remove('dn'); return; }
   showLoading();
-  
   try {
     var sb = getSB();
-    
-    // Admin icin Supabase Auth sifresini guncelle
     if (_forgotCtx.type === 'admin' && _forgotCtx.target.email) {
-      // Not: Supabase Auth sifre sifirlama email ile yapilir
-      // Burada sadece users tablosundaki pass alanini guncelliyoruz
-      var ph = await sha256(p1);
-      await supaPatch('users', { pass: ph }, { id: _forgotCtx.target.id });
+      var ph = await sha256(p1); await supaPatch('users', { pass: ph }, { id: _forgotCtx.target.id });
     } else {
-      var ph = await sha256(p1);
-      await supaPatch('athletes', { sp_pass: ph }, { id: _forgotCtx.target.id });
+      var ph = await sha256(p1); await supaPatch('athletes', { sp_pass: ph }, { id: _forgotCtx.target.id });
     }
-    
     hideLoading(); _forgotCtx = null;
-    document.getElementById('lbox-wrap').innerHTML = '<div class="lbox" style="text-align:center"><div style="font-size:48px;margin-bottom:16px">&#x2705;</div><div style="font-size:20px;font-weight:800;margin-bottom:8px">Sifre Guncellendi!</div><button class="btn bp w100 mt3" style="padding:12px" onclick="location.reload()">Giris Yap</button></div>';
-  } catch(e) {
-    hideLoading();
-    errEl.textContent = 'Hata: ' + e.message;
-    errEl.classList.remove('dn');
-  }
+    document.getElementById('lbox-wrap').innerHTML = '<div class="lbox" style="text-align:center"><div style="font-size:48px;margin-bottom:16px">&#x2705;</div><div style="font-size:20px;font-weight:800;margin-bottom:8px">Şifre Güncellendi!</div><button class="btn bp w100 mt3" style="padding:12px" onclick="location.reload()">Giriş Yap</button></div>';
+  } catch(e) { hideLoading(); errEl.textContent = 'Hata: ' + e.message; errEl.classList.remove('dn'); }
 }
-
 
 // ══════════════════════════════════════════════════════════
 //  PAGES
@@ -868,37 +618,23 @@ function pgDashboard() {
   var inc = payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).reduce(function(s, p) { return s + (p.amt || 0); }, 0);
   var exp = payments.filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).reduce(function(s, p) { return s + (p.amt || 0); }, 0);
   var od = overdueCount();
-  var html = '<div class="ph"><div class="stit">Gosterge</div><div class="ssub">Akademi ozeti</div></div>' +
-    '<div class="g4 mb3">' +
-    sc('b', '&#x1F465;', fmtN(active), 'Aktif Sporcu', 'athletes') +
-    sc('g', '&#x1F4B0;', fmtN(inc) + ' &#x20BA;', 'Aylik Gelir', 'payments') +
-    sc('r', '&#x26A0;', fmtN(od), 'Gecikmis Odeme', 'payments') +
-    sc('y', '&#x1F4CB;', fmtN(total), 'Toplam Kayit', 'athletes') +
-    '</div>' +
-    '<div class="card mb3"><div class="tw6 tsm mb2">Hizli Eylemler</div><div class="quick-actions">' +
-    '<button class="qa-btn" onclick="go(\'athletes\')" style="border-color:var(--blue2)"><div class="qa-icon">&#x2795;</div><div class="qa-lbl">YENI SPORCU</div></button>' +
-    '<button class="qa-btn" onclick="go(\'payments\')" style="border-color:var(--green)"><div class="qa-icon">&#x1F4B3;</div><div class="qa-lbl">ODEME AL</div></button>' +
+  var html = '<div class="ph"><div class="stit">Gösterge</div><div class="ssub">Akademi özeti</div></div>' +
+    '<div class="g4 mb3">' + sc('b', '&#x1F465;', fmtN(active), 'Aktif Sporcu', 'athletes') + sc('g', '&#x1F4B0;', fmtN(inc) + ' &#x20BA;', 'Aylık Gelir', 'payments') + sc('r', '&#x26A0;', fmtN(od), 'Gecikmiş Ödeme', 'payments') + sc('y', '&#x1F4CB;', fmtN(total), 'Toplam Kayıt', 'athletes') + '</div>' +
+    '<div class="card mb3"><div class="tw6 tsm mb2">Hızlı Eylemler</div><div class="quick-actions">' +
+    '<button class="qa-btn" onclick="go(\'athletes\')" style="border-color:var(--blue2)"><div class="qa-icon">&#x2795;</div><div class="qa-lbl">YENİ SPORCU</div></button>' +
+    '<button class="qa-btn" onclick="go(\'payments\')" style="border-color:var(--green)"><div class="qa-icon">&#x1F4B3;</div><div class="qa-lbl">ÖDEME AL</div></button>' +
     '<button class="qa-btn" onclick="go(\'attendance\')" style="border-color:var(--yellow)"><div class="qa-icon">&#x2705;</div><div class="qa-lbl">YOKLAMA</div></button>' +
-    '<button class="qa-btn" onclick="showQRScanner()" style="border-color:var(--purple)"><div class="qa-icon">&#x1F4F7;</div><div class="qa-lbl">QR OKU</div></button>' +
-    '</div></div>' +
-    '<div class="g2"><div class="card"><div class="tw6 tsm mb2">Gelir/Gider Dagilimi</div><div id="dash-chart" style="height:180px"></div></div>' +
-    '<div class="card"><div class="tw6 tsm mb2">Brans Dagilimi</div><div id="dash-sport-chart" style="height:180px"></div></div></div>';
+    '<button class="qa-btn" onclick="showQRScanner()" style="border-color:var(--purple)"><div class="qa-icon">&#x1F4F7;</div><div class="qa-lbl">QR OKU</div></button></div></div>' +
+    '<div class="g2"><div class="card"><div class="tw6 tsm mb2">Gelir/Gider Dağılımı</div><div id="dash-chart" style="height:180px"></div></div><div class="card"><div class="tw6 tsm mb2">Branş Dağılımı</div><div id="dash-sport-chart" style="height:180px"></div></div></div>';
   setTimeout(function() { renderDashCharts(inc, exp); }, 50);
   return html;
 }
 function renderDashCharts(inc, exp) {
   var el = document.getElementById('dash-chart'); if (!el) return;
-  el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:center">' +
-    '<div style="display:flex;align-items:center;gap:10px"><div style="width:12px;height:12px;border-radius:50%;background:var(--green)"></div><span style="font-size:13px">Gelir: <b>' + fmtN(inc) + ' &#x20BA;</b></span></div>' +
-    '<div style="display:flex;align-items:center;gap:10px"><div style="width:12px;height:12px;border-radius:50%;background:var(--red)"></div><span style="font-size:13px">Gider: <b>' + fmtN(exp) + ' &#x20BA;</b></span></div>' +
-    '<div style="height:20px;background:var(--bg3);border-radius:10px;overflow:hidden"><div style="width:' + (inc + exp > 0 ? inc / (inc + exp) * 100 : 50) + '%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>';
-  var spData = {};
-  athletes.forEach(function(a) { var sp = a.sp || 'Diger'; spData[sp] = (spData[sp] || 0) + 1; });
+  el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:center"><div style="display:flex;align-items:center;gap:10px"><div style="width:12px;height:12px;border-radius:50%;background:var(--green)"></div><span style="font-size:13px">Gelir: <b>' + fmtN(inc) + ' &#x20BA;</b></span></div><div style="display:flex;align-items:center;gap:10px"><div style="width:12px;height:12px;border-radius:50%;background:var(--red)"></div><span style="font-size:13px">Gider: <b>' + fmtN(exp) + ' &#x20BA;</b></span></div><div style="height:20px;background:var(--bg3);border-radius:10px;overflow:hidden"><div style="width:' + (inc + exp > 0 ? inc / (inc + exp) * 100 : 50) + '%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>';
+  var spData = {}; athletes.forEach(function(a) { var sp = a.sp || 'Diger'; spData[sp] = (spData[sp] || 0) + 1; });
   var spEl = document.getElementById('dash-sport-chart');
-  if (spEl) {
-    var bars = Object.keys(spData).map(function(k) { return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;max-width:40px;background:var(--grad);border-radius:4px 4px 0 0;min-height:3px;height:' + (spData[k] * 8) + 'px"></div><span style="font-size:10px;color:var(--text2)">' + esc(k) + '</span></div>'; }).join('');
-    spEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:6px;height:100%;padding:0 10px">' + bars + '</div>';
-  }
+  if (spEl) { var bars = Object.keys(spData).map(function(k) { return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;max-width:40px;background:var(--grad);border-radius:4px 4px 0 0;min-height:3px;height:' + (spData[k] * 8) + 'px"></div><span style="font-size:10px;color:var(--text2)">' + esc(k) + '</span></div>'; }).join(''); spEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:6px;height:100%;padding:0 10px">' + bars + '</div>'; }
 }
 
 function pgAthletes() {
@@ -907,120 +643,51 @@ function pgAthletes() {
   if (_athFilter.st) list = list.filter(function(a) { return a.st === _athFilter.st; });
   if (_athFilter.cls) list = list.filter(function(a) { return a.clsId === _athFilter.cls; });
   if (_athFilter.q) { var q = _athFilter.q.toLowerCase(); list = list.filter(function(a) { return (a.fn + ' ' + a.ln).toLowerCase().indexOf(q) >= 0 || a.tc.indexOf(q) >= 0; }); }
-  var html = '<div class="ph"><div class="stit">Sporcular</div><div class="ssub">Kayitli sporculari yonet</div></div>' +
-    '<div class="filters mb3">' +
-    '<select class="fs" onchange="_athFilter.sp=this.value;go(\'athletes\')"><option value="">Tum Branslar</option>' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (_athFilter.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select>' +
-    '<select class="fs" onchange="_athFilter.st=this.value;go(\'athletes\')"><option value="">Tum Durumlar</option><option value="active"' + (_athFilter.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (_athFilter.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select>' +
-    '<select class="fs" onchange="_athFilter.cls=this.value;go(\'athletes\')"><option value="">Tum Siniflar</option>' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (_athFilter.cls === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select>' +
-    '<input class="fs" type="text" placeholder="Ara..." value="' + esc(_athFilter.q) + '" onchange="_athFilter.q=this.value;go(\'athletes\')"/>' +
-    '</div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editAth()">+ Yeni Sporcu</button><button class="btn bs" onclick="importExcelAthletes()">&#x1F4E5; Excel Yükle</button><button class="btn bs" onclick="exportAthletes()">&#x1F4E4; Excel Indir</button></div>' +
-    '<div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Brans</th><th>Sinif</th><th>Durum</th><th>Ucret</th><th>Islemler</th></tr></thead><tbody>' +
-    list.map(function(a) {
-      return '<tr><td><div class="flex fca gap2"><div class="ava" style="background:' + avatarColor(a.fn) + '">' + (a.fn[0] || 'A').toUpperCase() + '</div><div><div class="tw6">' + esc(a.fn) + ' ' + esc(a.ln) + '</div><div class="ts tm">' + age(a.bd) + ' yas</div></div></div></td>' +
-        '<td>' + esc(a.tc) + '</td><td>' + semi(a.sp) + ' ' + esc(a.sp) + '</td><td>' + esc(clsName(a.clsId)) + '</td>' +
-        '<td><span class="bg ' + stc(a.st) + '">' + stl(a.st) + '</span></td>' +
-        '<td class="tw6">' + fmtN(a.fee) + ' &#x20BA;</td>' +
-        '<td><button class="btn btn-xs bp" onclick="editAth(\'' + a.id + '\')">Duzenle</button> <button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button></td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
+  var html = '<div class="ph"><div class="stit">Sporcular</div><div class="ssub">Kayıtlı sporcuları yönet</div></div>' +
+    '<div class="filters mb3"><select class="fs" onchange="_athFilter.sp=this.value;go(\'athletes\')"><option value="">Tüm Branşlar</option>' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (_athFilter.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select>' +
+    '<select class="fs" onchange="_athFilter.st=this.value;go(\'athletes\')"><option value="">Tüm Durumlar</option><option value="active"' + (_athFilter.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (_athFilter.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select>' +
+    '<select class="fs" onchange="_athFilter.cls=this.value;go(\'athletes\')"><option value="">Tüm Sınıflar</option>' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (_athFilter.cls === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select>' +
+    '<input class="fs" type="text" placeholder="Ara..." value="' + esc(_athFilter.q) + '" onchange="_athFilter.q=this.value;go(\'athletes\')"/></div>' +
+    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editAth()">+ Yeni Sporcu</button><button class="btn bs" onclick="importExcelAthletes()">&#x1F4E5; Excel Yükle</button><button class="btn bs" onclick="exportAthletes()">&#x1F4E4; Excel İndir</button></div>' +
+    '<div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Branş</th><th>Sınıf</th><th>Durum</th><th>Ücret</th><th>İşlemler</th></tr></thead><tbody>' +
+    list.map(function(a) { return '<tr><td><div class="flex fca gap2"><div class="ava" style="background:' + avatarColor(a.fn) + '">' + (a.fn[0] || 'A').toUpperCase() + '</div><div><div class="tw6">' + esc(a.fn) + ' ' + esc(a.ln) + '</div><div class="ts tm">' + age(a.bd) + ' yaş</div></div></div></td><td>' + esc(a.tc) + '</td><td>' + semi(a.sp) + ' ' + esc(a.sp) + '</td><td>' + esc(clsName(a.clsId)) + '</td><td><span class="bg ' + stc(a.st) + '">' + stl(a.st) + '</span></td><td class="tw6">' + fmtN(a.fee) + ' &#x20BA;</td><td><button class="btn btn-xs bp" onclick="editAth(\'' + a.id + '\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button></td></tr>'; }).join('') + '</tbody></table></div></div>';
   return html;
 }
 
 function editAth(id) {
-  var a = id ? athletes.find(function(x) { return x.id === id; }) : null;
-  var isNew = !a;
-  var html = '<div class="g21">' +
-    '<div class="fgr"><label>Ad</label><input id="a-fn" value="' + esc(a ? a.fn : '') + '"/></div>' +
-    '<div class="fgr"><label>Soyad</label><input id="a-ln" value="' + esc(a ? a.ln : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>TC Kimlik</label><input id="a-tc" type="tel" maxlength="11" value="' + esc(a ? a.tc : '') + '"/></div>' +
-    '<div class="fgr"><label>Dogum Tarihi</label><input id="a-bd" type="date" value="' + esc(a ? a.bd : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Cinsiyet</label><select id="a-gn"><option value="E"' + (a && a.gn === 'E' ? ' selected' : '') + '>Erkek</option><option value="K"' + (a && a.gn === 'K' ? ' selected' : '') + '>Kadin</option></select></div>' +
-    '<div class="fgr"><label>Telefon</label><input id="a-ph" type="tel" value="' + esc(a ? a.ph : '') + '"/></div>' +
-    '</div>' +
+  var a = id ? athletes.find(function(x) { return x.id === id; }) : null; var isNew = !a;
+  var html = '<div class="g21"><div class="fgr"><label>Ad</label><input id="a-fn" value="' + esc(a ? a.fn : '') + '"/></div><div class="fgr"><label>Soyad</label><input id="a-ln" value="' + esc(a ? a.ln : '') + '"/></div></div>' +
+    '<div class="g21"><div class="fgr"><label>TC Kimlik</label><input id="a-tc" type="tel" maxlength="11" value="' + esc(a ? a.tc : '') + '"/></div><div class="fgr"><label>Doğum Tarihi</label><input id="a-bd" type="date" value="' + esc(a ? a.bd : '') + '"/></div></div>' +
+    '<div class="g21"><div class="fgr"><label>Cinsiyet</label><select id="a-gn"><option value="E"' + (a && a.gn === 'E' ? ' selected' : '') + '>Erkek</option><option value="K"' + (a && a.gn === 'K' ? ' selected' : '') + '>Kadın</option></select></div><div class="fgr"><label>Telefon</label><input id="a-ph" type="tel" value="' + esc(a ? a.ph : '') + '"/></div></div>' +
     '<div class="fgr mb2"><label>E-posta</label><input id="a-em" type="email" value="' + esc(a ? a.em : '') + '"/></div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Brans</label><select id="a-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (a && a.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="fgr"><label>Sinif</label><select id="a-cls">' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (a && a.clsId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Kategori</label><input id="a-cat" value="' + esc(a ? a.cat : '') + '"/></div>' +
-    '<div class="fgr"><label>Lisans No</label><input id="a-lic" value="' + esc(a ? a.lic : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Kayit Tarihi</label><input id="a-rd" type="date" value="' + esc(a ? a.rd : tod()) + '"/></div>' +
-    '<div class="fgr"><label>Durum</label><select id="a-st"><option value="active"' + (a && a.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (a && a.st === 'inactive' ? ' selected' : '') + '>Pasif</option><option value="pending"' + (a && a.st === 'pending' ? ' selected' : '') + '>Bekliyor</option></select></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Aylik Ucret</label><input id="a-fee" type="number" value="' + (a ? a.fee : '') + '"/></div>' +
-    '<div class="fgr"><label>Vade Gunu</label><input id="a-vd" type="number" value="' + (a ? a.vd : '5') + '"/></div>' +
-    '</div>' +
-    '<div class="fgr mb2"><label>Notlar</label><textarea id="a-nt">' + esc(a ? a.nt : '') + '</textarea></div>' +
-    '<div class="dv"></div>' +
-    '<div class="tw6 tsm mb2">Veli Bilgileri</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Veli Ad Soyad</label><input id="a-pn" value="' + esc(a ? a.pn : '') + '"/></div>' +
-    '<div class="fgr"><label>Veli Telefon</label><input id="a-pph" type="tel" value="' + esc(a ? a.pph : '') + '"/></div>' +
-    '</div>' +
+    '<div class="g21"><div class="fgr"><label>Branş</label><select id="a-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (a && a.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Sınıf</label><select id="a-cls">' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (a && a.clsId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="g21"><div class="fgr"><label>Kategori</label><input id="a-cat" value="' + esc(a ? a.cat : '') + '"/></div><div class="fgr"><label>Lisans No</label><input id="a-lic" value="' + esc(a ? a.lic : '') + '"/></div></div>' +
+    '<div class="g21"><div class="fgr"><label>Kayıt Tarihi</label><input id="a-rd" type="date" value="' + esc(a ? a.rd : tod()) + '"/></div><div class="fgr"><label>Durum</label><select id="a-st"><option value="active"' + (a && a.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (a && a.st === 'inactive' ? ' selected' : '') + '>Pasif</option><option value="pending"' + (a && a.st === 'pending' ? ' selected' : '') + '>Bekliyor</option></select></div></div>' +
+    '<div class="g21"><div class="fgr"><label>Aylık Ücret</label><input id="a-fee" type="number" value="' + (a ? a.fee : '') + '"/></div><div class="fgr"><label>Vade Günü</label><input id="a-vd" type="number" value="' + (a ? a.vd : '5') + '"/></div></div>' +
+    '<div class="fgr mb2"><label>Notlar</label><textarea id="a-nt">' + esc(a ? a.nt : '') + '</textarea></div><div class="dv"></div><div class="tw6 tsm mb2">Veli Bilgileri</div>' +
+    '<div class="g21"><div class="fgr"><label>Veli Ad Soyad</label><input id="a-pn" value="' + esc(a ? a.pn : '') + '"/></div><div class="fgr"><label>Veli Telefon</label><input id="a-pph" type="tel" value="' + esc(a ? a.pph : '') + '"/></div></div>' +
     '<div class="fgr mb2"><label>Veli E-posta</label><input id="a-pem" type="email" value="' + esc(a ? a.pem : '') + '"/></div>' +
-    '<div class="fgr mb2"><label>Sporcu Sifresi (varsayilan: TC son 4)</label><input id="a-sppass" type="text" placeholder="Bos birak = TC son 4" value="' + esc(a ? a.spPass : '') + '"/></div>';
-  modal(isNew ? 'Yeni Sporcu' : 'Sporcu Duzenle', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
+    '<div class="fgr mb2"><label>Sporcu Şifresi (Varsayılan: TC son 4)</label><input id="a-sppass" type="text" placeholder="Boş bırak = TC son 4" value="' + esc(a ? a.spPass : '') + '"/></div>';
+  modal(isNew ? 'Yeni Sporcu' : 'Sporcu Düzenle', html, [
+    { lbl: 'İptal', cls: 'bs', fn: closeModal },
     { lbl: 'Kaydet', cls: 'bp', fn: function() {
-      var obj = {
-        id: a ? a.id : uid(),
-        fn: gv('a-fn'), ln: gv('a-ln'), tc: gv('a-tc'), bd: gv('a-bd'), gn: gv('a-gn'), ph: gv('a-ph'), em: gv('a-em'),
-        sp: gv('a-sp'), cat: gv('a-cat'), lic: gv('a-lic'), rd: gv('a-rd'), st: gv('a-st'), fee: gvn('a-fee'), vd: gvn('a-vd'), nt: gv('a-nt'),
-        clsId: gv('a-cls'), pn: gv('a-pn'), pph: gv('a-pph'), pem: gv('a-pem'), spPass: gv('a-sppass')
-      };
+      var obj = { id: a ? a.id : uid(), fn: gv('a-fn'), ln: gv('a-ln'), tc: gv('a-tc'), bd: gv('a-bd'), gn: gv('a-gn'), ph: gv('a-ph'), em: gv('a-em'), sp: gv('a-sp'), cat: gv('a-cat'), lic: gv('a-lic'), rd: gv('a-rd'), st: gv('a-st'), fee: gvn('a-fee'), vd: gvn('a-vd'), nt: gv('a-nt'), clsId: gv('a-cls'), pn: gv('a-pn'), pph: gv('a-pph'), pem: gv('a-pem'), spPass: gv('a-sppass') };
       if (!obj.fn || !obj.ln || !obj.tc) { toast('Ad, soyad ve TC zorunlu!', 'e'); return; }
       if (isNew) athletes.push(obj); else { var idx = athletes.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) athletes[idx] = obj; }
-      dbSaveAth(obj);
-      toast('Sporcu kaydedildi!', 'g'); closeModal(); go('athletes');
+      dbSaveAth(obj); toast('Sporcu kaydedildi!', 'g'); closeModal(); go('athletes');
     } }
   ]);
 }
-
-function delAth(id) {
-  var a = athletes.find(function(x) { return x.id === id; });
-  confirm2('Sporcu Sil', '<b>' + esc(a.fn + ' ' + a.ln) + '</b> silinecek. Bu islem geri alinamaz.', function() {
-    athletes = athletes.filter(function(x) { return x.id !== id; });
-    dbDelAth(id);
-    toast('Sporcu silindi!', 'g'); go('athletes');
-  });
-}
-
-function importExcelAthletes() {
-  var html = '<div class="fgr mb2"><label>Excel dosyasi secin (.xlsx, .xls)</label><input type="file" id="xl-file" accept=".xlsx,.xls" onchange="handleAthleteExcel(this)"/></div>' +
-    '<div class="al al-b">Beklenen kolonlar: Ad, Soyad, TC, Telefon, Brans, Kategori, Ucret</div>';
-  modal('Excel Yükle', html, [{ lbl: 'Kapat', cls: 'bs', fn: closeModal }]);
-}
-
+function delAth(id) { var a = athletes.find(function(x) { return x.id === id; }); confirm2('Sporcu Sil', '<b>' + esc(a.fn + ' ' + a.ln) + '</b> silinecek. Bu islem geri alınamaz.', function() { athletes = athletes.filter(function(x) { return x.id !== id; }); dbDelAth(id); toast('Sporcu silindi!', 'g'); go('athletes'); }); }
+function importExcelAthletes() { modal('Excel Yükle', '<div class="fgr mb2"><label>Excel dosyası seçin (.xlsx, .xls)</label><input type="file" id="xl-file" accept=".xlsx,.xls" onchange="handleAthleteExcel(this)"/></div><div class="al al-b">Beklenen kolonlar: Ad, Soyad, TC, Telefon, Branş, Kategori, Ücret</div>', [{ lbl: 'Kapat', cls: 'bs', fn: closeModal }]); }
 async function handleAthleteExcel(input) {
-  var file = input.files[0]; if (!file) return;
-  showLoading();
+  var file = input.files[0]; if (!file) return; showLoading();
   try {
-    var data = await file.arrayBuffer();
-    var wb = XLSX.read(data, { type: 'array' });
-    var ws = wb.Sheets[wb.SheetNames[0]];
-    var rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    var headers = rows[0] || [];
-    var imported = 0;
+    var data = await file.arrayBuffer(), wb = XLSX.read(data, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]], rows = XLSX.utils.sheet_to_json(ws, { header: 1 }), imported = 0;
     for (var i = 1; i < rows.length; i++) {
-      var r = rows[i];
-      if (!r[0] || !r[1]) continue;
-      var obj = {
-        id: uid(), fn: r[0] || '', ln: r[1] || '', tc: String(r[2] || ''), ph: String(r[3] || ''),
-        sp: r[4] || 'Futbol', cat: r[5] || '', fee: parseFloat(r[6]) || 0,
-        st: 'active', rd: tod(), bd: '', gn: 'E', em: '', lic: '', vd: 5, nt: '', clsId: '', pn: '', pph: '', pem: '', spPass: ''
-      };
-      athletes.push(obj);
-      await dbSaveAth(obj);
-      imported++;
+      var r = rows[i]; if (!r[0] || !r[1]) continue;
+      var obj = { id: uid(), fn: r[0] || '', ln: r[1] || '', tc: String(r[2] || ''), ph: String(r[3] || ''), sp: r[4] || 'Futbol', cat: r[5] || '', fee: parseFloat(r[6]) || 0, st: 'active', rd: tod(), bd: '', gn: 'E', em: '', lic: '', vd: 5, nt: '', clsId: '', pn: '', pph: '', pem: '', spPass: '' };
+      athletes.push(obj); await dbSaveAth(obj); imported++;
     }
     toast(imported + ' sporcu yüklendi!', 'g'); closeModal(); go('athletes');
   } catch(e) { toast('Hata: ' + e.message, 'e'); }
@@ -1028,558 +695,117 @@ async function handleAthleteExcel(input) {
 }
 
 function pgPayments() {
-  var list = payments;
-  if (_payFilter.st) list = list.filter(function(p) { return p.st === _payFilter.st; });
-  if (_payFilter.q) { var q = _payFilter.q.toLowerCase(); list = list.filter(function(p) { return (p.an || '').toLowerCase().indexOf(q) >= 0; }); }
+  var list = payments; if (_payFilter.st) list = list.filter(function(p) { return p.st === _payFilter.st; }); if (_payFilter.q) { var q = _payFilter.q.toLowerCase(); list = list.filter(function(p) { return (p.an || '').toLowerCase().indexOf(q) >= 0; }); }
   var total = list.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
-  var html = '<div class="ph"><div class="stit">Odemeler</div><div class="ssub">Tüm odemeleri yonet</div></div>' +
-    '<div class="filters mb3">' +
-    '<select class="fs" onchange="_payFilter.st=this.value;go(\'payments\')"><option value="">Tum Durumlar</option><option value="pending"' + (_payFilter.st === 'pending' ? ' selected' : '') + '>Bekliyor</option><option value="completed"' + (_payFilter.st === 'completed' ? ' selected' : '') + '>Tamamlandi</option><option value="overdue"' + (_payFilter.st === 'overdue' ? ' selected' : '') + '>Gecikti</option></select>' +
-    '<input class="fs" type="text" placeholder="Ara..." value="' + esc(_payFilter.q) + '" onchange="_payFilter.q=this.value;go(\'payments\')"/>' +
-    '</div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editPay()">+ Yeni Odeme</button><button class="btn bs" onclick="exportPayments()">&#x1F4E4; Excel Indir</button><span class="tw6 tb">Toplam: ' + fmtN(total) + ' &#x20BA;</span></div>' +
-    '<div class="card"><div class="tw"><table><thead><tr><th>Tarih</th><th>Sporcu</th><th>Aciklama</th><th>Tutar</th><th>Tur</th><th>Durum</th><th>Islemler</th></tr></thead><tbody>' +
+  var html = '<div class="ph"><div class="stit">Ödemeler</div><div class="ssub">Tüm ödemeleri yönet</div></div>' +
+    '<div class="filters mb3"><select class="fs" onchange="_payFilter.st=this.value;go(\'payments\')"><option value="">Tüm Durumlar</option><option value="pending"' + (_payFilter.st === 'pending' ? ' selected' : '') + '>Bekliyor</option><option value="completed"' + (_payFilter.st === 'completed' ? ' selected' : '') + '>Tamamlandı</option><option value="overdue"' + (_payFilter.st === 'overdue' ? ' selected' : '') + '>Gecikti</option></select><input class="fs" type="text" placeholder="Ara..." value="' + esc(_payFilter.q) + '" onchange="_payFilter.q=this.value;go(\'payments\')"/></div>' +
+    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editPay()">+ Yeni Ödeme</button><button class="btn bs" onclick="exportPayments()">&#x1F4E4; Excel İndir</button><span class="tw6 tb">Toplam: ' + fmtN(total) + ' &#x20BA;</span></div>' +
+    '<div class="card"><div class="tw"><table><thead><tr><th>Tarih</th><th>Sporcu</th><th>Açıklama</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' +
     list.map(function(p) {
-      var isPending = p.needsApproval && p.st === 'pending';
-      var statusClass = isPending ? 'bg-y' : stc(p.st);
-      var statusText = isPending ? 'Onay Bekliyor' : stl(p.st);
-      return '<tr><td>' + fmtD(p.dt) + '</td><td><div class="flex fca gap2"><div class="ava" style="width:28px;height:28px;font-size:10px">' + (p.an ? p.an[0] : 'A') + '</div><span class="tw6 tsm">' + esc(p.an) + '</span></div></td>' +
-        '<td>' + esc(p.ds) + '</td><td class="tw6">' + fmtN(p.amt) + ' &#x20BA;</td>' +
-        '<td><span class="bg ' + (p.ty === 'income' ? 'bg-g' : 'bg-r') + '">' + (p.ty === 'income' ? 'Gelir' : 'Gider') + '</span></td>' +
-        '<td><span class="bg ' + statusClass + '">' + statusText + '</span></td>' +
-        '<td>' + (isPending ? '<button class="btn btn-xs bsu" onclick="approvePay(\'' + p.id + '\')">Onayla</button> ' : '') +
-        '<button class="btn btn-xs bp" onclick="editPay(\'' + p.id + '\')">Duzenle</button> <button class="btn btn-xs bd" onclick="delPay(\'' + p.id + '\')">Sil</button></td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
+      var isPending = p.needsApproval && p.st === 'pending', statusClass = isPending ? 'bg-y' : stc(p.st), statusText = isPending ? 'Onay Bekliyor' : stl(p.st);
+      return '<tr><td>' + fmtD(p.dt) + '</td><td><div class="flex fca gap2"><div class="ava" style="width:28px;height:28px;font-size:10px">' + (p.an ? p.an[0] : 'A') + '</div><span class="tw6 tsm">' + esc(p.an) + '</span></div></td><td>' + esc(p.ds) + '</td><td class="tw6">' + fmtN(p.amt) + ' &#x20BA;</td><td><span class="bg ' + (p.ty === 'income' ? 'bg-g' : 'bg-r') + '">' + (p.ty === 'income' ? 'Gelir' : 'Gider') + '</span></td><td><span class="bg ' + statusClass + '">' + statusText + '</span></td><td>' + (isPending ? '<button class="btn btn-xs bsu" onclick="approvePay(\'' + p.id + '\')">Onayla</button> ' : '') + '<button class="btn btn-xs bp" onclick="editPay(\'' + p.id + '\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delPay(\'' + p.id + '\')">Sil</button></td></tr>';
+    }).join('') + '</tbody></table></div></div>';
   return html;
 }
-
 function editPay(id) {
-  var p = id ? payments.find(function(x) { return x.id === id; }) : null;
-  var isNew = !p;
-  var html = '<div class="g21">' +
-    '<div class="fgr"><label>Sporcu</label><select id="p-aid">' + athletes.map(function(a) { return '<option value="' + esc(a.id) + '"' + (p && p.aid === a.id ? ' selected' : '') + '>' + esc(a.fn + ' ' + a.ln) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="fgr"><label>Tutar</label><input id="p-amt" type="number" value="' + (p ? p.amt : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Tarih</label><input id="p-dt" type="date" value="' + esc(p ? p.dt : tod()) + '"/></div>' +
-    '<div class="fgr"><label>Vade</label><input id="p-dd" type="date" value="' + esc(p ? p.dd : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Tur</label><select id="p-ty"><option value="income"' + (p && p.ty === 'income' ? ' selected' : '') + '>Gelir</option><option value="expense"' + (p && p.ty === 'expense' ? ' selected' : '') + '>Gider</option></select></div>' +
-    '<div class="fgr"><label>Kategori</label><input id="p-cat" value="' + esc(p ? p.cat : 'Aidat') + '"/></div>' +
-    '</div>' +
-    '<div class="fgr mb2"><label>Aciklama</label><input id="p-ds" value="' + esc(p ? p.ds : '') + '"/></div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Durum</label><select id="p-st"><option value="pending"' + (p && p.st === 'pending' ? ' selected' : '') + '>Bekliyor</option><option value="completed"' + (p && p.st === 'completed' ? ' selected' : '') + '>Tamamlandi</option><option value="overdue"' + (p && p.st === 'overdue' ? ' selected' : '') + '>Gecikti</option><option value="cancelled"' + (p && p.st === 'cancelled' ? ' selected' : '') + '>Iptal</option></select></div>' +
-    '<div class="fgr"><label>Fatura No</label><input id="p-inv" value="' + esc(p ? p.inv : '') + '"/></div>' +
-    '</div>';
-  modal(isNew ? 'Yeni Odeme' : 'Odeme Duzenle', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
+  var p = id ? payments.find(function(x) { return x.id === id; }) : null; var isNew = !p;
+  var html = '<div class="g21"><div class="fgr"><label>Sporcu</label><select id="p-aid">' + athletes.map(function(a) { return '<option value="' + esc(a.id) + '"' + (p && p.aid === a.id ? ' selected' : '') + '>' + esc(a.fn + ' ' + a.ln) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Tutar</label><input id="p-amt" type="number" value="' + (p ? p.amt : '') + '"/></div></div>' +
+    '<div class="g21"><div class="fgr"><label>Tarih</label><input id="p-dt" type="date" value="' + esc(p ? p.dt : tod()) + '"/></div><div class="fgr"><label>Vade</label><input id="p-dd" type="date" value="' + esc(p ? p.dd : '') + '"/></div></div>' +
+    '<div class="g21"><div class="fgr"><label>Tür</label><select id="p-ty"><option value="income"' + (p && p.ty === 'income' ? ' selected' : '') + '>Gelir</option><option value="expense"' + (p && p.ty === 'expense' ? ' selected' : '') + '>Gider</option></select></div><div class="fgr"><label>Kategori</label><input id="p-cat" value="' + esc(p ? p.cat : 'Aidat') + '"/></div></div>' +
+    '<div class="fgr mb2"><label>Açıklama</label><input id="p-ds" value="' + esc(p ? p.ds : '') + '"/></div>' +
+    '<div class="g21"><div class="fgr"><label>Durum</label><select id="p-st"><option value="pending"' + (p && p.st === 'pending' ? ' selected' : '') + '>Bekliyor</option><option value="completed"' + (p && p.st === 'completed' ? ' selected' : '') + '>Tamamlandı</option><option value="overdue"' + (p && p.st === 'overdue' ? ' selected' : '') + '>Gecikti</option><option value="cancelled"' + (p && p.st === 'cancelled' ? ' selected' : '') + '>İptal</option></select></div><div class="fgr"><label>Fatura No</label><input id="p-inv" value="' + esc(p ? p.inv : '') + '"/></div></div>';
+  modal(isNew ? 'Yeni Ödeme' : 'Ödeme Düzenle', html, [
+    { lbl: 'İptal', cls: 'bs', fn: closeModal },
     { lbl: 'Kaydet', cls: 'bp', fn: function() {
       var aid = gv('p-aid'), ath = athletes.find(function(a) { return a.id === aid; });
-      var obj = {
-        id: p ? p.id : uid(), aid: aid, an: ath ? ath.fn + ' ' + ath.ln : '',
-        amt: gvn('p-amt'), dt: gv('p-dt'), ty: gv('p-ty'), cat: gv('p-cat'), ds: gv('p-ds'),
-        st: gv('p-st'), inv: gv('p-inv'), dd: gv('p-dd')
-      };
+      var obj = { id: p ? p.id : uid(), aid: aid, an: ath ? ath.fn + ' ' + ath.ln : '', amt: gvn('p-amt'), dt: gv('p-dt'), ty: gv('p-ty'), cat: gv('p-cat'), ds: gv('p-ds'), st: gv('p-st'), inv: gv('p-inv'), dd: gv('p-dd') };
       if (!obj.amt) { toast('Tutar zorunlu!', 'e'); return; }
       if (isNew) payments.push(obj); else { var idx = payments.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) payments[idx] = obj; }
-      dbSavePay(obj);
-      toast('Odeme kaydedildi!', 'g'); closeModal(); go('payments');
+      dbSavePay(obj); toast('Ödeme kaydedildi!', 'g'); closeModal(); go('payments');
     } }
   ]);
 }
-
-function approvePay(id) {
-  var p = payments.find(function(x) { return x.id === id; });
-  if (!p) return;
-  confirm2('Odeme Onayla', '<b>' + esc(p.an) + '</b> icin <b>' + fmtN(p.amt) + ' &#x20BA;</b> odeme onaylanacak.', function() {
-    p.needsApproval = false; p.st = 'completed'; p.approvedBy = currentUser ? currentUser.name : 'Admin'; p.approvedAt = new Date().toISOString();
-    dbSavePay(p);
-    toast('Odeme onaylandi!', 'g'); go('payments');
-  });
-}
-
-function delPay(id) {
-  var p = payments.find(function(x) { return x.id === id; });
-  confirm2('Odeme Sil', '<b>' + esc(p.ds || 'Odeme') + '</b> silinecek. Bu islem geri alinamaz.', function() {
-    payments = payments.filter(function(x) { return x.id !== id; });
-    dbDelPay(id);
-    toast('Odeme silindi!', 'g'); go('payments');
-  });
-}
+function approvePay(id) { var p = payments.find(function(x) { return x.id === id; }); if (!p) return; confirm2('Ödeme Onayla', '<b>' + esc(p.an) + '</b> için <b>' + fmtN(p.amt) + ' &#x20BA;</b> ödeme onaylanacak.', function() { p.needsApproval = false; p.st = 'completed'; p.approvedBy = currentUser ? currentUser.name : 'Admin'; p.approvedAt = new Date().toISOString(); dbSavePay(p); toast('Ödeme onaylandı!', 'g'); go('payments'); }); }
+function delPay(id) { var p = payments.find(function(x) { return x.id === id; }); confirm2('Ödeme Sil', '<b>' + esc(p.ds || 'Odeme') + '</b> silinecek.', function() { payments = payments.filter(function(x) { return x.id !== id; }); dbDelPay(id); toast('Ödeme silindi!', 'g'); go('payments'); }); }
 
 function pgAccounting() {
-  var inc = payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).reduce(function(s, p) { return s + (p.amt || 0); }, 0);
-  var exp = payments.filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).reduce(function(s, p) { return s + (p.amt || 0); }, 0);
-  var bal = inc - exp;
-  var html = '<div class="ph"><div class="stit">Muhasebe</div><div class="ssub">Finansal ozet</div></div>' +
-    '<div class="g3 mb3">' +
-    '<div class="card stat-card stat-g"><div class="stat-icon">&#x1F4B0;</div><div class="stat-val tg">' + fmtN(inc) + ' &#x20BA;</div><div class="stat-lbl">Toplam Gelir</div></div>' +
-    '<div class="card stat-card stat-r"><div class="stat-icon">&#x1F4B8;</div><div class="stat-val tr2">' + fmtN(exp) + ' &#x20BA;</div><div class="stat-lbl">Toplam Gider</div></div>' +
-    '<div class="card stat-card stat-b"><div class="stat-icon">&#x1F4B3;</div><div class="stat-val tb">' + fmtN(bal) + ' &#x20BA;</div><div class="stat-lbl">Net Bakiye</div></div>' +
-    '</div>' +
-    '<div class="card"><div class="tw6 tsm mb2">Son Islemler</div><div class="tw"><table><thead><tr><th>Tarih</th><th>Aciklama</th><th>Tutar</th><th>Tur</th></tr></thead><tbody>' +
-    payments.slice(0, 20).map(function(p) {
-      return '<tr><td>' + fmtD(p.dt) + '</td><td>' + esc(p.ds) + '</td><td class="tw6 ' + (p.ty === 'income' ? 'tg' : 'tr2') + '">' + fmtN(p.amt) + ' &#x20BA;</td><td><span class="bg ' + (p.ty === 'income' ? 'bg-g' : 'bg-r') + '">' + (p.ty === 'income' ? 'Gelir' : 'Gider') + '</span></td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
-  return html;
+  var inc = payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).reduce(function(s, p) { return s + (p.amt || 0); }, 0), exp = payments.filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).reduce(function(s, p) { return s + (p.amt || 0); }, 0), bal = inc - exp;
+  return '<div class="ph"><div class="stit">Muhasebe</div><div class="ssub">Finansal özet</div></div><div class="g3 mb3"><div class="card stat-card stat-g"><div class="stat-icon">&#x1F4B0;</div><div class="stat-val tg">' + fmtN(inc) + ' &#x20BA;</div><div class="stat-lbl">Toplam Gelir</div></div><div class="card stat-card stat-r"><div class="stat-icon">&#x1F4B8;</div><div class="stat-val tr2">' + fmtN(exp) + ' &#x20BA;</div><div class="stat-lbl">Toplam Gider</div></div><div class="card stat-card stat-b"><div class="stat-icon">&#x1F4B3;</div><div class="stat-val tb">' + fmtN(bal) + ' &#x20BA;</div><div class="stat-lbl">Net Bakiye</div></div></div><div class="card"><div class="tw6 tsm mb2">Son İşlemler</div><div class="tw"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th>Tür</th></tr></thead><tbody>' + payments.slice(0, 20).map(function(p) { return '<tr><td>' + fmtD(p.dt) + '</td><td>' + esc(p.ds) + '</td><td class="tw6 ' + (p.ty === 'income' ? 'tg' : 'tr2') + '">' + fmtN(p.amt) + ' &#x20BA;</td><td><span class="bg ' + (p.ty === 'income' ? 'bg-g' : 'bg-r') + '">' + (p.ty === 'income' ? 'Gelir' : 'Gider') + '</span></td></tr>'; }).join('') + '</tbody></table></div></div>';
 }
 
 function pgAttendance() {
-  var html = '<div class="ph"><div class="stit">Devam Takibi</div><div class="ssub">Yoklama al</div></div>' +
-    '<div class="card mb3"><div class="flex fca gap3 mb3">' +
-    '<div class="fgr" style="flex:0 0 140px"><label>Tarih</label><input type="date" id="att-date" value="' + ATD + '" onchange="ATD=this.value;go(\'attendance\')"/></div>' +
-    '<div class="fgr"><label>Brans Filtre</label><select class="fs" id="att-sp" onchange="ATSP=this.value;go(\'attendance\')">' +
-    '<option value="">Tum Branslar</option>' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (ATSP === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="fgr"><label>Sinif Filtre</label><select class="fs" id="att-cls" onchange="ATCLS=this.value;go(\'attendance\')">' +
-    '<option value="">Tum Siniflar</option>' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (ATCLS === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></div>' +
-    '<button class="btn bp" style="align-self:flex-end" onclick="showQRScanner()">&#x1F4F7; QR Okut</button>' +
-    '</div></div>' +
-    '<div class="card"><div class="tw6 tsm mb2">Sporcu Listesi</div>';
-  var list = athletes.filter(function(a) { return a.st === 'active'; });
-  if (ATSP) list = list.filter(function(a) { return a.sp === ATSP; });
-  if (ATCLS) list = list.filter(function(a) { return a.clsId === ATCLS; });
-  html += '<div>' + list.map(function(a) {
-    var st = (attData[ATD] && attData[ATD][a.id]) || '';
-    return '<div class="att-row"><div class="flex fca gap2" style="flex:1"><div class="ava" style="width:32px;height:32px;font-size:11px;background:' + avatarColor(a.fn) + '">' + (a.fn[0] || 'A').toUpperCase() + '</div><div><div class="tw6 tsm">' + esc(a.fn + ' ' + a.ln) + '</div><div class="ts tm">' + esc(a.sp) + ' · ' + esc(clsName(a.clsId)) + '</div></div></div>' +
-      '<div class="att-btns"><button class="att-b' + (st === 'P' ? ' ap' : '') + '" onclick="setAtt(\'' + a.id + '\',\'P\')">Var</button>' +
-      '<button class="att-b' + (st === 'A' ? ' aa' : '') + '" onclick="setAtt(\'' + a.id + '\',\'A\')">Yok</button>' +
-      '<button class="att-b' + (st === 'L' ? ' al2' : '') + '" onclick="setAtt(\'' + a.id + '\',\'L\')">Izin</button>' +
-      '<button class="att-b" onclick="setAtt(\'' + a.id + '\')">Temizle</button></div></div>';
-  }).join('') + '</div></div>';
-  return html;
+  var html = '<div class="ph"><div class="stit">Devam Takibi</div><div class="ssub">Yoklama al</div></div><div class="card mb3"><div class="flex fca gap3 mb3"><div class="fgr" style="flex:0 0 140px"><label>Tarih</label><input type="date" id="att-date" value="' + ATD + '" onchange="ATD=this.value;go(\'attendance\')"/></div><div class="fgr"><label>Branş Filtre</label><select class="fs" id="att-sp" onchange="ATSP=this.value;go(\'attendance\')"><option value="">Tüm Branşlar</option>' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (ATSP === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Sınıf Filtre</label><select class="fs" id="att-cls" onchange="ATCLS=this.value;go(\'attendance\')"><option value="">Tüm Sınıflar</option>' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (ATCLS === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></div><button class="btn bp" style="align-self:flex-end" onclick="showQRScanner()">&#x1F4F7; QR Okut</button></div></div><div class="card"><div class="tw6 tsm mb2">Sporcu Listesi</div>';
+  var list = athletes.filter(function(a) { return a.st === 'active'; }); if (ATSP) list = list.filter(function(a) { return a.sp === ATSP; }); if (ATCLS) list = list.filter(function(a) { return a.clsId === ATCLS; });
+  html += '<div>' + list.map(function(a) { var st = (attData[ATD] && attData[ATD][a.id]) || ''; return '<div class="att-row"><div class="flex fca gap2" style="flex:1"><div class="ava" style="width:32px;height:32px;font-size:11px;background:' + avatarColor(a.fn) + '">' + (a.fn[0] || 'A').toUpperCase() + '</div><div><div class="tw6 tsm">' + esc(a.fn + ' ' + a.ln) + '</div><div class="ts tm">' + esc(a.sp) + ' · ' + esc(clsName(a.clsId)) + '</div></div></div><div class="att-btns"><button class="att-b' + (st === 'P' ? ' ap' : '') + '" onclick="setAtt(\'' + a.id + '\',\'P\')">Var</button><button class="att-b' + (st === 'A' ? ' aa' : '') + '" onclick="setAtt(\'' + a.id + '\',\'A\')">Yok</button><button class="att-b' + (st === 'L' ? ' al2' : '') + '" onclick="setAtt(\'' + a.id + '\',\'L\')">İzin</button><button class="att-b" onclick="setAtt(\'' + a.id + '\')">Temizle</button></div></div>'; }).join('') + '</div></div>'; return html;
 }
-
-function setAtt(aid, st) {
-  if (!attData[ATD]) attData[ATD] = {};
-  if (st === undefined) delete attData[ATD][aid]; else attData[ATD][aid] = st;
-  dbSaveAtt(ATD, aid, st);
-  go('attendance');
-}
+function setAtt(aid, st) { if (!attData[ATD]) attData[ATD] = {}; if (st === undefined) delete attData[ATD][aid]; else attData[ATD][aid] = st; dbSaveAtt(ATD, aid, st); go('attendance'); }
 
 function pgCoaches() {
-  var html = '<div class="ph"><div class="stit">Antrenorler</div><div class="ssub">Antrenor kadrosu</div></div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editCoach()">+ Yeni Antrenor</button></div>' +
-    '<div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Brans</th><th>Maas</th><th>Durum</th><th>Islemler</th></tr></thead><tbody>' +
-    coaches.map(function(c) {
-      return '<tr><td><div class="flex fca gap2"><div class="ava" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">' + (c.fn[0] || 'A').toUpperCase() + '</div><span class="tw6 tsm">' + esc(c.fn + ' ' + c.ln) + '</span></div></td>' +
-        '<td>' + esc(c.ph) + '</td><td>' + esc(c.sp) + '</td><td class="tw6">' + fmtN(c.sal) + ' &#x20BA;</td>' +
-        '<td><span class="bg ' + stc(c.st) + '">' + stl(c.st) + '</span></td>' +
-        '<td><button class="btn btn-xs bp" onclick="editCoach(\'' + c.id + '\')">Duzenle</button> <button class="btn btn-xs bd" onclick="delCoach(\'' + c.id + '\')">Sil</button></td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
-  return html;
+  return '<div class="ph"><div class="stit">Antrenörler</div><div class="ssub">Antrenör kadrosu</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editCoach()">+ Yeni Antrenör</button></div><div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Branş</th><th>Maaş</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' + coaches.map(function(c) { return '<tr><td><div class="flex fca gap2"><div class="ava" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">' + (c.fn[0] || 'A').toUpperCase() + '</div><span class="tw6 tsm">' + esc(c.fn + ' ' + c.ln) + '</span></div></td><td>' + esc(c.ph) + '</td><td>' + esc(c.sp) + '</td><td class="tw6">' + fmtN(c.sal) + ' &#x20BA;</td><td><span class="bg ' + stc(c.st) + '">' + stl(c.st) + '</span></td><td><button class="btn btn-xs bp" onclick="editCoach(\'' + c.id + '\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delCoach(\'' + c.id + '\')">Sil</button></td></tr>'; }).join('') + '</tbody></table></div></div>';
 }
-
 function editCoach(id) {
-  var c = id ? coaches.find(function(x) { return x.id === id; }) : null;
-  var isNew = !c;
-  var html = '<div class="g21">' +
-    '<div class="fgr"><label>Ad</label><input id="c-fn" value="' + esc(c ? c.fn : '') + '"/></div>' +
-    '<div class="fgr"><label>Soyad</label><input id="c-ln" value="' + esc(c ? c.ln : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Telefon</label><input id="c-ph" type="tel" value="' + esc(c ? c.ph : '') + '"/></div>' +
-    '<div class="fgr"><label>E-posta</label><input id="c-em" type="email" value="' + esc(c ? c.em : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Brans</label><select id="c-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (c && c.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="fgr"><label>Maas</label><input id="c-sal" type="number" value="' + (c ? c.sal : '') + '"/></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Durum</label><select id="c-st"><option value="active"' + (c && c.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (c && c.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select></div>' +
-    '<div class="fgr"><label>Baslama Tarihi</label><input id="c-sd" type="date" value="' + esc(c ? c.sd : tod()) + '"/></div>' +
-    '</div>' +
-    '<div class="fgr mb2"><label>Notlar</label><textarea id="c-nt">' + esc(c ? c.nt : '') + '</textarea></div>';
-  modal(isNew ? 'Yeni Antrenor' : 'Antrenor Duzenle', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
-    { lbl: 'Kaydet', cls: 'bp', fn: function() {
-      var obj = { id: c ? c.id : uid(), fn: gv('c-fn'), ln: gv('c-ln'), ph: gv('c-ph'), em: gv('c-em'), sp: gv('c-sp'), sal: gvn('c-sal'), st: gv('c-st'), sd: gv('c-sd'), nt: gv('c-nt') };
-      if (!obj.fn || !obj.ln) { toast('Ad ve soyad zorunlu!', 'e'); return; }
-      if (isNew) coaches.push(obj); else { var idx = coaches.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) coaches[idx] = obj; }
-      dbSaveCoach(obj);
-      toast('Antrenor kaydedildi!', 'g'); closeModal(); go('coaches');
-    } }
+  var c = id ? coaches.find(function(x) { return x.id === id; }) : null; var isNew = !c;
+  var html = '<div class="g21"><div class="fgr"><label>Ad</label><input id="c-fn" value="' + esc(c ? c.fn : '') + '"/></div><div class="fgr"><label>Soyad</label><input id="c-ln" value="' + esc(c ? c.ln : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Telefon</label><input id="c-ph" type="tel" value="' + esc(c ? c.ph : '') + '"/></div><div class="fgr"><label>E-posta</label><input id="c-em" type="email" value="' + esc(c ? c.em : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Branş</label><select id="c-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (c && c.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Maaş</label><input id="c-sal" type="number" value="' + (c ? c.sal : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Durum</label><select id="c-st"><option value="active"' + (c && c.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (c && c.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select></div><div class="fgr"><label>Başlama Tarihi</label><input id="c-sd" type="date" value="' + esc(c ? c.sd : tod()) + '"/></div></div><div class="fgr mb2"><label>Notlar</label><textarea id="c-nt">' + esc(c ? c.nt : '') + '</textarea></div>';
+  modal(isNew ? 'Yeni Antrenör' : 'Antrenör Düzenle', html, [
+    { lbl: 'İptal', cls: 'bs', fn: closeModal },
+    { lbl: 'Kaydet', cls: 'bp', fn: function() { var obj = { id: c ? c.id : uid(), fn: gv('c-fn'), ln: gv('c-ln'), ph: gv('c-ph'), em: gv('c-em'), sp: gv('c-sp'), sal: gvn('c-sal'), st: gv('c-st'), sd: gv('c-sd'), nt: gv('c-nt') }; if (!obj.fn || !obj.ln) { toast('Ad ve soyad zorunlu!', 'e'); return; } if (isNew) coaches.push(obj); else { var idx = coaches.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) coaches[idx] = obj; } dbSaveCoach(obj); toast('Antrenör kaydedildi!', 'g'); closeModal(); go('coaches'); } }
   ]);
 }
-
-function delCoach(id) {
-  var c = coaches.find(function(x) { return x.id === id; });
-  confirm2('Antrenor Sil', '<b>' + esc(c.fn + ' ' + c.ln) + '</b> silinecek. Bu islem geri alinamaz.', function() {
-    coaches = coaches.filter(function(x) { return x.id !== id; });
-    dbDelCoach(id);
-    toast('Antrenor silindi!', 'g'); go('coaches');
-  });
-}
+function delCoach(id) { var c = coaches.find(function(x) { return x.id === id; }); confirm2('Antrenör Sil', '<b>' + esc(c.fn + ' ' + c.ln) + '</b> silinecek.', function() { coaches = coaches.filter(function(x) { return x.id !== id; }); dbDelCoach(id); toast('Antrenör silindi!', 'g'); go('coaches'); }); }
 
 function pgMessages() {
-  var html = '<div class="ph"><div class="stit">Mesajlar</div><div class="ssub">Gelen kutusu</div></div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="newMessage()">+ Yeni Mesaj</button></div>' +
-    '<div class="card">' + messages.map(function(m) {
-      return '<div class="att-row" style="cursor:pointer" onclick="viewMessage(\'' + m.id + '\')">' +
-        '<div class="flex fca gap2" style="flex:1"><div class="ava" style="width:32px;height:32px;font-size:11px;background:' + avatarColor(m.fr) + '">' + (m.fr[0] || 'A').toUpperCase() + '</div>' +
-        '<div style="flex:1"><div class="flex fjb fca"><span class="tw6 tsm">' + esc(m.sub) + '</span><span class="ts tm">' + fmtD(m.dt) + '</span></div>' +
-        '<div class="ts tm trunc">' + esc(m.body.slice(0, 60)) + (m.body.length > 60 ? '...' : '') + '</div></div>' +
-        '<span class="bg ' + (m.rd ? 'bg-b' : 'bg-y') + '">' + (m.rd ? 'Okundu' : 'Yeni') + '</span></div></div>';
-    }).join('') + '</div>';
-  return html;
+  return '<div class="ph"><div class="stit">Mesajlar</div><div class="ssub">Gelen kutusu</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="newMessage()">+ Yeni Mesaj</button></div><div class="card">' + messages.map(function(m) { return '<div class="att-row" style="cursor:pointer" onclick="viewMessage(\'' + m.id + '\')"><div class="flex fca gap2" style="flex:1"><div class="ava" style="width:32px;height:32px;font-size:11px;background:' + avatarColor(m.fr) + '">' + (m.fr[0] || 'A').toUpperCase() + '</div><div style="flex:1"><div class="flex fjb fca"><span class="tw6 tsm">' + esc(m.sub) + '</span><span class="ts tm">' + fmtD(m.dt) + '</span></div><div class="ts tm trunc">' + esc(m.body.slice(0, 60)) + (m.body.length > 60 ? '...' : '') + '</div></div><span class="bg ' + (m.rd ? 'bg-b' : 'bg-y') + '">' + (m.rd ? 'Okundu' : 'Yeni') + '</span></div></div>'; }).join('') + '</div>';
 }
-
 function newMessage() {
-  var html = '<div class="fgr mb2"><label>Kime</label><select id="m-to"><option value="all">Tum Sporcular</option>' + athletes.map(function(a) { return '<option value="' + esc(a.id) + '">' + esc(a.fn + ' ' + a.ln) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="fgr mb2"><label>Konu</label><input id="m-sub"/></div>' +
-    '<div class="fgr mb2"><label>Mesaj</label><textarea id="m-body" rows="5"></textarea></div>' +
-    '<div class="flex fca gap2"><input type="checkbox" id="m-sms"/><label style="margin:0">SMS olarak da gonder</label></div>';
+  var html = '<div class="fgr mb2"><label>Kime</label><select id="m-to"><option value="all">Tüm Sporcular</option>' + athletes.map(function(a) { return '<option value="' + esc(a.id) + '">' + esc(a.fn + ' ' + a.ln) + '</option>'; }).join('') + '</select></div><div class="fgr mb2"><label>Konu</label><input id="m-sub"/></div><div class="fgr mb2"><label>Mesaj</label><textarea id="m-body" rows="5"></textarea></div><div class="flex fca gap2"><input type="checkbox" id="m-sms"/><label style="margin:0">SMS olarak da gönder</label></div>';
   modal('Yeni Mesaj', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
-    { lbl: 'Gonder', cls: 'bp', fn: async function() {
-      var to = gv('m-to'), sub = gv('m-sub'), body = gv('m-body'), sendSms = document.getElementById('m-sms').checked;
-      if (!sub || !body) { toast('Konu ve mesaj zorunlu!', 'e'); return; }
-      var obj = { id: uid(), fr: currentUser ? currentUser.name : 'Admin', role: 'admin', sub: sub, body: body, dt: new Date().toISOString(), rd: false };
-      messages.push(obj);
-      await dbSaveMsg(obj);
-      if (sendSms && NETGSM_USER) {
-        var phones = [];
-        if (to === 'all') athletes.forEach(function(a) { if (a.ph) phones.push(a.ph); });
-        else { var a = athletes.find(function(x) { return x.id === to; }); if (a && a.ph) phones.push(a.ph); }
-        if (phones.length > 0) { var sent = await sendBulkSMS(phones, sub + ': ' + body); toast(sent + ' SMS gonderildi!', 'g'); }
-      }
-      toast('Mesaj gonderildi!', 'g'); closeModal(); go('messages');
-    } }
+    { lbl: 'İptal', cls: 'bs', fn: closeModal },
+    { lbl: 'Gönder', cls: 'bp', fn: async function() { var to = gv('m-to'), sub = gv('m-sub'), body = gv('m-body'), sendSms = document.getElementById('m-sms').checked; if (!sub || !body) { toast('Konu ve mesaj zorunlu!', 'e'); return; } var obj = { id: uid(), fr: currentUser ? currentUser.name : 'Admin', role: 'admin', sub: sub, body: body, dt: new Date().toISOString(), rd: false }; messages.push(obj); await dbSaveMsg(obj); if (sendSms && NETGSM_USER) { var phones = []; if (to === 'all') athletes.forEach(function(a) { if (a.ph) phones.push(a.ph); }); else { var a = athletes.find(function(x) { return x.id === to; }); if (a && a.ph) phones.push(a.ph); } if (phones.length > 0) { var sent = await sendBulkSMS(phones, sub + ': ' + body); toast(sent + ' SMS gönderildi!', 'g'); } } toast('Mesaj gönderildi!', 'g'); closeModal(); go('messages'); } }
   ]);
 }
+function viewMessage(id) { var m = messages.find(function(x) { return x.id === id; }); if (!m) return; if (!m.rd) { m.rd = true; dbSaveMsg(m); } modal(esc(m.sub), '<div class="ts tm mb2">Gönderen: ' + esc(m.fr) + ' · ' + fmtD(m.dt) + '</div><div style="line-height:1.7">' + esc(m.body).replace(/\n/g, '<br>') + '</div>', [{ lbl: 'Kapat', cls: 'bs', fn: closeModal }, { lbl: 'Sil', cls: 'bd', fn: function() { messages = messages.filter(function(x) { return x.id !== id; }); dbDelMsg(id); closeModal(); go('messages'); } }]); }
 
-function viewMessage(id) {
-  var m = messages.find(function(x) { return x.id === id; });
-  if (!m) return;
-  if (!m.rd) { m.rd = true; dbSaveMsg(m); }
-  modal(esc(m.sub), '<div class="ts tm mb2">Gonderen: ' + esc(m.fr) + ' · ' + fmtD(m.dt) + '</div><div style="line-height:1.7">' + esc(m.body).replace(/\n/g, '<br>') + '</div>', [{ lbl: 'Kapat', cls: 'bs', fn: closeModal }, { lbl: 'Sil', cls: 'bd', fn: function() { messages = messages.filter(function(x) { return x.id !== id; }); dbDelMsg(id); closeModal(); go('messages'); } }]);
-}
-
-function pgSettings() {
-  var html = '<div class="ph"><div class="stit">Ayarlar</div><div class="ssub">Sistem ayarlari</div></div>' +
-    '<div class="card mb3"><div class="tw6 tsm mb2">Kurum Bilgileri</div>' +
-    row('Kurum Adi', settings.schoolName || '-') +
-    row('Logo URL', settings.logoUrl || '-') +
-    row('Adres', settings.address || '-') +
-    row('Telefon', settings.ownerPhone || '-') +
-    '</div>' +
-    '<div class="card mb3"><div class="tw6 tsm mb2">Banka Hesabi</div>' +
-    row('Banka', settings.bankName || '-') +
-    row('Hesap Adi', settings.accountName || '-') +
-    row('IBAN', settings.iban || '-') +
-    '</div>' +
-    '<div class="card mb3"><div class="tw6 tsm mb2">NetGSM SMS</div>' +
-    row('Kullanici', NETGSM_USER ? '***' : 'Ayarlanmadi') +
-    row('Baslik', NETGSM_HEADER) +
-    '</div>' +
-    '<div class="flex gap2"><button class="btn bp" onclick="editSettings()">Duzenle</button><button class="btn bs" onclick="go(\'dashboard\')">Geri Don</button></div>';
-  return html;
-}
-
+function pgSettings() { return '<div class="ph"><div class="stit">Ayarlar</div><div class="ssub">Sistem ayarları</div></div><div class="card mb3"><div class="tw6 tsm mb2">Kurum Bilgileri</div>' + row('Kurum Adı', settings.schoolName || '-') + row('Logo URL', settings.logoUrl || '-') + row('Adres', settings.address || '-') + row('Telefon', settings.ownerPhone || '-') + '</div><div class="card mb3"><div class="tw6 tsm mb2">Banka Hesabı</div>' + row('Banka', settings.bankName || '-') + row('Hesap Adı', settings.accountName || '-') + row('IBAN', settings.iban || '-') + '</div><div class="card mb3"><div class="tw6 tsm mb2">NetGSM SMS</div>' + row('Kullanıcı', NETGSM_USER ? '***' : 'Ayarlanmadı') + row('Başlık', NETGSM_HEADER) + '</div><div class="flex gap2"><button class="btn bp" onclick="editSettings()">Düzenle</button><button class="btn bs" onclick="go(\'dashboard\')">Geri Dön</button></div>'; }
 function editSettings() {
-  var html = '<div class="fgr mb2"><label>Kurum Adi</label><input id="s-name" value="' + esc(settings.schoolName) + '"/></div>' +
-    '<div class="fgr mb2"><label>Logo URL</label><input id="s-logo" value="' + esc(settings.logoUrl) + '"/></div>' +
-    '<div class="fgr mb2"><label>Adres</label><textarea id="s-addr">' + esc(settings.address) + '</textarea></div>' +
-    '<div class="fgr mb2"><label>Telefon</label><input id="s-phone" value="' + esc(settings.ownerPhone) + '"/></div>' +
-    '<div class="dv"></div>' +
-    '<div class="fgr mb2"><label>Banka Adi</label><input id="s-bank" value="' + esc(settings.bankName) + '"/></div>' +
-    '<div class="fgr mb2"><label>Hesap Adi</label><input id="s-acc" value="' + esc(settings.accountName) + '"/></div>' +
-    '<div class="fgr mb2"><label>IBAN</label><input id="s-iban" value="' + esc(settings.iban) + '"/></div>' +
-    '<div class="dv"></div>' +
-    '<div class="fgr mb2"><label>NetGSM Kullanici</label><input id="s-ng-user" value="' + esc(settings.netgsmUser) + '"/></div>' +
-    '<div class="fgr mb2"><label>NetGSM Sifre</label><input id="s-ng-pass" type="password" placeholder="Degistirmek icin girin"/></div>' +
-    '<div class="fgr mb2"><label>NetGSM Baslik</label><input id="s-ng-head" value="' + esc(settings.netgsmHeader || 'SPORCU') + '"/></div>';
-  modal('Ayarlar Duzenle', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
-    { lbl: 'Kaydet', cls: 'bp', fn: function() {
-      settings.schoolName = gv('s-name'); settings.logoUrl = gv('s-logo'); settings.address = gv('s-addr'); settings.ownerPhone = gv('s-phone');
-      settings.bankName = gv('s-bank'); settings.accountName = gv('s-acc'); settings.iban = gv('s-iban');
-      settings.netgsmUser = gv('s-ng-user'); var np = gv('s-ng-pass'); if (np) settings.netgsmPass = np; settings.netgsmHeader = gv('s-ng-head');
-      NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader;
-      saveS();
-      toast('Ayarlar kaydedildi!', 'g'); closeModal(); go('settings');
-    } }
+  var html = '<div class="fgr mb2"><label>Kurum Adı</label><input id="s-name" value="' + esc(settings.schoolName) + '"/></div><div class="fgr mb2"><label>Logo URL</label><input id="s-logo" value="' + esc(settings.logoUrl) + '"/></div><div class="fgr mb2"><label>Adres</label><textarea id="s-addr">' + esc(settings.address) + '</textarea></div><div class="fgr mb2"><label>Telefon</label><input id="s-phone" value="' + esc(settings.ownerPhone) + '"/></div><div class="dv"></div><div class="fgr mb2"><label>Banka Adı</label><input id="s-bank" value="' + esc(settings.bankName) + '"/></div><div class="fgr mb2"><label>Hesap Adı</label><input id="s-acc" value="' + esc(settings.accountName) + '"/></div><div class="fgr mb2"><label>IBAN</label><input id="s-iban" value="' + esc(settings.iban) + '"/></div><div class="dv"></div><div class="fgr mb2"><label>NetGSM Kullanıcı</label><input id="s-ng-user" value="' + esc(settings.netgsmUser) + '"/></div><div class="fgr mb2"><label>NetGSM Şifre</label><input id="s-ng-pass" type="password" placeholder="Değiştirmek için girin"/></div><div class="fgr mb2"><label>NetGSM Başlık</label><input id="s-ng-head" value="' + esc(settings.netgsmHeader || 'SPORCU') + '"/></div>';
+  modal('Ayarlar Düzenle', html, [
+    { lbl: 'İptal', cls: 'bs', fn: closeModal },
+    { lbl: 'Kaydet', cls: 'bp', fn: function() { settings.schoolName = gv('s-name'); settings.logoUrl = gv('s-logo'); settings.address = gv('s-addr'); settings.ownerPhone = gv('s-phone'); settings.bankName = gv('s-bank'); settings.accountName = gv('s-acc'); settings.iban = gv('s-iban'); settings.netgsmUser = gv('s-ng-user'); var np = gv('s-ng-pass'); if (np) settings.netgsmPass = np; settings.netgsmHeader = gv('s-ng-head'); NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader; saveS(); toast('Ayarlar kaydedildi!', 'g'); closeModal(); go('settings'); } }
   ]);
 }
 
-function pgBranches() {
-  var html = '<div class="ph"><div class="stit">Subeler</div><div class="ssub">Subeleri yonet</div></div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editBranch()">+ Yeni Sube</button></div>' +
-    '<div class="card"><div class="tw"><table><thead><tr><th>Sube Adi</th><th>Kod</th><th>Islemler</th></tr></thead><tbody>' +
-    _branchesCache.filter(function(b) { return b.orgId === currentOrgId; }).map(function(b) {
-      return '<tr><td class="tw6">' + esc(b.name) + '</td><td>' + esc(b.code) + '</td><td><button class="btn btn-xs bp" onclick="switchBranch(\'' + b.id + '\')">Sec</button></td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
-  return html;
-}
+function pgBranches() { return '<div class="ph"><div class="stit">Şubeler</div><div class="ssub">Şubeleri yönet</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editBranch()">+ Yeni Şube</button></div><div class="card"><div class="tw"><table><thead><tr><th>Şube Adı</th><th>Kod</th><th>İşlemler</th></tr></thead><tbody>' + _branchesCache.filter(function(b) { return b.orgId === currentOrgId; }).map(function(b) { return '<tr><td class="tw6">' + esc(b.name) + '</td><td>' + esc(b.code) + '</td><td><button class="btn btn-xs bp" onclick="switchBranch(\'' + b.id + '\')">Seç</button></td></tr>'; }).join('') + '</tbody></table></div></div>'; }
+function editBranch() { modal('Yeni Şube', '<div class="fgr mb2"><label>Şube Adı</label><input id="br-name"/></div><div class="fgr mb2"><label>Şube Kodu</label><input id="br-code" placeholder="MRK"/></div>', [{ lbl: 'İptal', cls: 'bs', fn: closeModal }, { lbl: 'Kaydet', cls: 'bp', fn: async function() { var name = gv('br-name'), code = gv('br-code'); if (!name) { toast('Şube adı zorunlu!', 'e'); return; } var obj = { id: 'br-' + Date.now().toString(36), orgId: currentOrgId, name: name, code: code || name.slice(0, 3).toUpperCase() }; _branchesCache.push(obj); await supaPost('branches', { id: obj.id, org_id: obj.orgId, name: obj.name, code: obj.code }); toast('Şube oluşturuldu!', 'g'); closeModal(); go('branches'); } }]); }
+function switchBranch(id) { currentBranchId = id; loadBranchData(true).then(function() { toast('Şube değiştirildi!', 'g'); go('dashboard'); }); }
 
-function editBranch() {
-  var html = '<div class="fgr mb2"><label>Sube Adi</label><input id="br-name"/></div>' +
-    '<div class="fgr mb2"><label>Sube Kodu</label><input id="br-code" placeholder="MRK"/></div>';
-  modal('Yeni Sube', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
-    { lbl: 'Kaydet', cls: 'bp', fn: async function() {
-      var name = gv('br-name'), code = gv('br-code');
-      if (!name) { toast('Sube adi zorunlu!', 'e'); return; }
-      var obj = { id: 'br-' + Date.now().toString(36), orgId: currentOrgId, name: name, code: code || name.slice(0, 3).toUpperCase() };
-      _branchesCache.push(obj);
-      await supaPost('branches', { id: obj.id, org_id: obj.orgId, name: obj.name, code: obj.code });
-      toast('Sube olusturuldu!', 'g'); closeModal(); go('branches');
-    } }
-  ]);
-}
+function pgSports() { return '<div class="ph"><div class="stit">Branşlar</div><div class="ssub">Spor branşları</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editSport()">+ Yeni Branş</button></div><div class="g2">' + sports.map(function(s) { return '<div class="card"><div class="flex fca gap2"><div style="font-size:32px">' + semi(s.name) + '</div><div><div class="tw6">' + esc(s.name) + '</div><div class="ts tm">' + athletes.filter(function(a) { return a.sp === s.name; }).length + ' sporcu</div></div></div></div>'; }).join('') + '</div>'; }
+function editSport() { modal('Yeni Branş', '<div class="fgr mb2"><label>Branş Adı</label><input id="sp-name"/></div><div class="fgr mb2"><label>İkon (emoji)</label><input id="sp-icon" placeholder="&#x26BD;"/></div>', [{ lbl: 'İptal', cls: 'bs', fn: closeModal }, { lbl: 'Kaydet', cls: 'bp', fn: async function() { var name = gv('sp-name'), icon = gv('sp-icon'); if (!name) { toast('Branş adı zorunlu!', 'e'); return; } var obj = { id: uid(), name: name, icon: icon }; sports.push(obj); await dbSaveSport(obj); toast('Branş eklendi!', 'g'); closeModal(); go('sports'); } }]); }
 
-function switchBranch(id) {
-  currentBranchId = id;
-  loadBranchData().then(function() { updateBranchUI(); toast('Sube degistirildi!', 'g'); go('dashboard'); });
-}
+function pgClasses() { return '<div class="ph"><div class="stit">Sınıflar</div><div class="ssub">Antrenman grupları</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editClass()">+ Yeni Sınıf</button></div><div class="card"><div class="tw"><table><thead><tr><th>Sınıf</th><th>Branş</th><th>Antrenör</th><th>Kapasite</th><th>Sporcu</th><th>İşlemler</th></tr></thead><tbody>' + classes.map(function(c) { var sp = sports.find(function(s) { return s.id === c.spId; }); var coach = coaches.find(function(co) { return co.id === c.coachId; }); var count = athletes.filter(function(a) { return a.clsId === c.id; }).length; return '<tr><td class="tw6">' + esc(c.name) + '</td><td>' + (sp ? esc(sp.name) : '-') + '</td><td>' + (coach ? esc(coach.fn + ' ' + coach.ln) : '-') + '</td><td>' + (c.cap || '-') + '</td><td>' + count + '</td><td><button class="btn btn-xs bp" onclick="editClass(\'' + c.id + '\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delClass(\'' + c.id + '\')">Sil</button></td></tr>'; }).join('') + '</tbody></table></div></div>'; }
+function editClass(id) { var c = id ? classes.find(function(x) { return x.id === id; }) : null; var isNew = !c; var html = '<div class="fgr mb2"><label>Sınıf Adı</label><input id="cls-name" value="' + esc(c ? c.name : '') + '"/></div><div class="g21"><div class="fgr"><label>Branş</label><select id="cls-sp">' + sports.map(function(s) { return '<option value="' + esc(s.id) + '"' + (c && c.spId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Antrenör</label><select id="cls-coach"><option value="">Seçiniz</option>' + coaches.map(function(co) { return '<option value="' + esc(co.id) + '"' + (c && c.coachId === co.id ? ' selected' : '') + '>' + esc(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div></div><div class="g21"><div class="fgr"><label>Kapasite</label><input id="cls-cap" type="number" value="' + (c ? c.cap : '20') + '"/></div><div class="fgr"><label>Program</label><input id="cls-sch" value="' + esc(c ? c.schedule : '') + '" placeholder="Pzt-Cmt 18:00-20:00"/></div></div>'; modal(isNew ? 'Yeni Sınıf' : 'Sınıf Düzenle', html, [{ lbl: 'İptal', cls: 'bs', fn: closeModal }, { lbl: 'Kaydet', cls: 'bp', fn: async function() { var obj = { id: c ? c.id : uid(), name: gv('cls-name'), spId: gv('cls-sp'), coachId: gv('cls-coach'), cap: gvn('cls-cap'), schedule: gv('cls-sch') }; if (!obj.name) { toast('Sınıf adı zorunlu!', 'e'); return; } if (isNew) classes.push(obj); else { var idx = classes.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) classes[idx] = obj; } await dbSaveClass(obj); toast('Sınıf kaydedildi!', 'g'); closeModal(); go('classes'); } }]); }
+function delClass(id) { confirm2('Sınıf Sil', 'Bu sınıf silinecek. Sporcular sınıfsız kalacak.', function() { classes = classes.filter(function(x) { return x.id !== id; }); athletes.forEach(function(a) { if (a.clsId === id) a.clsId = ''; }); dbDelClass(id); toast('Sınıf silindi!', 'g'); go('classes'); }); }
 
-function pgSports() {
-  var html = '<div class="ph"><div class="stit">Branslar</div><div class="ssub">Spor branslari</div></div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editSport()">+ Yeni Brans</button></div>' +
-    '<div class="g2">' + sports.map(function(s) {
-      return '<div class="card"><div class="flex fca gap2"><div style="font-size:32px">' + semi(s.name) + '</div><div><div class="tw6">' + esc(s.name) + '</div><div class="ts tm">' + athletes.filter(function(a) { return a.sp === s.name; }).length + ' sporcu</div></div></div></div>';
-    }).join('') + '</div>';
-  return html;
-}
+function pgAnnouncements() { return '<div class="ph"><div class="stit">Duyurular</div><div class="ssub">Toplu duyurular</div></div><div class="card"><div class="al al-b mb3">&#x1F4E3; Yeni duyuru için Mesajlar > Yeni Mesaj kullanın.</div><div class="tw6 tsm mb2">Son Duyurular</div>' + messages.filter(function(m) { return m.role === 'admin'; }).slice(0, 10).map(function(m) { return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div></div></div>'; }).join('') + '</div>'; }
 
-function editSport() {
-  var html = '<div class="fgr mb2"><label>Brans Adi</label><input id="sp-name"/></div>' +
-    '<div class="fgr mb2"><label>Ikon (emoji)</label><input id="sp-icon" placeholder="&#x26BD;"/></div>';
-  modal('Yeni Brans', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
-    { lbl: 'Kaydet', cls: 'bp', fn: async function() {
-      var name = gv('sp-name'), icon = gv('sp-icon');
-      if (!name) { toast('Brans adi zorunlu!', 'e'); return; }
-      var obj = { id: uid(), name: name, icon: icon };
-      sports.push(obj);
-      await dbSaveSport(obj);
-      toast('Brans eklendi!', 'g'); closeModal(); go('sports');
-    } }
-  ]);
-}
+function pgSMS() { return '<div class="ph"><div class="stit">SMS Duyuru</div><div class="ssub">Toplu SMS gönderimi</div></div><div class="card mb3"><div class="fgr mb2"><label>Alıcılar</label><select id="sms-to"><option value="all">Tüm Sporcular</option><option value="active">Aktif Sporcular</option><option value="overdue">Gecikmiş Ödemesi Olanlar</option></select></div><div class="fgr mb2"><label>Mesaj</label><textarea id="sms-body" rows="4" placeholder="Mesajınızı yazın..."></textarea></div><button class="btn bp w100" onclick="sendBulkSMSFromUI()">Gönder</button></div><div class="card"><div class="tw6 tsm mb2">SMS Geçmişi</div><p class="tm ts">Gelecek versiyonda eklenecek.</p></div>'; }
+async function sendBulkSMSFromUI() { if (!NETGSM_USER) { toast('NetGSM ayarları eksik!', 'e'); return; } var to = gv('sms-to'), body = gv('sms-body'); if (!body) { toast('Mesaj boş!', 'e'); return; } var phones = []; if (to === 'all') athletes.forEach(function(a) { if (a.ph) phones.push(a.ph); }); else if (to === 'active') athletes.filter(function(a) { return a.st === 'active'; }).forEach(function(a) { if (a.ph) phones.push(a.ph); }); else if (to === 'overdue') { var oids = payments.filter(function(p) { return p.st === 'overdue'; }).map(function(p) { return p.aid; }); athletes.filter(function(a) { return oids.indexOf(a.id) >= 0; }).forEach(function(a) { if (a.ph) phones.push(a.ph); }); } if (!phones.length) { toast('Alıcı bulunamadı!', 'e'); return; } showLoading(); var sent = await sendBulkSMS(phones, body); hideLoading(); toast(sent + ' SMS gönderildi!', 'g'); }
 
-function pgClasses() {
-  var html = '<div class="ph"><div class="stit">Siniflar</div><div class="ssub">Antrenman gruplari</div></div>' +
-    '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editClass()">+ Yeni Sinif</button></div>' +
-    '<div class="card"><div class="tw"><table><thead><tr><th>Sinif</th><th>Brans</th><th>Antrenor</th><th>Kapasite</th><th>Sporcu</th><th>Islemler</th></tr></thead><tbody>' +
-    classes.map(function(c) {
-      var sp = sports.find(function(s) { return s.id === c.spId; });
-      var coach = coaches.find(function(co) { return co.id === c.coachId; });
-      var count = athletes.filter(function(a) { return a.clsId === c.id; }).length;
-      return '<tr><td class="tw6">' + esc(c.name) + '</td><td>' + (sp ? esc(sp.name) : '-') + '</td><td>' + (coach ? esc(coach.fn + ' ' + coach.ln) : '-') + '</td><td>' + (c.cap || '-') + '</td><td>' + count + '</td>' +
-        '<td><button class="btn btn-xs bp" onclick="editClass(\'' + c.id + '\')">Duzenle</button> <button class="btn btn-xs bd" onclick="delClass(\'' + c.id + '\')">Sil</button></td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
-  return html;
-}
-
-function editClass(id) {
-  var c = id ? classes.find(function(x) { return x.id === id; }) : null;
-  var isNew = !c;
-  var html = '<div class="fgr mb2"><label>Sinif Adi</label><input id="cls-name" value="' + esc(c ? c.name : '') + '"/></div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Brans</label><select id="cls-sp">' + sports.map(function(s) { return '<option value="' + esc(s.id) + '"' + (c && c.spId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="fgr"><label>Antrenor</label><select id="cls-coach"><option value="">Secin</option>' + coaches.map(function(co) { return '<option value="' + esc(co.id) + '"' + (c && c.coachId === co.id ? ' selected' : '') + '>' + esc(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div>' +
-    '</div>' +
-    '<div class="g21">' +
-    '<div class="fgr"><label>Kapasite</label><input id="cls-cap" type="number" value="' + (c ? c.cap : '20') + '"/></div>' +
-    '<div class="fgr"><label>Program</label><input id="cls-sch" value="' + esc(c ? c.schedule : '') + '" placeholder="Pzt-Cmt 18:00-20:00"/></div>' +
-    '</div>';
-  modal(isNew ? 'Yeni Sinif' : 'Sinif Duzenle', html, [
-    { lbl: 'Iptal', cls: 'bs', fn: closeModal },
-    { lbl: 'Kaydet', cls: 'bp', fn: async function() {
-      var obj = { id: c ? c.id : uid(), name: gv('cls-name'), spId: gv('cls-sp'), coachId: gv('cls-coach'), cap: gvn('cls-cap'), schedule: gv('cls-sch') };
-      if (!obj.name) { toast('Sinif adi zorunlu!', 'e'); return; }
-      if (isNew) classes.push(obj); else { var idx = classes.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) classes[idx] = obj; }
-      await dbSaveClass(obj);
-      toast('Sinif kaydedildi!', 'g'); closeModal(); go('classes');
-    } }
-  ]);
-}
-
-function delClass(id) {
-  confirm2('Sinif Sil', 'Bu sinif silinecek. Sporcular sinifsiz kalacak.', function() {
-    classes = classes.filter(function(x) { return x.id !== id; });
-    athletes.forEach(function(a) { if (a.clsId === id) a.clsId = ''; });
-    dbDelClass(id);
-    toast('Sinif silindi!', 'g'); go('classes');
-  });
-}
-
-function pgAnnouncements() {
-  var html = '<div class="ph"><div class="stit">Duyurular</div><div class="ssub">Toplu duyurular</div></div>' +
-    '<div class="card"><div class="al al-b mb3">&#x1F4E3; Yeni duyuru icin Mesajlar > Yeni Mesaj kullanin.</div>' +
-    '<div class="tw6 tsm mb2">Son Duyurular</div>' +
-    messages.filter(function(m) { return m.role === 'admin'; }).slice(0, 10).map(function(m) {
-      return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div></div></div>';
-    }).join('') +
-    '</div>';
-  return html;
-}
-
-function pgSMS() {
-  var html = '<div class="ph"><div class="stit">SMS Duyuru</div><div class="ssub">Toplu SMS gonderimi</div></div>' +
-    '<div class="card mb3"><div class="fgr mb2"><label>Alicilar</label><select id="sms-to"><option value="all">Tum Sporcular</option><option value="active">Aktif Sporcular</option><option value="overdue">Gecikmis Odemesi Olanlar</option></select></div>' +
-    '<div class="fgr mb2"><label>Mesaj</label><textarea id="sms-body" rows="4" placeholder="Mesajinizi yazin..."></textarea></div>' +
-    '<button class="btn bp w100" onclick="sendBulkSMSFromUI()">Gonder</button></div>' +
-    '<div class="card"><div class="tw6 tsm mb2">SMS Gecmisi</div><p class="tm ts">SMS gecmisi burada listelenecek.</p></div>';
-  return html;
-}
-
-async function sendBulkSMSFromUI() {
-  if (!NETGSM_USER) { toast('NetGSM ayarlari eksik!', 'e'); return; }
-  var to = gv('sms-to'), body = gv('sms-body');
-  if (!body) { toast('Mesaj bos!', 'e'); return; }
-  var phones = [];
-  if (to === 'all') athletes.forEach(function(a) { if (a.ph) phones.push(a.ph); });
-  else if (to === 'active') athletes.filter(function(a) { return a.st === 'active'; }).forEach(function(a) { if (a.ph) phones.push(a.ph); });
-  else if (to === 'overdue') {
-    var oids = payments.filter(function(p) { return p.st === 'overdue'; }).map(function(p) { return p.aid; });
-    athletes.filter(function(a) { return oids.indexOf(a.id) >= 0; }).forEach(function(a) { if (a.ph) phones.push(a.ph); });
-  }
-  if (!phones.length) { toast('Alici bulunamadi!', 'e'); return; }
-  showLoading();
-  var sent = await sendBulkSMS(phones, body);
-  hideLoading();
-  toast(sent + ' SMS gonderildi!', 'g');
-}
-
-function pgPendingOrgs() {
-  if (!currentUser || currentUser.email !== SUPER_ADMIN_EMAIL) return '<div class="card"><div class="al al-r">Yetkisiz erisim!</div></div>';
-  var html = '<div class="ph"><div class="stit">Kurum Yonetimi</div><div class="ssub">Bekleyen kurumlar</div></div>' +
-    '<div class="card"><div class="tw"><table><thead><tr><th>Kurum</th><th>Durum</th><th>Tarih</th><th>Islemler</th></tr></thead><tbody>' +
-    _orgsCache.map(function(o) {
-      return '<tr><td class="tw6">' + esc(o.name) + '</td><td><span class="bg ' + (o.status === 'approved' ? 'bg-g' : o.status === 'rejected' ? 'bg-r' : 'bg-y') + '">' + stl(o.status) + '</span></td><td>' + fmtD(o.registered_at) + '</td>' +
-        '<td>' + (o.status === 'pending' ? '<button class="btn btn-xs bsu" onclick="approveOrg(\'' + o.id + '\')">Onayla</button> <button class="btn btn-xs bd" onclick="rejectOrg(\'' + o.id + '\')">Reddet</button>' : '-') + '</td></tr>';
-    }).join('') +
-    '</tbody></table></div></div>';
-  return html;
-}
-
-async function approveOrg(id) {
-  await supaPatch('orgs', { status: 'approved' }, { id: id });
-  var org = _orgsCache.find(function(o) { return o.id === id; }); if (org) org.status = 'approved';
-  toast('Kurum onaylandi!', 'g'); go('pending-orgs');
-}
-
-async function rejectOrg(id) {
-  await supaPatch('orgs', { status: 'rejected' }, { id: id });
-  var org = _orgsCache.find(function(o) { return o.id === id; }); if (org) org.status = 'rejected';
-  toast('Kurum reddedildi!', 'y'); go('pending-orgs');
-}
+function pgPendingOrgs() { if (!currentUser || currentUser.email !== SUPER_ADMIN_EMAIL) return '<div class="card"><div class="al al-r">Yetkisiz erişim!</div></div>'; return '<div class="ph"><div class="stit">Kurum Yönetimi</div><div class="ssub">Bekleyen kurumlar</div></div><div class="card"><div class="tw"><table><thead><tr><th>Kurum</th><th>Durum</th><th>Tarih</th><th>İşlemler</th></tr></thead><tbody>' + _orgsCache.map(function(o) { return '<tr><td class="tw6">' + esc(o.name) + '</td><td><span class="bg ' + (o.status === 'approved' ? 'bg-g' : o.status === 'rejected' ? 'bg-r' : 'bg-y') + '">' + stl(o.status) + '</span></td><td>' + fmtD(o.registered_at) + '</td><td>' + (o.status === 'pending' ? '<button class="btn btn-xs bsu" onclick="approveOrg(\'' + o.id + '\')">Onayla</button> <button class="btn btn-xs bd" onclick="rejectOrg(\'' + o.id + '\')">Reddet</button>' : '-') + '</td></tr>'; }).join('') + '</tbody></table></div></div>'; }
+async function approveOrg(id) { await supaPatch('orgs', { status: 'approved' }, { id: id }); var org = _orgsCache.find(function(o) { return o.id === id; }); if (org) org.status = 'approved'; toast('Kurum onaylandı!', 'g'); go('pending-orgs'); }
+async function rejectOrg(id) { await supaPatch('orgs', { status: 'rejected' }, { id: id }); var org = _orgsCache.find(function(o) { return o.id === id; }); if (org) org.status = 'rejected'; toast('Kurum reddedildi!', 'y'); go('pending-orgs'); }
 
 // ══════════════════════════════════════════════════════════
 //  SPORCU PORTAL
 // ══════════════════════════════════════════════════════════
-function spTab(tab) {
-  document.querySelectorAll('.sp-tab').forEach(function(el) { el.classList.toggle('on', el.textContent.toLowerCase().indexOf(tab) >= 0 || (tab === 'profil' && el.textContent.indexOf('Profil') >= 0) || (tab === 'yoklama' && el.textContent.indexOf('Yoklama') >= 0) || (tab === 'odemeler' && el.textContent.indexOf('Odemeler') >= 0) || (tab === 'odeme-yap' && el.textContent.indexOf('Odeme Yap') >= 0) || (tab === 'duyurular' && el.textContent.indexOf('Duyurular') >= 0)); });
-  var content = document.getElementById('sp-content');
-  var fns = { 'profil': spProfil, 'yoklama': spYoklama, 'odemeler': spOdemeler, 'odeme-yap': spOdemeYap, 'duyurular': spDuyurular };
-  if (fns[tab]) content.innerHTML = fns[tab]();
-}
-
-function spProfil() {
-  var a = currentSporcu;
-  if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadi!</div></div>';
-  var rate = attRate(a.id);
-  var html = '<div class="profile-hero"><div class="flex fca gap3"><div class="ava" style="width:64px;height:64px;font-size:24px;background:' + avatarColor(a.fn) + '">' + (a.fn[0] || 'S').toUpperCase() + '</div><div><div class="tw6" style="font-size:18px">' + esc(a.fn + ' ' + a.ln) + '</div><div class="ts tm">' + esc(a.sp) + ' · ' + esc(a.cat) + '</div></div></div></div>' +
-    '<div class="card mb3">' + row('TC Kimlik', a.tc) + row('Dogum Tarihi', fmtD(a.bd)) + row('Cinsiyet', a.gn === 'E' ? 'Erkek' : 'Kadin') + row('Telefon', a.ph) + row('E-posta', a.em || '-') + '</div>' +
-    '<div class="card mb3"><div class="tw6 tsm mb2">Devam Orani</div><div class="pr"><div class="prb prb-' + (rate >= 80 ? 'g' : rate >= 50 ? 'y' : 'r') + '" style="width:' + (rate || 0) + '%"></div></div><div class="flex fjb mt2"><span class="ts tm">Devam Orani</span><span class="tw6">' + (rate || 0) + '%</span></div></div>' +
-    '<div class="card"><div class="tw6 tsm mb2">Veli Bilgileri</div>' + row('Veli Adi', a.pn || '-') + row('Veli Telefon', a.pph || '-') + row('Veli E-posta', a.pem || '-') + '</div>';
-  return html;
-}
-
-function spYoklama() {
-  var a = currentSporcu;
-  if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadi!</div></div>';
-  var dates = Object.keys(attData).sort().reverse().slice(0, 30);
-  var html = '<div class="card"><div class="tw6 tsm mb2">Son Yoklamalar</div>';
-  if (!dates.length) html += '<p class="tm ts">Henüz yoklama kaydi yok.</p>';
-  else {
-    html += dates.map(function(d) {
-      var st = attData[d] && attData[d][a.id];
-      var status = st === 'P' ? '<span class="bg bg-g">Var</span>' : st === 'A' ? '<span class="bg bg-r">Yok</span>' : st === 'L' ? '<span class="bg bg-y">Izin</span>' : '<span class="bg bg-b">-</span>';
-      return '<div class="att-row"><span class="ts tm">' + fmtD(d) + '</span>' + status + '</div>';
-    }).join('');
-  }
-  html += '</div>';
-  return html;
-}
-
-function spOdemeler() {
-  var a = currentSporcu;
-  if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadi!</div></div>';
-  var myPayments = payments.filter(function(p) { return p.aid === a.id; });
-  var html = '<div class="card"><div class="tw6 tsm mb2">Odemelerim</div>';
-  if (!myPayments.length) html += '<p class="tm ts">Henüz odeme kaydi yok.</p>';
-  else {
-    html += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Aciklama</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>' +
-      myPayments.map(function(p) {
-        return '<tr><td>' + fmtD(p.dt) + '</td><td>' + esc(p.ds) + '</td><td class="tw6">' + fmtN(p.amt) + ' &#x20BA;</td><td><span class="bg ' + stc(p.st) + '">' + stl(p.st) + '</span></td></tr>';
-      }).join('') + '</tbody></table></div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-function spOdemeYap() {
-  var a = currentSporcu;
-  if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadi!</div></div>';
-  var html = '<div class="card"><div class="tw6 tsm mb2">Odeme Yap</div>' +
-    '<div class="fgr mb2"><label>Odeme Turu</label><select id="sp-pay-ty"><option value="aidat">Aidat</option><option value="kayit">Kayit Ucreti</option><option value="diger">Diger</option></select></div>' +
-    '<div class="fgr mb2"><label>Tutar</label><input id="sp-pay-amt" type="number"/></div>' +
-    '<div class="fgr mb2"><label>Aciklama</label><input id="sp-pay-ds"/></div>' +
-    '<div class="fgr mb3"><label>Odeme Yontemi</label><select id="sp-pay-method"><option value="havale">Havale/EFT</option><option value="kart">Kredi Karti</option><option value="nakit">Nakit</option></select></div>' +
-    '<div id="sp-havale-info" class="al al-b mb3 dn">' +
-    '<div class="tw6 tsm mb2">Havale Bilgileri</div>' +
-    row('Banka', settings.bankName || '-') +
-    row('Hesap', settings.accountName || '-') +
-    row('IBAN', settings.iban || '-') +
-    '</div>' +
-    '<button class="btn bp w100" onclick="submitSpPayment()">Odeme Bildirimi Yap</button></div>';
-  setTimeout(function() {
-    var sel = document.getElementById('sp-pay-method');
-    if (sel) sel.onchange = function() { document.getElementById('sp-havale-info').classList.toggle('dn', this.value !== 'havale'); };
-  }, 50);
-  return html;
-}
-
-async function submitSpPayment() {
-  var a = currentSporcu;
-  if (!a) return;
-  var ty = gv('sp-pay-ty'), amt = gvn('sp-pay-amt'), ds = gv('sp-pay-ds'), method = gv('sp-pay-method');
-  if (!amt) { toast('Tutar zorunlu!', 'e'); return; }
-  var obj = {
-    id: uid(), aid: a.id, an: a.fn + ' ' + a.ln, amt: amt, dt: tod(), ty: 'income', cat: ty, ds: ds || ty,
-    st: 'pending', inv: '', dd: '', payMethod: method, needsApproval: true
-  };
-  payments.push(obj);
-  await dbSavePay(obj);
-  toast('Odeme bildirimi gonderildi! Onay bekleniyor.', 'g');
-  spTab('odemeler');
-}
-
-function spDuyurular() {
-  var html = '<div class="card"><div class="tw6 tsm mb2">Duyurular</div>';
-  var announcements = messages.filter(function(m) { return m.role === 'admin'; });
-  if (!announcements.length) html += '<p class="tm ts">Henüz duyuru yok.</p>';
-  else {
-    html += announcements.map(function(m) {
-      return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div><div class="ts" style="margin-top:4px">' + esc(m.body.slice(0, 100)) + (m.body.length > 100 ? '...' : '') + '</div></div></div>';
-    }).join('');
-  }
-  html += '</div>';
-  return html;
-}
+function spTab(tab) { document.querySelectorAll('.sp-tab').forEach(function(el) { el.classList.toggle('on', el.textContent.toLowerCase().indexOf(tab) >= 0 || (tab === 'profil' && el.textContent.indexOf('Profil') >= 0) || (tab === 'yoklama' && el.textContent.indexOf('Yoklama') >= 0) || (tab === 'odemeler' && el.textContent.indexOf('Ödemeler') >= 0) || (tab === 'odeme-yap' && el.textContent.indexOf('Ödeme Yap') >= 0) || (tab === 'duyurular' && el.textContent.indexOf('Duyurular') >= 0)); }); var content = document.getElementById('sp-content'); var fns = { 'profil': spProfil, 'yoklama': spYoklama, 'odemeler': spOdemeler, 'odeme-yap': spOdemeYap, 'duyurular': spDuyurular }; if (fns[tab]) content.innerHTML = fns[tab](); }
+function spProfil() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var rate = attRate(a.id); return '<div class="profile-hero"><div class="flex fca gap3"><div class="ava" style="width:64px;height:64px;font-size:24px;background:' + avatarColor(a.fn) + '">' + (a.fn[0] || 'S').toUpperCase() + '</div><div><div class="tw6" style="font-size:18px">' + esc(a.fn + ' ' + a.ln) + '</div><div class="ts tm">' + esc(a.sp) + ' · ' + esc(a.cat) + '</div></div></div></div><div class="card mb3">' + row('TC Kimlik', a.tc) + row('Doğum Tarihi', fmtD(a.bd)) + row('Cinsiyet', a.gn === 'E' ? 'Erkek' : 'Kadın') + row('Telefon', a.ph) + row('E-posta', a.em || '-') + '</div><div class="card mb3"><div class="tw6 tsm mb2">Devam Oranı</div><div class="pr"><div class="prb prb-' + (rate >= 80 ? 'g' : rate >= 50 ? 'y' : 'r') + '" style="width:' + (rate || 0) + '%"></div></div><div class="flex fjb mt2"><span class="ts tm">Devam Oranı</span><span class="tw6">' + (rate || 0) + '%</span></div></div><div class="card"><div class="tw6 tsm mb2">Veli Bilgileri</div>' + row('Veli Adı', a.pn || '-') + row('Veli Telefon', a.pph || '-') + row('Veli E-posta', a.pem || '-') + '</div>'; }
+function spYoklama() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var dates = Object.keys(attData).sort().reverse().slice(0, 30); var html = '<div class="card"><div class="tw6 tsm mb2">Son Yoklamalar</div>'; if (!dates.length) html += '<p class="tm ts">Henüz yoklama kaydı yok.</p>'; else { html += dates.map(function(d) { var st = attData[d] && attData[d][a.id]; var status = st === 'P' ? '<span class="bg bg-g">Var</span>' : st === 'A' ? '<span class="bg bg-r">Yok</span>' : st === 'L' ? '<span class="bg bg-y">İzin</span>' : '<span class="bg bg-b">-</span>'; return '<div class="att-row"><span class="ts tm">' + fmtD(d) + '</span>' + status + '</div>'; }).join(''); } html += '</div>'; return html; }
+function spOdemeler() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var myPayments = payments.filter(function(p) { return p.aid === a.id; }); var html = '<div class="card"><div class="tw6 tsm mb2">Ödemelerim</div>'; if (!myPayments.length) html += '<p class="tm ts">Henüz ödeme kaydı yok.</p>'; else { html += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>' + myPayments.map(function(p) { return '<tr><td>' + fmtD(p.dt) + '</td><td>' + esc(p.ds) + '</td><td class="tw6">' + fmtN(p.amt) + ' &#x20BA;</td><td><span class="bg ' + stc(p.st) + '">' + stl(p.st) + '</span></td></tr>'; }).join('') + '</tbody></table></div>'; } html += '</div>'; return html; }
+function spOdemeYap() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var html = '<div class="card"><div class="tw6 tsm mb2">Ödeme Yap</div><div class="fgr mb2"><label>Ödeme Türü</label><select id="sp-pay-ty"><option value="aidat">Aidat</option><option value="kayit">Kayıt Ücreti</option><option value="diger">Diğer</option></select></div><div class="fgr mb2"><label>Tutar</label><input id="sp-pay-amt" type="number"/></div><div class="fgr mb2"><label>Açıklama</label><input id="sp-pay-ds"/></div><div class="fgr mb3"><label>Ödeme Yöntemi</label><select id="sp-pay-method"><option value="havale">Havale/EFT</option><option value="kart">Kredi Kartı</option><option value="nakit">Nakit</option></select></div><div id="sp-havale-info" class="al al-b mb3 dn"><div class="tw6 tsm mb2">Havale Bilgileri</div>' + row('Banka', settings.bankName || '-') + row('Hesap', settings.accountName || '-') + row('IBAN', settings.iban || '-') + '</div><button class="btn bp w100" onclick="submitSpPayment()">Ödeme Bildirimi Yap</button></div>'; setTimeout(function() { var sel = document.getElementById('sp-pay-method'); if (sel) sel.onchange = function() { document.getElementById('sp-havale-info').classList.toggle('dn', this.value !== 'havale'); }; }, 50); return html; }
+async function submitSpPayment() { var a = currentSporcu; if (!a) return; var ty = gv('sp-pay-ty'), amt = gvn('sp-pay-amt'), ds = gv('sp-pay-ds'), method = gv('sp-pay-method'); if (!amt) { toast('Tutar zorunlu!', 'e'); return; } var obj = { id: uid(), aid: a.id, an: a.fn + ' ' + a.ln, amt: amt, dt: tod(), ty: 'income', cat: ty, ds: ds || ty, st: 'pending', inv: '', dd: '', payMethod: method, needsApproval: true }; payments.push(obj); await dbSavePay(obj); toast('Ödeme bildirimi gönderildi! Onay bekleniyor.', 'g'); spTab('odemeler'); }
+function spDuyurular() { var html = '<div class="card"><div class="tw6 tsm mb2">Duyurular</div>'; var announcements = messages.filter(function(m) { return m.role === 'admin'; }); if (!announcements.length) html += '<p class="tm ts">Henüz duyuru yok.</p>'; else { html += announcements.map(function(m) { return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div><div class="ts" style="margin-top:4px">' + esc(m.body.slice(0, 100)) + (m.body.length > 100 ? '...' : '') + '</div></div></div>'; }).join(''); } html += '</div>'; return html; }
 
 // ══════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('Sporcu Paneli yuklendi');
-});
+document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli yüklendi'); });
