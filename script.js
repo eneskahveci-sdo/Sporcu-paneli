@@ -449,7 +449,7 @@ function switchLoginTab(tab) {
   document.querySelectorAll('.ltab').forEach(function(el, i) { el.classList.toggle('on', (i === 0 && tab === 'admin') || (i === 1 && tab === 'sporcu')); });
 }
 
-// GUVENLIK: Yeni doLogin - Supabase Auth kullaniyor
+// GUVENLIK: Yeni doLogin - Supabase Auth + Eski Sistem Uyumlulugu
 async function doLogin() {
   var e = gv('le'), p = gv('lp');
   if (!e || !p) { showErr('lerr', 'E-posta ve sifre gerekli!'); return; }
@@ -457,24 +457,74 @@ async function doLogin() {
   
   try {
     var sb = getSB();
+    var ph = await sha256(p);
     
-    // GUVENLIK: Supabase Auth ile giris yap (sifre sunucuda kontrol edilir)
+    // ADIM 1: Supabase Auth dene
     var { data: authData, error: authError } = await sb.auth.signInWithPassword({
       email: e,
       password: p
     });
     
-    if (authError || !authData.user) {
-      hideLoading();
-      showErr('lerr', 'E-posta veya sifre hatali!');
-      return;
+    // ADIM 2: Auth basarisiz olursa, ESKI SISTEM kontrolu (DUZ METIN + HASH)
+    if (authError) {
+      console.log('Supabase Auth basarisiz, eski sistem kontrol ediliyor...');
+      
+      var allUsers = await supaGet('users') || [];
+      var found = null;
+      
+      allUsers.forEach(function(u) {
+        if (u.email === e) {
+          // Duz metin sifre kontrolu (ORNEK: Admin1234)
+          if (u.pass === p) {
+            found = u;
+            console.log('Duz metin sifre bulundu!');
+          }
+          // SHA-256 hash kontrolu
+          else if (u.pass === ph) {
+            found = u;
+            console.log('Hash sifre bulundu!');
+          }
+        }
+      });
+      
+      if (!found) {
+        hideLoading();
+        showErr('lerr', 'E-posta veya sifre hatali!');
+        return;
+      }
+      
+      console.log('Eski sistemde kullanici bulundu, Supabase Auth\'a tasınıyor...');
+      
+      // ADIM 3: Eski kullaniciyi Supabase Auth'a kaydet
+      var { data: signUpData, error: signUpError } = await sb.auth.signUp({
+        email: e,
+        password: p
+      });
+      
+      if (signUpError && !signUpError.message.includes('already registered')) {
+        console.error('SignUp hatasi:', signUpError);
+      }
+      
+      // ADIM 4: Simdi normal login yap
+      var { data: finalAuth, error: finalError } = await sb.auth.signInWithPassword({
+        email: e,
+        password: p
+      });
+      
+      if (finalError) {
+        hideLoading();
+        showErr('lerr', 'Aktarım hatası: ' + finalError.message);
+        return;
+      }
+      
+      authData = finalAuth;
+      console.log('Kullanici basariyla aktarildi!');
     }
     
-    // Auth basarili, kullanici bilgilerini users tablosundan al
+    // ADIM 5: Auth basarili, kullanici bilgilerini al
     var userId = authData.user.id;
     var userEmail = authData.user.email;
     
-    // Kullanici profilini cek
     var { data: userData, error: userError } = await sb
       .from('users')
       .select('*')
@@ -482,15 +532,40 @@ async function doLogin() {
       .single();
     
     if (userError || !userData) {
-      // Profil yoksa auth kullanicisindan olustur
-      userData = {
-        id: userId,
-        email: userEmail,
-        org_id: 'org-default',
-        branch_id: 'br-default',
-        role: 'admin',
-        name: userEmail.split('@')[0]
-      };
+      var allUsers = await supaGet('users') || [];
+      var oldUser = allUsers.find(function(u) { return u.email === userEmail; });
+      
+      if (oldUser) {
+        await supaUpsert('users', {
+          id: userId,
+          org_id: oldUser.org_id || 'org-default',
+          branch_id: oldUser.branch_id || 'br-default',
+          email: userEmail,
+          role: oldUser.role || 'admin',
+          name: oldUser.name || userEmail.split('@')[0],
+          phone: oldUser.phone || ''
+        });
+        
+        userData = {
+          id: userId,
+          org_id: oldUser.org_id || 'org-default',
+          branch_id: oldUser.branch_id || 'br-default',
+          email: userEmail,
+          role: oldUser.role || 'admin',
+          name: oldUser.name || userEmail.split('@')[0],
+          phone: oldUser.phone || ''
+        };
+      } else {
+        userData = {
+          id: userId,
+          org_id: 'org-default',
+          branch_id: 'br-default',
+          email: userEmail,
+          role: 'admin',
+          name: userEmail.split('@')[0]
+        };
+        await supaPost('users', userData);
+      }
     }
     
     // Org ve sube bilgilerini cek
@@ -498,14 +573,17 @@ async function doLogin() {
     try { allOrgs = await supaGet('orgs') || []; } catch(e2) {}
     try { allBranches = await supaGet('branches') || []; } catch(e2) {}
     
-    _orgsCache = allOrgs.map(function(o) { return { id: o.id, name: o.name, status: o.status || 'approved', registered_at: o.registered_at }; });
-    _branchesCache = allBranches.map(function(b) { return { id: b.id, orgId: b.org_id, name: b.name, code: b.code }; });
+    _orgsCache = allOrgs.map(function(o) { 
+      return { id: o.id, name: o.name, status: o.status || 'approved', registered_at: o.registered_at }; 
+    });
+    _branchesCache = allBranches.map(function(b) { 
+      return { id: b.id, orgId: b.org_id, name: b.name, code: b.code }; 
+    });
     
     if (!_branchesCache.length) {
       _branchesCache.push({ id: 'br-default', orgId: 'org-default', name: 'Dragos Futbol Akademisi', code: 'DFA' });
     }
     
-    // Kullanici cache'ine ekle
     var found = {
       id: userData.id,
       orgId: userData.org_id,
@@ -516,19 +594,18 @@ async function doLogin() {
       phone: userData.phone
     };
     
-    // Onay kontrolu
     if (found.email !== SUPER_ADMIN_EMAIL) {
       var foundOrg = allOrgs.find(function(o) { return o.id === found.orgId; });
       if (foundOrg && foundOrg.status === 'pending') {
         hideLoading();
         await sb.auth.signOut();
-        showErr('lerr', '⏳ Hesabiniz henüz onaylanmadi. Yönetici onayi bekleniyor.');
+        showErr('lerr', '⏳ Hesabiniz henüz onaylanmadi.');
         return;
       }
       if (foundOrg && foundOrg.status === 'rejected') {
         hideLoading();
         await sb.auth.signOut();
-        showErr('lerr', '❌ Hesabiniz reddedildi. Detay için yöneticiyle iletisime geçin.');
+        showErr('lerr', '❌ Hesabiniz reddedildi.');
         return;
       }
     }
@@ -538,7 +615,12 @@ async function doLogin() {
     currentBranchId = found.branchId || (allBranches[0] && allBranches[0].id) || 'br-default';
     
     if (!getBranch(currentBranchId)) {
-      _branchesCache.push({ id: currentBranchId, orgId: currentOrgId, name: settings.schoolName || 'Merkez Sube', code: 'MRK' });
+      _branchesCache.push({ 
+        id: currentBranchId, 
+        orgId: currentOrgId, 
+        name: settings.schoolName || 'Merkez Sube', 
+        code: 'MRK' 
+      });
     }
     
     acct.email = found.email;
@@ -550,9 +632,15 @@ async function doLogin() {
     
     var dname = found.name || found.email.split('@')[0];
     var setEl = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-    setEl('suname', dname); setEl('sava', (dname[0] || 'A').toUpperCase()); setEl('bar-ava', (dname[0] || 'A').toUpperCase());
+    setEl('suname', dname); 
+    setEl('sava', (dname[0] || 'A').toUpperCase()); 
+    setEl('bar-ava', (dname[0] || 'A').toUpperCase());
     
-    updateBranchUI(); updateBadges(); go('dashboard'); resetSessionTimer();
+    updateBranchUI(); 
+    updateBadges(); 
+    go('dashboard'); 
+    resetSessionTimer();
+    
     hideLoading();
     
   } catch(err) { 
@@ -561,6 +649,7 @@ async function doLogin() {
     showErr('lerr', 'Baglanti hatasi: ' + (err.message || err)); 
   }
 }
+
 
 function showErr(id, msg) { var el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.remove('dn'); } }
 
