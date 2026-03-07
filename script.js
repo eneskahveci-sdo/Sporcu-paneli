@@ -1,6 +1,6 @@
 /* ============================================================
    SPORCU PANELI — script.js (EKSİKSİZ VE KUSURSUZ FİNAL SÜRÜM)
-   Tüm Modüller, Tema, Dil, Gizli Admin, Antrenör Yetkisi ve Gelişmiş Ayarlar
+   Tüm Modüller, Tema, Dil, Gizli Admin, Antrenör Yetkisi ve Sekmeli Giriş
    ============================================================ */
 
 window.onerror = function(msg, url, line) { return true; };
@@ -8,7 +8,6 @@ if (window.location.hostname.includes('vercel.app')) { console.log = function(){
 
 var SUPA_URL = 'https://wfarbydojxtufnkjuhtc.supabase.co';
 var SUPA_KEY = 'sb_publishable_w1_nXk_7TM1ePWHMN2CDcQ_1ufk0kYC';
-var SUPER_ADMIN_EMAIL = 'eneskahveci@spor.com';
 var DEFAULT_LOGO = '/assets/logo.png'; 
 var NETGSM_USER = '', NETGSM_PASS = '', NETGSM_HEADER = 'SPORCU';
 
@@ -39,14 +38,33 @@ function applyLang(lang) {
 }
 function toggleLang() { var newLang = currentLang === 'TR' ? 'EN' : 'TR'; applyLang(newLang); if(document.getElementById('main-wrap').classList.contains('dn')===false) go(curPage); }
 
+// --- GİRİŞ EKRANI SEKME GEÇİŞİ ---
+window.switchLoginTab = function(tab) {
+    var ls = document.getElementById('login-sporcu');
+    var lc = document.getElementById('login-coach');
+    if(ls) ls.classList.toggle('dn', tab !== 'sporcu');
+    if(lc) lc.classList.toggle('dn', tab !== 'coach');
+    
+    var tabs = document.querySelectorAll('#login-tabs .ltab');
+    if(tabs.length > 1) {
+        tabs[0].classList.toggle('on', tab === 'sporcu');
+        tabs[1].classList.toggle('on', tab === 'coach');
+    }
+};
+
 document.addEventListener('DOMContentLoaded', async function() { 
   applyTheme(currentTheme); applyLang(currentLang); initAuth(); 
   var logoEl = document.querySelector('.llogo-i'); if (logoEl) logoEl.style.backgroundImage = 'url("' + DEFAULT_LOGO + '")';
   
   // GİZLİ ADMİN KONTROLÜ
   if(window.location.href.includes('admin')) {
-      var ls = document.getElementById('login-sporcu'), la = document.getElementById('login-admin');
+      var tabs = document.getElementById('login-tabs');
+      var ls = document.getElementById('login-sporcu');
+      var lc = document.getElementById('login-coach');
+      var la = document.getElementById('login-admin');
+      if(tabs) tabs.classList.add('dn');
       if(ls) ls.classList.add('dn');
+      if(lc) lc.classList.add('dn');
       if(la) la.classList.remove('dn');
   }
   await restoreSession(); 
@@ -70,7 +88,7 @@ function stl(s) { var m = { active: 'Aktif', inactive: 'Pasif', pending: 'Bekliy
 function stc(s) { var m = { active: 'bg-g', inactive: 'bg-r', pending: 'bg-y', completed: 'bg-g', overdue: 'bg-r', cancelled: 'bg-r' }; return m[s] || 'bg-b'; }
 function semi(sp) { var sl = (sp||'').toLowerCase(); if (sl.includes('basket')) return '&#x1F3C0;'; if (sl.includes('yuzme')||sl.includes('yüzme')) return '&#x1F3CA;'; return '&#x26BD;'; }
 function clsName(ci) { var c = classes.find(function(x){return x.id===ci;}); return c ? c.name : '-'; }
-function getAvaStr(sz) { return '<div class="ava" style="width:'+sz+'px;height:'+sz+'px;flex-shrink:0;background-image:url(\''+(settings.logoUrl||DEFAULT_LOGO)+'\');background-size:cover;background-position:center;border:1px solid var(--border)"></div>'; }
+function getAvaStr(sz) { return '<div class="ava" style="width:'+sz+'px;height:'+sz+'px;flex-shrink:0;background-image:url(\''+(settings.logoUrl||DEFAULT_LOGO)+'\');background-size:cover;background-position:center;border:1px solid var(--border);background-color:var(--bg3)"></div>'; }
 function setElAva(id) { var el = document.getElementById(id); if (el) { el.innerHTML=''; el.style.backgroundImage='url("'+(settings.logoUrl||DEFAULT_LOGO)+'")'; el.style.backgroundSize='cover'; el.style.backgroundPosition='center'; } }
 function showLoading() { var el = document.getElementById('loading-overlay'); if(el) el.style.display = 'flex'; }
 function hideLoading() { var el = document.getElementById('loading-overlay'); if(el) el.style.display = 'none'; }
@@ -128,44 +146,49 @@ async function dbDelSport(id) { return await supaDelete('sports', { id: id }); }
 async function saveS() { return await supaUpsert('settings', settingsToDB(settings)); }
 
 // GİRİŞ KONTROLLERİ
-async function doNormalLogin() {
-    var tc = gv('ls-tc'), pass = gv('ls-pass'), errEl = document.getElementById('ls-err'); 
+window.doNormalLogin = async function(type) {
+    var tc = gv(type === 'coach' ? 'lc-tc' : 'ls-tc');
+    var pass = gv(type === 'coach' ? 'lc-pass' : 'ls-pass');
+    var errEl = document.getElementById(type === 'coach' ? 'lc-err' : 'ls-err'); 
+    
     if(!tc || !pass) { errEl.textContent = "TC ve şifre giriniz!"; errEl.classList.remove('dn'); return; }
     showLoading(); 
     try { 
         var ph = await sha256(pass);
-        // 1. Önce Sporcularda Ara
-        var athRes = await supaGet('athletes', { tc: tc }); var foundAth = null;
-        (athRes || []).forEach(function(r) { var exp = r.sp_pass || tc.slice(-4); if (pass === exp || ph === exp) foundAth = r; }); 
         
-        if (foundAth) {
-            currentSporcu = dbToAth(foundAth); currentOrgId = foundAth.org_id; currentBranchId = foundAth.branch_id;
-            localStorage.setItem('sporcu_app_sporcu', JSON.stringify({user: currentSporcu, orgId: currentOrgId, branchId: currentBranchId}));
-            await loadBranchData(); document.getElementById('lbox-wrap').style.display = 'none'; document.getElementById('sporcu-portal').style.display = 'flex';
-            document.getElementById('sp-name').textContent = currentSporcu.fn + ' ' + currentSporcu.ln;
-            document.getElementById('sp-orgname').textContent = settings.schoolName || 'Dragos Futbol Akademisi';
-            spTab('profil'); hideLoading(); return;
-        }
-        
-        // 2. Eğer Sporcu değilse Antrenörlerde Ara
-        var coaRes = await supaGet('coaches', { tc: tc }); var foundCoa = null;
-        (coaRes || []).forEach(function(r) { var exp = r.coach_pass || tc.slice(-4); if (pass === exp || ph === exp) foundCoa = r; });
-        
-        if (foundCoa) {
-            currentUser = { id: foundCoa.id, name: foundCoa.fn + ' ' + foundCoa.ln, role: 'coach', email: tc+'@coach' };
-            currentOrgId = foundCoa.org_id; currentBranchId = foundCoa.branch_id;
-            localStorage.setItem('sporcu_app_user', JSON.stringify(currentUser));
-            await loadBranchData(); document.getElementById('lbox-wrap').style.display = 'none'; document.getElementById('wrap').classList.remove('dn');
-            document.getElementById('suname').textContent = currentUser.name;
-            document.querySelector('[data-i18n="roleAdmin"]').textContent = currentLang==='EN'?"Coach":"Antrenör";
-            updateBranchUI(); go('attendance'); hideLoading(); return;
+        if (type === 'sporcu') {
+            var athRes = await supaGet('athletes', { tc: tc }); var foundAth = null;
+            (athRes || []).forEach(function(r) { var exp = r.sp_pass || tc.slice(-4); if (pass === exp || ph === exp) foundAth = r; }); 
+            
+            if (foundAth) {
+                currentSporcu = dbToAth(foundAth); currentOrgId = foundAth.org_id; currentBranchId = foundAth.branch_id;
+                localStorage.setItem('sporcu_app_sporcu', JSON.stringify({user: currentSporcu, orgId: currentOrgId, branchId: currentBranchId}));
+                await loadBranchData(); document.getElementById('lbox-wrap').style.display = 'none'; document.getElementById('sporcu-portal').style.display = 'flex';
+                document.getElementById('sp-name').textContent = currentSporcu.fn + ' ' + currentSporcu.ln;
+                document.getElementById('sp-orgname').textContent = settings.schoolName || 'Dragos Futbol Akademisi';
+                spTab('profil'); hideLoading(); return;
+            }
+        } 
+        else if (type === 'coach') {
+            var coaRes = await supaGet('coaches', { tc: tc }); var foundCoa = null;
+            (coaRes || []).forEach(function(r) { var exp = r.coach_pass || tc.slice(-4); if (pass === exp || ph === exp) foundCoa = r; });
+            
+            if (foundCoa) {
+                currentUser = { id: foundCoa.id, name: foundCoa.fn + ' ' + foundCoa.ln, role: 'coach', email: tc+'@coach' };
+                currentOrgId = foundCoa.org_id; currentBranchId = foundCoa.branch_id;
+                localStorage.setItem('sporcu_app_user', JSON.stringify(currentUser));
+                await loadBranchData(); document.getElementById('lbox-wrap').style.display = 'none'; document.getElementById('wrap').classList.remove('dn');
+                document.getElementById('suname').textContent = currentUser.name;
+                document.querySelector('[data-i18n="roleAdmin"]').textContent = currentLang==='EN'?"Coach":"Antrenör";
+                updateBranchUI(); go('attendance'); hideLoading(); return;
+            }
         }
         
         hideLoading(); errEl.textContent = "Kayıt bulunamadı veya şifre hatalı!"; errEl.classList.remove('dn'); 
     } catch(e) { hideLoading(); errEl.textContent="Bir hata oluştu."; errEl.classList.remove('dn'); }
-}
+};
 
-async function doLogin() {
+window.doLogin = async function() {
     var e = gv('le'), p = gv('lp'); showLoading();
     try {
         var sb = getSB(); var { data: authData, error: authError } = await sb.auth.signInWithPassword({ email: e, password: p });
@@ -180,7 +203,7 @@ async function doLogin() {
         document.querySelector('[data-i18n="roleAdmin"]').textContent = currentLang==='EN'?"Admin":"Yönetici";
         updateBranchUI(); go('dashboard'); hideLoading();
     } catch(err) { hideLoading(); toast('Hata', 'e'); }
-}
+};
 
 async function restoreSession() {
   showLoading();
@@ -205,7 +228,8 @@ async function restoreSession() {
   hideLoading();
 }
 
-function doLogout() { localStorage.clear(); location.reload(); }
+window.doLogout = function() { localStorage.clear(); location.reload(); };
+window.doSporcuLogout = function() { localStorage.clear(); location.reload(); };
 
 async function loadBranchData() {
     var bid = currentBranchId;
@@ -240,24 +264,25 @@ function updateBranchUI() {
         });
         var finSec = document.getElementById('sec-finance'); if(finSec) finSec.style.display = 'none';
         var sysSec = document.getElementById('sec-sys'); if(sysSec) sysSec.style.display = 'none';
-        document.getElementById('bn-dashboard').style.display='none';
+        var bdash = document.getElementById('bn-dashboard'); if(bdash) bdash.style.display='none';
     }
 }
 
-function go(pg) {
+window.go = function(pg) {
     if (currentUser && currentUser.role === 'coach' && ['dashboard', 'payments', 'accounting', 'settings', 'sms', 'sports', 'classes'].includes(pg)) {
         toast('Bu sayfaya erişim yetkiniz yok.', 'e'); return;
     }
     curPage = pg; var main = document.getElementById('main');
-    var fns = { dashboard: pgDashboard, athletes: pgAthletes, payments: pgPayments, accounting: pgAccounting, attendance: pgAttendance, coaches: pgCoaches, messages: pgMessages, settings: pgSettings, sports: pgSports, classes: pgClasses, announcements: pgAnnouncements, sms: pgSMS };
+    var fns = { dashboard: pgDashboard, athletes: pgAthletes, payments: pgPayments, accounting: pgAccounting, attendance: pgAttendance, coaches: pgCoaches, messages: pgMessages, settings: pgSettings, sports: pgSports, classes: pgClasses };
     main.style.opacity = '0';
     setTimeout(function() { if(fns[pg]) main.innerHTML = fns[pg](); main.style.opacity = '1'; }, 100);
     document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-' + pg); });
     document.querySelectorAll('.bni-btn').forEach(function(el) { el.classList.toggle('on', el.id === 'bn-' + pg); });
     closeSide();
-}
-function openSide() { document.getElementById('side').classList.add('open'); document.getElementById('overlay').classList.add('show'); }
-function closeSide() { document.getElementById('side').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
+};
+
+window.openSide = function() { document.getElementById('side').classList.add('open'); document.getElementById('overlay').classList.add('show'); };
+window.closeSide = function() { document.getElementById('side').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); };
 
 // --- SAYFALAR ---
 function pgDashboard() { 
@@ -279,7 +304,7 @@ function pgAthletes() {
            '<div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editAth()">+ Yeni Sporcu</button><button class="btn bs" onclick="exportAthletes()">&#x1F4E4; Excel İndir</button></div><div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Branş</th><th>Sınıf</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' + list.map(function(a) { return '<tr><td><div class="flex fca gap2">' + getAvaStr(36) + '<div><div class="tw6">' + esc(a.fn) + ' ' + esc(a.ln) + '</div><div class="ts tm">' + age(a.bd) + ' yaş</div></div></div></td><td>' + esc(a.tc) + '</td><td>' + semi(a.sp) + ' ' + esc(a.sp) + '</td><td>' + esc(clsName(a.clsId)) + '</td><td><span class="bg ' + stc(a.st) + '">' + stl(a.st) + '</span></td><td><button class="btn btn-xs bp" onclick="editAth(\'' + a.id + '\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button></td></tr>'; }).join('') + '</tbody></table></div></div>'; 
 }
 
-function editAth(id) { 
+window.editAth = function(id) { 
   var a = id ? athletes.find(function(x) { return x.id === id; }) : null; var isNew = !a; 
   var html = '<div class="g21"><div class="fgr"><label>Ad</label><input id="a-fn" value="' + esc(a?a.fn:'') + '"/></div><div class="fgr"><label>Soyad</label><input id="a-ln" value="' + esc(a?a.ln:'') + '"/></div></div><div class="g21"><div class="fgr"><label>TC Kimlik</label><input id="a-tc" type="tel" maxlength="11" value="' + esc(a?a.tc:'') + '"/></div><div class="fgr"><label>Doğum Tarihi</label><input id="a-bd" type="date" value="' + esc(a?a.bd:'') + '"/></div></div><div class="g21"><div class="fgr"><label>Telefon</label><input id="a-ph" type="tel" value="' + esc(a?a.ph:'') + '"/></div><div class="fgr"><label>Sınıf</label><select id="a-cls"><option value="">Sınıfsız</option>' + classes.map(function(c){return '<option value="'+esc(c.id)+'"'+(a&&a.clsId===c.id?' selected':'')+'>'+esc(c.name)+'</option>';}).join('') + '</select></div></div><div class="g21"><div class="fgr"><label>Branş</label><select id="a-sp">' + sports.map(function(s){return '<option value="'+esc(s.name)+'"'+(a&&a.sp===s.name?' selected':'')+'>'+esc(s.name)+'</option>';}).join('') + '</select></div><div class="fgr"><label>Durum</label><select id="a-st"><option value="active"'+(a&&a.st==='active'?' selected':'')+'>Aktif</option><option value="inactive"'+(a&&a.st==='inactive'?' selected':'')+'>Pasif</option></select></div></div>';
   if(currentUser && currentUser.role !== 'coach') { html += '<div class="g21 mt2"><div class="fgr"><label>Aylık Ücret (₺)</label><input id="a-fee" type="number" value="' + (a?a.fee:'') + '"/></div><div class="fgr"><label>Vade Takvimi (Ödeme Günü)</label><input id="a-vd" type="date" value="' + esc(a?a.vd:'') + '"/></div></div>'; }
@@ -293,8 +318,8 @@ function editAth(id) {
         if(await dbSaveAth(obj)){ if(isNew)athletes.push(obj); else{var idx=athletes.findIndex(function(x){return x.id===obj.id;}); if(idx>=0)athletes[idx]=obj;} toast('Kaydedildi!','g'); closeModal(); go('athletes'); }
     }}
   ]); 
-}
-function delAth(id) { confirm2('Sil', 'Sporcu silinecek, emin misiniz?', async function() { if(await dbDelAth(id)){ athletes=athletes.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('athletes'); } }); }
+};
+window.delAth = function(id) { confirm2('Sil', 'Sporcu silinecek, emin misiniz?', async function() { if(await dbDelAth(id)){ athletes=athletes.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('athletes'); } }); };
 
 // SINIFLAR
 function pgClasses() { 
@@ -305,13 +330,13 @@ function pgClasses() {
         return '<tr><td class="tw6">' + esc(c.name) + '</td><td>' + (sp?esc(sp.name):'-') + '</td><td>' + (coach?esc(coach.fn+' '+coach.ln):'-') + '</td><td>' + count + '</td><td><button class="btn btn-xs bsu" style="margin-right:4px" onclick="viewClassAthletes(\''+c.id+'\')">Öğrenciler</button> <button class="btn btn-xs bp" onclick="editClass(\''+c.id+'\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delClass(\''+c.id+'\')">Sil</button></td></tr>'; 
     }).join('') + '</tbody></table></div></div>'; 
 }
-function viewClassAthletes(cid) {
+window.viewClassAthletes = function(cid) {
     var cls = classes.find(function(c){return c.id===cid;}); if(!cls) return;
     var list = athletes.filter(function(a){return a.clsId===cid;});
     var html = list.length === 0 ? '<div class="al al-y">Bu sınıfa henüz kayıtlı sporcu bulunmuyor.</div>' : '<div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Veli</th></tr></thead><tbody>' + list.map(function(a){ return '<tr><td class="tw6">'+esc(a.fn+' '+a.ln)+'</td><td>'+esc(a.tc)+'</td><td>'+(a.pn?esc(a.pn)+' ('+esc(a.pph)+')':'-')+'</td></tr>'; }).join('') + '</tbody></table></div>';
     modal(esc(cls.name) + ' Öğrencileri', html, [{lbl:'Kapat',cls:'bs',fn:closeModal}]);
-}
-function editClass(id) { 
+};
+window.editClass = function(id) { 
     var c = id ? classes.find(function(x){return x.id===id;}) : null; var isNew = !c; 
     modal(isNew ? 'Yeni Sınıf' : 'Sınıf Düzenle', '<div class="fgr mb2"><label>Sınıf Adı</label><input id="c-name" value="'+esc(c?c.name:'')+'"/></div><div class="g21"><div class="fgr"><label>Branş</label><select id="c-sp">' + sports.map(function(s){return '<option value="'+esc(s.id)+'"'+(c&&c.spId===s.id?' selected':'')+'>'+esc(s.name)+'</option>';}).join('') + '</select></div><div class="fgr"><label>Antrenör</label><select id="c-coach"><option value="">Seçiniz</option>'+coaches.map(function(co){return '<option value="'+esc(co.id)+'"'+(c&&c.coachId===co.id?' selected':'')+'>'+esc(co.fn+' '+co.ln)+'</option>';}).join('')+'</select></div></div>', [
         {lbl:'İptal',cls:'bs',fn:closeModal}, {lbl:'Kaydet',cls:'bp',fn:async function(){
@@ -320,17 +345,17 @@ function editClass(id) {
             if(await dbSaveClass(obj)){ if(isNew)classes.push(obj); else{var i=classes.findIndex(function(x){return x.id===obj.id;}); if(i>=0)classes[i]=obj;} toast('Kaydedildi','g'); closeModal(); go('classes'); }
         }}
     ]); 
-}
-function delClass(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelClass(id)){ classes=classes.filter(function(x){return x.id!==id;}); athletes.forEach(function(a){if(a.clsId===id)a.clsId='';}); toast('Silindi','g'); go('classes'); }}); }
+};
+window.delClass = function(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelClass(id)){ classes=classes.filter(function(x){return x.id!==id;}); athletes.forEach(function(a){if(a.clsId===id)a.clsId='';}); toast('Silindi','g'); go('classes'); }}); };
 
 // BRANŞLAR
 function pgSports() { 
     return '<div class="ph"><div class="stit" data-i18n="menuSpo">Branşlar</div></div><div class="flex fjb mb3"><button class="btn bp" onclick="editSport()">+ Yeni Branş</button></div><div class="g2">' + sports.map(function(s){ return '<div class="card"><div class="flex fca gap2"><div style="font-size:32px">' + semi(s.name) + '</div><div><div class="tw6">' + esc(s.name) + '</div><div class="ts tm">' + athletes.filter(function(a){return a.sp===s.name;}).length + ' sporcu</div></div></div><div class="mt2" style="text-align:right"><button class="btn btn-xs bd" onclick="delSport(\''+s.id+'\')">Sil</button></div></div>'; }).join('') + '</div>'; 
 }
-function editSport() { 
+window.editSport = function() { 
     modal('Yeni Branş', '<div class="fgr mb2"><label>Branş Adı</label><input id="s-name" placeholder="Basketbol"/></div>', [{lbl:'İptal',cls:'bs',fn:closeModal}, {lbl:'Kaydet',cls:'bp',fn:async function(){ var obj={id:uid(), name:gv('s-name'), icon:''}; if(!obj.name){toast('İsim girin','e');return;} if(await dbSaveSport(obj)){ sports.push(obj); toast('Eklendi','g'); closeModal(); go('sports'); } }}]); 
-}
-function delSport(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelSport(id)){ sports=sports.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('sports'); }}); }
+};
+window.delSport = function(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelSport(id)){ sports=sports.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('sports'); }}); };
 
 // YOKLAMA
 function pgAttendance() { 
@@ -338,7 +363,7 @@ function pgAttendance() {
     if (ATCLS) list = list.filter(function(a){return a.clsId===ATCLS;}); 
     return '<div class="ph"><div class="stit" data-i18n="menuAtt">Devam Takibi</div></div><div class="card mb3"><div class="flex fca gap3 fwrap"><div class="fgr" style="flex:1;min-width:200px;"><input type="date" value="' + ATD + '" onchange="ATD=this.value;go(\'attendance\')" style="font-weight:700"/></div><div class="fgr"><select class="fs" onchange="ATCLS=this.value;go(\'attendance\')"><option value="">Tüm Sınıflar</option>' + classes.map(function(c){return '<option value="'+esc(c.id)+'"'+(ATCLS===c.id?' selected':'')+'>'+esc(c.name)+'</option>';}).join('') + '</select></div></div></div><div class="card">' + list.map(function(a) { var st = (attData[ATD]&&attData[ATD][a.id])||''; return '<div class="att-row"><div class="flex fca gap2" style="flex:1">' + getAvaStr(32) + '<div><div class="tw6 tsm">' + esc(a.fn+' '+a.ln) + '</div><div class="ts tm">' + esc(clsName(a.clsId)) + '</div></div></div><div class="att-btns"><button class="att-b'+(st==='P'?' ap':'')+'" onclick="setAtt(\''+a.id+'\',\'P\')">Var</button><button class="att-b'+(st==='A'?' aa':'')+'" onclick="setAtt(\''+a.id+'\',\'A\')">Yok</button><button class="att-b" onclick="setAtt(\''+a.id+'\')">Sil</button></div></div>'; }).join('') + '</div>'; 
 }
-async function setAtt(aid, st) { if(!attData[ATD])attData[ATD]={}; if(st===undefined)delete attData[ATD][aid]; else attData[ATD][aid]=st; await dbSaveAtt(ATD, aid, st); go('attendance'); }
+window.setAtt = async function(aid, st) { if(!attData[ATD])attData[ATD]={}; if(st===undefined)delete attData[ATD][aid]; else attData[ATD][aid]=st; await dbSaveAtt(ATD, aid, st); go('attendance'); };
 
 // ÖDEMELER VE FİNANS
 function pgPayments() { 
@@ -346,7 +371,7 @@ function pgPayments() {
     var total = list.reduce(function(s,p){return s+(p.ty==='income'?(p.amt||0):-(p.amt||0));},0); 
     return '<div class="ph"><div class="stit" data-i18n="menuPay">Ödemeler</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editPay()">+ Yeni İşlem</button><div><button class="btn bs" onclick="exportPayments()" style="margin-right:8px">&#x1F4E4; İndir</button><span class="tw6 tb">Net: '+fmtN(total)+' ₺</span></div></div><div class="card"><div class="tw"><table><thead><tr><th>Tarih</th><th>Kişi/Kurum</th><th>Açıklama</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' + list.map(function(p){ return '<tr><td>'+fmtD(p.dt)+'</td><td>'+esc(p.an)+'</td><td>'+esc(p.serviceName||p.ds||'-')+'</td><td class="tw6 '+(p.ty==='income'?'tg':'tr2')+'">'+fmtN(p.amt)+' ₺</td><td><span class="bg '+(p.ty==='income'?'bg-g':'bg-r')+'">'+(p.ty==='income'?'Gelir':'Gider')+'</span></td><td><span class="bg '+stc(p.st)+'">'+stl(p.st)+'</span></td><td><button class="btn btn-xs bp" onclick="editPay(\''+p.id+'\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delPay(\''+p.id+'\')">Sil</button></td></tr>'; }).join('')+'</tbody></table></div></div>'; 
 }
-function editPay(id) { 
+window.editPay = function(id) { 
     var p = id ? payments.find(function(x){return x.id===id;}) : null; var isNew = !p; 
     modal(isNew ? 'Yeni Finansal İşlem' : 'İşlem Detayı', '<div class="fgr mb2"><label>Sporcu / Kişi (Gelir ise seçin)</label><select id="p-aid"><option value="">Bağımsız İşlem</option>'+athletes.map(function(a){return '<option value="'+esc(a.id)+'"'+(p&&p.aid===a.id?' selected':'')+'>'+esc(a.fn+' '+a.ln)+'</option>';}).join('')+'</select></div><div class="g21"><div class="fgr"><label>Tutar (₺)</label><input id="p-amt" type="number" value="'+(p?p.amt:'')+'"/></div><div class="fgr"><label>İşlem Türü</label><select id="p-ty"><option value="income"'+(p&&p.ty==='income'?' selected':'')+'>Gelir (Tahsilat)</option><option value="expense"'+(p&&p.ty==='expense'?' selected':'')+'>Gider (Ödeme)</option></select></div></div><div class="fgr mt2"><label>Açıklama / Hizmet Adı</label><input id="p-ds" value="'+esc(p?p.ds:'')+'" placeholder="Örn: Ekim Ayı Aidatı / Salon Kirası"/></div><div class="g21 mt2"><div class="fgr"><label>Durum</label><select id="p-st"><option value="completed"'+(p&&p.st==='completed'?' selected':'')+'>Ödendi (Tamamlandı)</option><option value="pending"'+(p&&p.st==='pending'?' selected':'')+'>Bekliyor (Ödenmedi)</option><option value="overdue"'+(p&&p.st==='overdue'?' selected':'')+'>Gecikti</option></select></div><div class="fgr"><label>İşlem / Vade Tarihi</label><input id="p-dt" type="date" value="'+esc(p?p.dt:tod())+'"/></div></div>', [
         {lbl:'İptal',cls:'bs',fn:closeModal}, {lbl:'Kaydet',cls:'bp',fn:async function(){
@@ -356,8 +381,8 @@ function editPay(id) {
             if(await dbSavePay(obj)){ if(isNew)payments.push(obj); else{var i=payments.findIndex(function(x){return x.id===obj.id;}); if(i>=0)payments[i]=obj;} toast('Kaydedildi','g'); closeModal(); go('payments'); }
         }}
     ]); 
-}
-function delPay(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelPay(id)){ payments=payments.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('payments'); }}); }
+};
+window.delPay = function(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelPay(id)){ payments=payments.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('payments'); }}); };
 
 function pgAccounting() { 
     var inc = payments.filter(function(p){return p.ty==='income'&&p.st==='completed';}).reduce(function(s,p){return s+(p.amt||0);},0); 
@@ -365,11 +390,11 @@ function pgAccounting() {
     return '<div class="ph"><div class="stit" data-i18n="menuAcc">Finans Raporu</div></div><div class="g3 mb3"><div class="card stat-card stat-g"><div class="stat-icon">&#x1F4B0;</div><div class="stat-val tg">'+fmtN(inc)+' ₺</div><div class="stat-lbl">Gerçekleşen Tahsilat</div></div><div class="card stat-card stat-r"><div class="stat-icon">&#x1F4B8;</div><div class="stat-val tr2">'+fmtN(exp)+' ₺</div><div class="stat-lbl">Gerçekleşen Gider</div></div><div class="card stat-card stat-b"><div class="stat-icon">&#x1F4B3;</div><div class="stat-val tb">'+fmtN(inc-exp)+' ₺</div><div class="stat-lbl">Net Kasa Bakiyesi</div></div></div><div class="card"><p class="tm">Banka: '+esc(settings.bankName||'Girmedi')+' - IBAN: '+esc(settings.iban||'Girmedi')+'</p></div>'; 
 }
 
-// ANTRENÖRLER VE DİĞER PANOLAR
+// ANTRENÖRLER
 function pgCoaches() { 
     return '<div class="ph"><div class="stit" data-i18n="menuCoa">Antrenörler</div></div><div class="flex fjb mb3"><button class="btn bp" onclick="editCoach()">+ Yeni Antrenör</button></div><div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC / Telefon</th><th>Sisteme Giriş Şifresi</th><th>İşlemler</th></tr></thead><tbody>' + coaches.map(function(c){ return '<tr><td class="tw6">'+esc(c.fn+' '+c.ln)+'</td><td>'+esc(c.tc)+' / '+esc(c.ph)+'</td><td>***</td><td><button class="btn btn-xs bp" onclick="editCoach(\''+c.id+'\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delCoach(\''+c.id+'\')">Sil</button></td></tr>'; }).join('')+'</tbody></table></div></div>'; 
 }
-function editCoach(id) { 
+window.editCoach = function(id) { 
     var c = id ? coaches.find(function(x){return x.id===id;}) : null; var isNew = !c; 
     modal(isNew ? 'Yeni Antrenör' : 'Antrenör Düzenle', '<div class="g21"><div class="fgr"><label>Ad</label><input id="c-fn" value="'+esc(c?c.fn:'')+'"/></div><div class="fgr"><label>Soyad</label><input id="c-ln" value="'+esc(c?c.ln:'')+'"/></div></div><div class="g21 mt2"><div class="fgr"><label>TC Kimlik (Giriş İçin)</label><input id="c-tc" type="tel" maxlength="11" value="'+esc(c?c.tc:'')+'"/></div><div class="fgr"><label>Telefon</label><input id="c-ph" value="'+esc(c?c.ph:'')+'"/></div></div><div class="fgr mt2"><label>Özel Şifre (Sisteme giriş için, boşsa TC son 4)</label><input id="c-pass" placeholder="Örn: 1234" value="'+esc(c?c.coachPass:'')+'"/></div>', [
         {lbl:'İptal',cls:'bs',fn:closeModal}, {lbl:'Kaydet',cls:'bp',fn:async function(){
@@ -378,12 +403,10 @@ function editCoach(id) {
             if(await dbSaveCoach(obj)){ if(isNew)coaches.push(obj); else{var i=coaches.findIndex(function(x){return x.id===obj.id;}); if(i>=0)coaches[i]=obj;} toast('Kaydedildi','g'); closeModal(); go('coaches'); }
         }}
     ]); 
-}
-function delCoach(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelCoach(id)){ coaches=coaches.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('coaches'); }}); }
+};
+window.delCoach = function(id) { confirm2('Sil','Emin misiniz?', async function(){ if(await dbDelCoach(id)){ coaches=coaches.filter(function(x){return x.id!==id;}); toast('Silindi','g'); go('coaches'); }}); };
 
-function pgMessages() { return '<div class="ph"><div class="stit">Mesajlar</div></div><div class="card">Mesaj kutusu modülü aktif. Yakında arayüze bağlanacak.</div>'; }
-function pgAnnouncements() { return '<div class="ph"><div class="stit">Duyurular</div></div><div class="card">Duyurular panosu aktif. Yakında arayüze bağlanacak.</div>'; }
-function pgSMS() { return '<div class="ph"><div class="stit">SMS Duyuru</div></div><div class="card">Toplu SMS paneli aktif. (NetGSM: '+(NETGSM_USER?'Bağlı':'Bağlı Değil')+')</div>'; }
+function pgMessages() { return '<div class="ph"><div class="stit">Mesajlar</div></div><div class="card">Mesaj kutusu modülü aktif.</div>'; }
 
 // --- GELİŞMİŞ AYARLAR MENÜSÜ ---
 function pgSettings() { 
@@ -417,7 +440,7 @@ function pgSettings() {
     '<button class="btn bp mt2" onclick="saveGeneralSettings()">Genel Ayarları Kaydet</button></div>';
 }
 
-async function saveGeneralSettings() {
+window.saveGeneralSettings = async function() {
     settings.school_name = gv('s-name'); settings.schoolName = settings.school_name;
     settings.bank_name = gv('s-bank'); settings.bankName = settings.bank_name;
     settings.account_name = gv('s-acc'); settings.accountName = settings.account_name;
@@ -426,17 +449,17 @@ async function saveGeneralSettings() {
     var p = gv('s-ngp'); if(p) settings.netgsm_pass = p;
     if(await saveS()){ toast('Genel ayarlar başarıyla kaydedildi!', 'g'); updateBranchUI(); }
     else { toast('Kayıt hatası!', 'e'); }
-}
+};
 
-function showAddAdminModal() { modal('Yönetici/Sekreter Ekle', '<div class="fgr mb2"><label>Ad Soyad</label><input id="aa-name"/></div><div class="fgr mb2"><label>E-posta</label><input id="aa-em" type="email"/></div><div class="fgr mb2"><label>Geçici Şifre</label><input id="aa-pass" type="password"/></div>', [{lbl:'İptal',cls:'bs',fn:closeModal}, {lbl:'Kaydet',cls:'bp',fn:async function(){ toast('Yönetici eklendi!','g'); closeModal(); }}]); }
+window.showAddAdminModal = function() { modal('Yönetici/Sekreter Ekle', '<div class="fgr mb2"><label>Ad Soyad</label><input id="aa-name"/></div><div class="fgr mb2"><label>E-posta</label><input id="aa-em" type="email"/></div><div class="fgr mb2"><label>Geçici Şifre</label><input id="aa-pass" type="password"/></div>', [{lbl:'İptal',cls:'bs',fn:closeModal}, {lbl:'Kaydet',cls:'bp',fn:async function(){ toast('Yönetici eklendi!','g'); closeModal(); }}]); };
 
 // --- SPORCU PORTALI ---
-function spTab(tab) {
+window.spTab = function(tab) {
     document.querySelectorAll('.sp-tab').forEach(function(el){el.classList.toggle('on', el.textContent.toLowerCase().includes(tab) || (tab==='profil'&&el.textContent.includes('Profil')) || (tab==='yoklama'&&el.textContent.includes('Yoklama')) || (tab==='odemeler'&&el.textContent.includes('Ödemeler')) || (tab==='odeme-yap'&&el.textContent.includes('Ödeme Yap'))); });
     var content = document.getElementById('sp-content');
     var fns = { 'profil': spProfil, 'yoklama': spYoklama, 'odemeler': spOdemeler, 'odeme-yap': spOdemeYap }; 
     if (fns[tab]) content.innerHTML = fns[tab]();
-}
+};
 function spProfil() { var a = currentSporcu; if(!a) return ''; var rate=attRate(a.id); return '<div class="profile-hero"><div class="flex fca gap3">'+getAvaStr(64)+'<div><div class="tw6" style="font-size:18px">'+esc(a.fn+' '+a.ln)+'</div><div class="ts tm">'+esc(a.tc)+'</div></div></div></div><div class="card">'+row('Devam Oranı', (rate||0)+'%')+row('Veli Adı', a.pn||'-')+'</div>'; }
 function spYoklama() { var a = currentSporcu; if(!a) return ''; var dates = Object.keys(attData).sort().reverse().slice(0, 30); var html = '<div class="card"><div class="tw6 tsm mb2">Son Yoklamalar</div>'; if (!dates.length) html += '<p class="tm">Kayıt yok.</p>'; else html += dates.map(function(d){ var st=attData[d][a.id]; var s=st==='P'?'<span class="bg bg-g">Var</span>':st==='A'?'<span class="bg bg-r">Yok</span>':'-'; return '<div class="att-row"><span class="tm">'+fmtD(d)+'</span>'+s+'</div>'; }).join(''); return html+'</div>'; }
 function spOdemeler() { var a=currentSporcu; if(!a)return''; var mp=payments.filter(function(p){return p.aid===a.id;}); var html='<div class="card"><div class="tw6 tsm mb2">Ödemelerim</div><div class="tw"><table><tbody>'; html+=mp.map(function(p){return '<tr><td>'+fmtD(p.dt)+'</td><td class="tw6">'+fmtN(p.amt)+' ₺</td><td><span class="bg '+stc(p.st)+'">'+stl(p.st)+'</span></td></tr>';}).join(''); return html+'</tbody></table></div></div>'; }
