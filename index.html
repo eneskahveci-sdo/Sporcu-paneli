@@ -9,7 +9,6 @@
 <title>Dragos Futbol Akademisi</title>
 <link rel="manifest" href='data:application/json,{"name":"Dragos","short_name":"Dragos","display":"standalone","background_color":"#080c14","theme_color":"#3b82f6"}'/>
 <style>
-/* VARSAYILAN: KOYU TEMA */
 :root {
   --bg: #080c14; --bg2: #0f1623; --bg3: #151e2d; --bg4: #1a2540;
   --border: #1e3352; --border2: #2a4a7f;
@@ -20,20 +19,18 @@
   --grad-hover: linear-gradient(135deg, var(--blue2), #93c5fd);
   --purple: #a855f7;
 }
-
-/* YENİ: SARI - LACİVERT AÇIK TEMA */
 html[data-theme="light"] {
   --bg: #f1f5f9; --bg2: #ffffff; --bg3: #f8fafc; --bg4: #e2e8f0;
   --border: #cbd5e1; --border2: #94a3b8;
   --text: #0f172a; --text2: #475569; --text3: #64748b;
-  --blue: #0B225C; /* Fenerbahçe Laciverti */
+  --blue: #0B225C;
   --blue2: #1e3a8a;
   --green: #16a34a; --red: #dc2626; --yellow: #d97706;
   --grad: linear-gradient(135deg, #0B225C, #1e3a8a);
   --grad-hover: linear-gradient(135deg, #1e3a8a, #0B225C);
   --purple: #9333ea;
 }
-html[data-theme="light"] .ni.on { color: #FFED00; /* Fenerbahçe Sarısı */ }
+html[data-theme="light"] .ni.on { color: #FFED00; }
 html[data-theme="light"] .bp { color: #FFED00; }
 html[data-theme="light"] .ava { color: #FFED00; }
 
@@ -51,7 +48,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .w100{width:100%} .h100{height:100%} .pr{position:relative}
 .mb2{margin-bottom:8px} .mb3{margin-bottom:16px} .mt2{margin-top:8px} .mt3{margin-top:16px} .pt2{padding-top:8px}
 
-/* YAPI */
 #wrap{display:flex;height:100vh;width:100vw}
 #side{width:260px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:transform .3s, background 0.3s;z-index:100}
 .slogo{padding:20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
@@ -78,7 +74,6 @@ html[data-theme="light"] .slogo-icon { color: #FFED00; }
 .bni-btn.on{color:var(--blue2)}
 .bni-btn.on svg{opacity:1;transform:translateY(-2px)}
 
-/* KARTLAR & MODÜLLER */
 .ph{margin-bottom:24px}
 .stit{font-size:24px;font-weight:800;letter-spacing:-.5px}
 .ssub{color:var(--text2);font-size:14px;margin-top:4px}
@@ -138,7 +133,6 @@ html[data-theme="light"] .bg-b { color: #1d4ed8; }
 .al-g{background:rgba(34,197,94,.1);color:#4ade80;border:1px solid rgba(34,197,94,.2)}
 .al-b{background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
 
-/* FORMLAR & MODAL */
 .fgr{display:flex;flex-direction:column;gap:6px}
 .fgr label{font-size:13px;font-weight:600;color:var(--text2)}
 .fs{padding:8px 12px;font-size:14px}
@@ -151,20 +145,17 @@ html[data-theme="light"] .bg-b { color: #1d4ed8; }
 .m-body{padding:20px;overflow-y:auto;flex:1}
 .m-foot{padding:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:12px;background:var(--bg2);border-radius:0 0 16px 16px; transition:background 0.3s;}
 
-/* GİRİŞ EKRANI VE SEKMELER */
 #lbox-wrap{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1000; transition:background 0.3s;}
 .lbox{background:var(--bg2);border:1px solid var(--border);border-radius:24px;padding:32px;width:100%;max-width:400px;box-shadow:0 20px 25px -5px rgba(0,0,0,.2); transition:background 0.3s;}
 .llogo{display:flex;flex-direction:column;align-items:center;margin-bottom:24px}
-.llogo-i{width:64px;height:64px;background:var(--grad);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;margin-bottom:16px}
+.llogo-i{width:64px;height:64px;background:var(--grad);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;margin-bottom:16px;background-size:cover;background-position:center;border:2px solid var(--border)}
 html[data-theme="light"] .llogo-i { color: #FFED00; }
 .lerr{background:rgba(239,68,68,.1);color:#f87171;padding:12px;border-radius:8px;font-size:13px;margin-bottom:16px;text-align:center;border:1px solid rgba(239,68,68,.2)}
 
-/* Sekme Tasarımı */
 .ltabs{display:flex;background:var(--bg);padding:4px;border-radius:12px;margin-bottom:24px;border:1px solid var(--border)}
 .ltab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:var(--text2);border-radius:8px;cursor:pointer;transition:all .2s}
 .ltab.on{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 
-/* OVERLAY & YUKLENIYOR */
 #overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);z-index:90;display:none;opacity:0;transition:opacity .3s}
 #overlay.show{display:block;opacity:1}
 #loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
@@ -172,8 +163,9 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
 @keyframes spin{to{transform:rotate(360deg)}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,100%);background:var(--bg3);color:var(--text);padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 10px 15px -3px rgba(0,0,0,.2);border:1px solid var(--border);z-index:10000;opacity:0;transition:all .3s}
 .toast.show{transform:translate(-50%,0);opacity:1}
+.toast-g{background:rgba(34,197,94,.15);color:#4ade80;border-color:rgba(34,197,94,.3)}
+.toast-e{background:rgba(239,68,68,.15);color:#f87171;border-color:rgba(239,68,68,.3)}
 
-/* SPORCU PORTALI */
 #sporcu-portal{display:none;flex-direction:column;height:100vh;background:var(--bg); transition:background 0.3s;}
 .sp-head{background:var(--bg2);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .sp-nav{display:flex;overflow-x:auto;padding:0 20px;background:var(--bg2);border-bottom:1px solid var(--border);scrollbar-width:none}
@@ -189,7 +181,6 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
 .prb div{height:100%;transition:width 1s ease}
 .prb-g{background:var(--green)} .prb-y{background:var(--yellow)} .prb-r{background:var(--red)}
 
-/* EKSTRA */
 .dv{height:1px;background:var(--border);margin:20px 0}
 .att-row{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)/50}
 .att-btns{display:flex;gap:8px}
@@ -204,10 +195,14 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
 .qa-icon{font-size:24px}
 .qa-lbl{font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px}
 
-/* Theme & Lang Toggles */
 .head-toggles { display: flex; align-items: center; gap: 8px; margin-right: 12px; }
 .ht-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
 .ht-btn:hover { background: var(--border); }
+
+/* Login legal links */
+.login-legal { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); text-align: center; }
+.login-legal a { color: var(--text2); font-size: 12px; margin: 0 8px; text-decoration: underline; }
+.login-legal a:hover { color: var(--blue); }
 
 @media (max-width:768px){
     .g2,.g3,.g4,.g21,.quick-actions{grid-template-columns:1fr}
@@ -246,7 +241,7 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
 <div id="lbox-wrap">
     <div class="lbox">
         <div class="llogo">
-            <div class="llogo-i" style="background-image:url('/assets/logo.png');background-size:cover;background-position:center;border:2px solid var(--border)"></div>
+            <div class="llogo-i" id="login-logo">&#x26BD;</div>
             <h1 style="font-size:24px;font-weight:800;letter-spacing:-.5px;text-align:center">Dragos Futbol Akademisi</h1>
             <p style="color:var(--text2);font-size:14px;margin-top:4px">Kayıt ve Yönetim Sistemi</p>
         </div>
@@ -257,7 +252,7 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
         </div>
         
         <div id="login-admin" class="dn">
-            <div class="al al-y mb3" style="font-size:12px">🔒 Yönetici Giriş Modu Aktif</div>
+            <div class="al al-y mb3" style="font-size:12px">&#x1F512; Yönetici Giriş Modu Aktif</div>
             <div class="fgr mb2"><label>Yönetici E-posta</label><input id="le" type="email" placeholder="admin@spor.com"/></div>
             <div class="fgr mb3"><label>Şifre</label><input id="lp" type="password" placeholder="••••••••"/></div>
             <div id="lerr" class="lerr dn"></div>
@@ -267,15 +262,20 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
         <div id="login-sporcu">
             <div class="fgr mb2"><label>Öğrenci TC Kimlik No</label><input id="ls-tc" type="tel" maxlength="11" placeholder="11 Haneli TC Giriniz"/></div>
             <div class="fgr mb3"><label>Sistem Şifresi</label><input id="ls-pass" type="password" placeholder="Şifre veya TC Son 4 Hane"/></div>
-            <div id="ls-err" class="lerr dn">Kayıt bulunamadı veya şifre hatalı!</div>
+            <div id="ls-err" class="lerr dn"></div>
             <button class="btn bp w100" style="padding:14px;font-size:15px" onclick="doNormalLogin('sporcu')">Öğrenci Girişi Yap</button>
         </div>
 
         <div id="login-coach" class="dn">
             <div class="fgr mb2"><label>Antrenör TC Kimlik No</label><input id="lc-tc" type="tel" maxlength="11" placeholder="11 Haneli TC Giriniz"/></div>
             <div class="fgr mb3"><label>Sistem Şifresi</label><input id="lc-pass" type="password" placeholder="Şifre veya TC Son 4 Hane"/></div>
-            <div id="lc-err" class="lerr dn">Antrenör bulunamadı veya şifre hatalı!</div>
+            <div id="lc-err" class="lerr dn"></div>
             <button class="btn bp w100" style="padding:14px;font-size:15px;background:var(--blue2)" onclick="doNormalLogin('coach')">Antrenör Girişi Yap</button>
+        </div>
+
+        <div class="login-legal">
+            <a href="#" onclick="showLegal('kvkk'); return false;">KVKK</a>
+            <a href="#" onclick="showLegal('kullanim'); return false;">Kullanım Şartları</a>
         </div>
     </div>
 </div>
@@ -287,7 +287,7 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
             <div><div class="tw6" id="sp-name">İsim Soyisim</div><div class="ts tm" id="sp-orgname">Dragos Futbol Akademisi</div></div>
         </div>
         <div class="flex fca gap2">
-            <button id="sp-theme-btn" class="ht-btn" onclick="toggleTheme()" style="font-size:16px;">🌙</button>
+            <button id="sp-theme-btn" class="ht-btn" onclick="toggleTheme()" style="font-size:16px;">&#x1F319;</button>
             <button class="btn bs btn-sm" onclick="doSporcuLogout()" data-i18n="btnLogout">Çıkış</button>
         </div>
     </div>
@@ -346,7 +346,7 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
             <div class="flex fca gap3">
                 <div class="head-toggles">
                     <button id="lang-btn" class="ht-btn" onclick="toggleLang()">EN</button>
-                    <button id="theme-btn" class="ht-btn" onclick="toggleTheme()" style="font-size:16px;">☀️</button>
+                    <button id="theme-btn" class="ht-btn" onclick="toggleTheme()" style="font-size:16px;">&#x1F31E;</button>
                 </div>
                 <div class="ava" style="width:36px;height:36px;font-size:14px" id="bar-ava">A</div>
             </div>
