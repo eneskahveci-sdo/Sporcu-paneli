@@ -1,5 +1,5 @@
 /* ============================================================
-   SPORCU PANELI — script.js (GÜNCEL: Tam Onarım ve Hata Ayıklama)
+   SPORCU PANELI — script.js (GÜNCEL: Sıralama Hatası Giderildi)
    Dragos Futbol Akademisi Yönetim Sistemi
    ============================================================ */
 
@@ -27,7 +27,7 @@ var NETGSM_USER = '', NETGSM_PASS = '', NETGSM_HEADER = 'SPORCU';
 
 var _sb = null;
 function getSB() {
-  if (!_sb) { try { _sb = supabase.createClient(SUPA_URL, SUPA_KEY); } catch(e) { alert('Supabase baglanti hatasi: ' + e); } }
+  if (!_sb) { try { _sb = supabase.createClient(SUPA_URL, SUPA_KEY); } catch(e) { toast('Supabase bağlantı hatası: ' + e, 'e', 5000); } }
   return _sb;
 }
 
@@ -81,13 +81,26 @@ async function restoreSession() {
   hideLoading();
 }
 
-// ── DB SORGULARI ──────────
+// ── DB SORGULARI (ÖLÜMCÜL SIRALAMA HATASI SİLİNDİ) ──────────
 async function supaGet(t, f, extra) {
-  try { var db = getSB(); if (!db) return null; var q = db.from(t).select('*').order('created_at', { ascending: false }).limit(2000); if (f) Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); }); if (extra) { var m = extra.match(/^(\w+)=(gte|lte|gt|lt|neq|like|ilike)\.(.+)$/); if (m) { var ops = { gte: 'gte', lte: 'lte', gt: 'gt', lt: 'lt', neq: 'neq', like: 'like', ilike: 'ilike' }; if (ops[m[2]]) q = q[ops[m[2]]](m[1], m[3]); } } var { data, error } = await q; if (error) { console.error('Okuma Hatasi ('+t+'):', error.message); return null; } return data || []; } catch(e) { return null; }
+  try { 
+      var db = getSB(); if (!db) return null; 
+      // DİKKAT: .order('created_at') KISMI TAMAMEN KALDIRILDI! Çökme sebebi buydu.
+      var q = db.from(t).select('*').limit(2000); 
+      if (f) Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); }); 
+      if (extra) { var m = extra.match(/^(\w+)=(gte|lte|gt|lt|neq|like|ilike)\.(.+)$/); if (m) { var ops = { gte: 'gte', lte: 'lte', gt: 'gt', lt: 'lt', neq: 'neq', like: 'like', ilike: 'ilike' }; if (ops[m[2]]) q = q[ops[m[2]]](m[1], m[3]); } } 
+      var { data, error } = await q; 
+      if (error) { 
+          console.error('Okuma Hatasi ('+t+'):', error.message); 
+          toast('DB Okuma Hatası ('+t+'): ' + error.message, 'e', 5000);
+          return null; 
+      } 
+      return data || []; 
+  } catch(e) { return null; }
 }
 
 async function supaPost(t, d) {
-  try { var db = getSB(); if (!db) return null; var { data, error } = await db.from(t).insert(d).select(); if (error) { alert('HATA ('+t+'): ' + error.message); return null; } return data; } catch(e) { alert('Sistem Hatasi: ' + e); return null; }
+  try { var db = getSB(); if (!db) return null; var { data, error } = await db.from(t).insert(d).select(); if (error) { toast('Kayıt Hatası ('+t+'): ' + error.message, 'e', 6000); return null; } return data; } catch(e) { toast('Sistem Hatası: ' + e, 'e', 5000); return null; }
 }
 
 async function supaUpsert(t, d) {
@@ -96,22 +109,22 @@ async function supaUpsert(t, d) {
     var arr = Array.isArray(d) ? d : [d];
     var { data, error } = await db.from(t).upsert(arr, { onConflict: 'id' }).select();
     if (error) { 
-        alert('VERİTABANI HATASI (' + t + '):\n' + error.message); 
+        toast('Veritabanı Hatası (' + t + '): ' + error.message, 'e', 8000); 
         return null; 
     }
     return data;
   } catch(e) { 
-      alert('KOD HATASI:\n' + e.message); 
+      toast('Kod Hatası: ' + e.message, 'e', 8000); 
       return null; 
   }
 }
 
 async function supaDelete(t, f) {
-  try { var db = getSB(); if (!db) return false; var q = db.from(t).delete(); Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); }); var { error } = await q; if (error) { alert('Silme Hatasi: ' + error.message); return false; } return true; } catch(e) { return false; }
+  try { var db = getSB(); if (!db) return false; var q = db.from(t).delete(); Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); }); var { error } = await q; if (error) { toast('Silme Hatası: ' + error.message, 'e', 6000); return false; } return true; } catch(e) { return false; }
 }
 
 async function supaPatch(t, d, f) {
-  try { var db = getSB(); if (!db) return null; var q = db.from(t).update(d); Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); }); var { data, error } = await q.select(); if (error) { alert('Guncelleme Hatasi: ' + error.message); return null; } return data; } catch(e) { return null; }
+  try { var db = getSB(); if (!db) return null; var q = db.from(t).update(d); Object.keys(f).forEach(function(k) { q = q.eq(k, f[k]); }); var { data, error } = await q.select(); if (error) { toast('Güncelleme Hatası: ' + error.message, 'e', 6000); return null; } return data; } catch(e) { return null; }
 }
 
 async function sendSMS(phone, msg) {
@@ -256,8 +269,12 @@ async function loadBranchData(forceRefresh = false) {
     attData = {}; (res[3] || []).forEach(function(r) { if (!attData[r.att_date]) attData[r.att_date] = {}; attData[r.att_date][r.athlete_id] = r.status; });
     messages = (res[4] || []).map(dbToMsg);
     var branch = getBranch(bid);
-    if (res[5] && res[5][0]) { settings = dbToSettings(res[5][0]) || {}; } else { settings = { id: uid(), schoolName: branch ? branch.name : 'Sube' }; }
+    
+    if (res[5] && res[5][0]) { settings = dbToSettings(res[5][0]) || {}; } 
+    else { settings = { id: uid(), schoolName: branch ? branch.name : 'Sube' }; }
+    
     if (!settings.schoolName || settings.schoolName === 'Sube') settings.schoolName = branch ? branch.name : 'Dragos Futbol Akademisi';
+    
     sports = (res[6] || []).map(dbToSport); classes = (res[7] || []).map(dbToClass);
     if (settings.netgsmUser) { NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader || 'SPORCU'; }
     var dataToCache = { timestamp: Date.now(), athletes: athletes, payments: payments, coaches: coaches, settings: settings, sports: sports, classes: classes, attData: attData, messages: messages };
@@ -296,13 +313,21 @@ function toast(msg, type, duration) {
   var t = document.createElement('div'); var cls = 'toast'; if (type === 'e' || type === 'r') cls += ' toast-e'; else if (type === 'g') cls += ' toast-g'; else if (type === 'y') cls += ' toast-y';
   t.className = cls; t.textContent = msg; document.body.appendChild(t); var dur = duration || (type === 'y' ? 5000 : 2800); setTimeout(function() { t.classList.add('show'); }, 10); setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, dur);
 }
+
 function modal(title, body, btns) {
   var m = document.getElementById('modal'); document.getElementById('modal-title').textContent = title; document.getElementById('modal-body').innerHTML = body;
-  var mf = document.getElementById('modal-footer'); mf.innerHTML = ''; (btns || []).forEach(function(b) { var btn = document.createElement('button'); btn.className = 'btn ' + b.cls; btn.innerHTML = b.lbl; btn.onclick = b.fn; mf.appendChild(btn); }); m.classList.add('show');
+  var mf = document.getElementById('modal-footer'); mf.innerHTML = ''; 
+  (btns || []).forEach(function(b) { 
+      var btn = document.createElement('button'); 
+      btn.className = 'btn ' + b.cls; 
+      btn.innerHTML = b.lbl; 
+      btn.onclick = b.fn; 
+      mf.appendChild(btn); 
+  }); 
+  m.classList.add('show');
 }
 function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
-// Düzeltilmiş Onay Penceresi (Async destegiyle)
 function confirm2(title, msg, cb) { 
     modal(title, '<p style="color:var(--text2);font-size:14px;line-height:1.7">' + msg + '</p>', [ 
         { lbl: 'Vazgeç', cls: 'bs', fn: function() { closeModal(); } }, 
@@ -594,4 +619,4 @@ async function submitSpPayment() {
 
 function spDuyurular() { var html = '<div class="card"><div class="tw6 tsm mb2">Duyurular</div>'; var announcements = messages.filter(function(m) { return m.role === 'admin'; }); if (!announcements.length) html += '<p class="tm ts">Henüz duyuru yok.</p>'; else { html += announcements.map(function(m) { return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div><div class="ts" style="margin-top:4px">' + esc(m.body.slice(0, 100)) + (m.body.length > 100 ? '...' : '') + '</div></div></div>'; }).join(''); } html += '</div>'; return html; }
 
-document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli Yüklendi - Auto Fix Sürümü'); });
+document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli Yüklendi - Kesin Çözüm Sürümü'); });
