@@ -1,5 +1,5 @@
 /* ============================================================
-   DRAGOS FUTBOL AKADEMISI - TAM DUZELTILMIS SURUM
+   DRAGOS FUTBOL AKADEMISI - GELİŞMİŞ PROFİL SİSTEMİ
    ============================================================ */
 
 window.onerror = function(msg, url, line, col, error) {
@@ -39,7 +39,8 @@ const AppState = {
     ui: {
         curPage: 'dashboard',
         atd: '',
-        atcls: ''
+        atcls: '',
+        profileTab: 'overview'
     }
 };
 
@@ -54,7 +55,19 @@ const i18n = {
         saveSuccess: 'Başarıyla kaydedildi!', saveError: 'Kayıt hatası!',
         deleteConfirm: 'Silmek istediğinize emin misiniz?', fillRequired: 'Zorunlu alanları doldurun!',
         invalidTC: 'Geçersiz TC Kimlik numarası', connectionError: 'Bağlantı hatası!',
-        noData: 'Veri bulunamadı', exportSuccess: 'Dışa aktarıldı!'
+        noData: 'Veri bulunamadı', exportSuccess: 'Dışa aktarıldı!',
+        profileOverview: 'Genel Bakış', profilePersonal: 'Kişisel Bilgiler', profileContact: 'İletişim',
+        profilePayments: 'Ödeme Geçmişi', profileAttendance: 'Devam Durumu', profileStats: 'İstatistikler',
+        profileDocuments: 'Belgeler', profileEdit: 'Profili Düzenle', profileView: 'Profili Görüntüle',
+        personalInfo: 'Kişisel Bilgiler', contactInfo: 'İletişim Bilgileri', parentInfo: 'Veli Bilgileri',
+        financialInfo: 'Finansal Bilgiler', registrationDate: 'Kayıt Tarihi', birthDate: 'Doğum Tarihi',
+        age: 'Yaş', gender: 'Cinsiyet', branch: 'Branş', class: 'Sınıf', status: 'Durum',
+        phone: 'Telefon', email: 'E-posta', address: 'Adres', parentName: 'Veli Adı',
+        parentPhone: 'Veli Telefon', parentEmail: 'Veli E-posta', monthlyFee: 'Aylık Ücret',
+        totalPaid: 'Toplam Ödenen', totalDebt: 'Toplam Borç', attendanceRate: 'Devam Oranı',
+        lastPayment: 'Son Ödeme', nextPayment: 'Sonraki Ödeme', active: 'Aktif', inactive: 'Pasif',
+        present: 'Var', absent: 'Yok', excused: 'İzinli', late: 'Geç', paymentPending: 'Bekliyor',
+        paymentCompleted: 'Tamamlandı', paymentOverdue: 'Gecikti'
     },
     EN: {
         loading: 'Loading...', menuMain: 'Main Menu', menuDash: 'Dashboard', menuAth: 'Athletes',
@@ -66,7 +79,19 @@ const i18n = {
         saveSuccess: 'Saved successfully!', saveError: 'Save error!',
         deleteConfirm: 'Are you sure you want to delete?', fillRequired: 'Please fill required fields!',
         invalidTC: 'Invalid ID number', connectionError: 'Connection error!',
-        noData: 'No data found', exportSuccess: 'Exported!'
+        noData: 'No data found', exportSuccess: 'Exported!',
+        profileOverview: 'Overview', profilePersonal: 'Personal Info', profileContact: 'Contact',
+        profilePayments: 'Payment History', profileAttendance: 'Attendance', profileStats: 'Statistics',
+        profileDocuments: 'Documents', profileEdit: 'Edit Profile', profileView: 'View Profile',
+        personalInfo: 'Personal Information', contactInfo: 'Contact Information', parentInfo: 'Parent Information',
+        financialInfo: 'Financial Information', registrationDate: 'Registration Date', birthDate: 'Birth Date',
+        age: 'Age', gender: 'Gender', branch: 'Branch', class: 'Class', status: 'Status',
+        phone: 'Phone', email: 'Email', address: 'Address', parentName: 'Parent Name',
+        parentPhone: 'Parent Phone', parentEmail: 'Parent Email', monthlyFee: 'Monthly Fee',
+        totalPaid: 'Total Paid', totalDebt: 'Total Debt', attendanceRate: 'Attendance Rate',
+        lastPayment: 'Last Payment', nextPayment: 'Next Payment', active: 'Active', inactive: 'Inactive',
+        present: 'Present', absent: 'Absent', excused: 'Excused', late: 'Late', paymentPending: 'Pending',
+        paymentCompleted: 'Completed', paymentOverdue: 'Overdue'
     }
 };
 
@@ -90,6 +115,11 @@ const DateUtils = {
         let age = now.getFullYear() - d.getFullYear();
         if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) age--;
         return age;
+    },
+    addMonths(dateStr, months) {
+        const d = new Date(dateStr);
+        d.setMonth(d.getMonth() + months);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 };
 
@@ -111,6 +141,9 @@ const FormatUtils = {
         const digit10 = (oddSum * 7 - evenSum) % 10;
         const digit11 = (oddSum + evenSum + digits[9]) % 10;
         return digits[9] === digit10 && digits[10] === digit11;
+    },
+    initials(firstName, lastName) {
+        return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
     }
 };
 
@@ -214,16 +247,24 @@ const UIUtils = {
         const el = document.getElementById('loading-overlay');
         if (el) el.style.display = show ? 'flex' : 'none';
     },
-    getAvatar(size, url) {
+    getAvatar(size, url, initials) {
         const logoUrl = url || AppState.data.settings?.logoUrl || DEFAULT_LOGO;
+        if (initials) {
+            return `<div class="ava" style="width:${size}px;height:${size}px;flex-shrink:0;font-size:${size/2}px;background:var(--grad);display:flex;align-items:center;justify-content:center">${initials}</div>`;
+        }
         return `<div class="ava" style="width:${size}px;height:${size}px;flex-shrink:0;background-image:url('${logoUrl}');background-size:cover;background-position:center;border:1px solid var(--border);background-color:var(--bg3)"></div>`;
     },
-    setElementAvatar(id, url) {
+    setElementAvatar(id, url, initials) {
         const el = document.getElementById(id);
         if (!el) return;
-        const logoUrl = url || AppState.data.settings?.logoUrl || DEFAULT_LOGO;
-        el.innerHTML = '';
-        el.style.cssText = `background-image:url("${logoUrl}");background-size:cover;background-position:center;`;
+        if (initials) {
+            el.innerHTML = initials;
+            el.style.cssText = `width:40px;height:40px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;border-radius:50%`;
+        } else {
+            const logoUrl = url || AppState.data.settings?.logoUrl || DEFAULT_LOGO;
+            el.innerHTML = '';
+            el.style.cssText = `background-image:url("${logoUrl}");background-size:cover;background-position:center;`;
+        }
     }
 };
 
@@ -312,10 +353,13 @@ const DB = {
         toAthlete(r) {
             return {
                 id: r.id, fn: r.fn, ln: r.ln, tc: r.tc, bd: r.bd, gn: r.gn,
-                ph: r.ph, em: r.em || '', sp: r.sp, cat: r.cat, lic: r.lic,
+                ph: r.ph, em: r.em || '', sp: r.sp, cat: r.lic, lic: r.lic,
                 rd: r.rd, st: r.st || 'active', fee: r.fee || 0, vd: r.vd,
                 nt: r.nt, clsId: r.cls_id, pn: r.pn, pph: r.pph, pem: r.pem,
-                spPass: r.sp_pass, orgId: r.org_id, branchId: r.branch_id
+                spPass: r.sp_pass, orgId: r.org_id, branchId: r.branch_id,
+                address: r.address || '', city: r.city || '', emergency: r.emergency || '',
+                blood: r.blood || '', height: r.height || '', weight: r.weight || '',
+                health: r.health || '', school: r.school || ''
             };
         },
         fromAthlete(a) {
@@ -326,7 +370,10 @@ const DB = {
                 ph: a.ph, em: a.em || '', sp: a.sp, cat: a.cat,
                 lic: a.lic, rd: a.rd, st: a.st, fee: a.fee,
                 vd: a.vd, nt: a.nt, cls_id: a.clsId,
-                pn: a.pn, pph: a.pph, pem: a.pem, sp_pass: a.spPass
+                pn: a.pn, pph: a.pph, pem: a.pem, sp_pass: a.spPass,
+                address: a.address, city: a.city, emergency: a.emergency,
+                blood: a.blood, height: a.height, weight: a.weight,
+                health: a.health, school: a.school
             };
         },
         toPayment(r) {
@@ -541,6 +588,9 @@ window.doNormalLogin = async function(type) {
             document.getElementById('sp-name').textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
             document.getElementById('sp-orgname').textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
             
+            const initials = FormatUtils.initials(AppState.currentSporcu.fn, AppState.currentSporcu.ln);
+            UIUtils.setElementAvatar('sp-avatar', null, initials);
+            
             spTab('profil');
         }
         
@@ -663,6 +713,9 @@ async function restoreSession() {
             document.getElementById('sp-name').textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
             document.getElementById('sp-orgname').textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
             
+            const initials = FormatUtils.initials(AppState.currentSporcu.fn, AppState.currentSporcu.ln);
+            UIUtils.setElementAvatar('sp-avatar', null, initials);
+            
             spTab('profil');
             return;
         }
@@ -766,7 +819,6 @@ function updateBranchUI() {
     UIUtils.setElementAvatar('bar-ava', logoUrl);
     UIUtils.setElementAvatar('side-logo-icon', logoUrl);
     UIUtils.setElementAvatar('login-logo', logoUrl);
-    UIUtils.setElementAvatar('sp-avatar', logoUrl);
     
     if (AppState.currentUser?.role === 'coach') {
         const restricted = ['ni-dashboard', 'ni-payments', 'ni-accounting', 
@@ -786,7 +838,7 @@ function updateBranchUI() {
     }
 }
 
-window.go = function(page) {
+window.go = function(page, params = {}) {
     if (AppState.currentUser?.role === 'coach') {
         const restricted = ['dashboard', 'payments', 'accounting', 'settings', 'sms', 'sports', 'classes'];
         if (restricted.includes(page)) {
@@ -800,6 +852,7 @@ window.go = function(page) {
     const pages = {
         dashboard: pgDashboard,
         athletes: pgAthletes,
+        athleteProfile: () => pgAthleteProfile(params.id),
         payments: pgPayments,
         accounting: pgAccounting,
         attendance: pgAttendance,
@@ -814,15 +867,18 @@ window.go = function(page) {
     setTimeout(() => {
         if (pages[page]) {
             main.innerHTML = pages[page]();
+            if (page === 'athleteProfile') {
+                initProfileTabs();
+            }
         }
         main.style.opacity = '1';
     }, 100);
     
     document.querySelectorAll('.ni').forEach(el => {
-        el.classList.toggle('on', el.id === `ni-${page}`);
+        el.classList.toggle('on', el.id === `ni-${page === 'athleteProfile' ? 'athletes' : page}`);
     });
     document.querySelectorAll('.bni-btn').forEach(el => {
-        el.classList.toggle('on', el.id === `bn-${page}`);
+        el.classList.toggle('on', el.id === `bn-${page === 'athleteProfile' ? 'athletes' : page}`);
     });
     
     closeSide();
@@ -862,11 +918,43 @@ function attendanceRate(aid) {
     return total ? Math.round(present / total * 100) : 0;
 }
 
+function getAttendanceStats(aid) {
+    const data = AppState.data.attendance;
+    let total = 0, present = 0, absent = 0, excused = 0;
+    
+    Object.values(data).forEach(day => {
+        if (day[aid]) {
+            total++;
+            if (day[aid] === 'P') present++;
+            else if (day[aid] === 'A') absent++;
+            else if (day[aid] === 'E') excused++;
+        }
+    });
+    
+    return { total, present, absent, excused, rate: total ? Math.round(present / total * 100) : 0 };
+}
+
+function getPaymentStats(aid) {
+    const payments = AppState.data.payments.filter(p => p.aid === aid);
+    const totalPaid = payments
+        .filter(p => p.ty === 'income' && p.st === 'completed')
+        .reduce((s, p) => s + (p.amt || 0), 0);
+    const totalDebt = payments
+        .filter(p => p.st === 'pending' || p.st === 'overdue')
+        .reduce((s, p) => s + (p.amt || 0), 0);
+    const lastPayment = payments
+        .filter(p => p.st === 'completed')
+        .sort((a, b) => new Date(b.dt) - new Date(a.dt))[0];
+    
+    return { totalPaid, totalDebt, lastPayment, count: payments.length };
+}
+
 function statusLabel(st) {
     const labels = {
         active: 'Aktif', inactive: 'Pasif', pending: 'Bekliyor',
         completed: 'Tamamlandı', overdue: 'Gecikti', cancelled: 'İptal',
-        income: 'Gelir', expense: 'Gider'
+        income: 'Gelir', expense: 'Gider', present: 'Var', absent: 'Yok',
+        excused: 'İzinli'
     };
     return labels[st] || st || '-';
 }
@@ -875,7 +963,8 @@ function statusClass(st) {
     const classes = {
         active: 'bg-g', inactive: 'bg-r', pending: 'bg-y',
         completed: 'bg-g', overdue: 'bg-r', cancelled: 'bg-r',
-        income: 'bg-g', expense: 'bg-r'
+        income: 'bg-g', expense: 'bg-r', present: 'bg-g', absent: 'bg-r',
+        excused: 'bg-y'
     };
     return classes[st] || 'bg-b';
 }
@@ -893,6 +982,489 @@ function className(id) {
     const c = AppState.data.classes.find(x => x.id === id);
     return c ? c.name : '-';
 }
+
+function coachName(id) {
+    const c = AppState.data.coaches.find(x => x.id === id);
+    return c ? `${c.fn} ${c.ln}` : '-';
+}
+
+// ==================== PROFİL SAYFASI ====================
+
+function pgAthleteProfile(athleteId) {
+    const a = AppState.data.athletes.find(x => x.id === athleteId);
+    if (!a) return `<div class="al al-r">Sporcu bulunamadı</div>`;
+    
+    const initials = FormatUtils.initials(a.fn, a.ln);
+    const age = DateUtils.age(a.bd);
+    const attStats = getAttendanceStats(a.id);
+    const payStats = getPaymentStats(a.id);
+    const cls = AppState.data.classes.find(c => c.id === a.clsId);
+    const coach = cls ? AppState.data.coaches.find(c => c.id === cls.coachId) : null;
+    
+    return `
+    <div class="profile-container">
+        <div class="profile-header">
+            <div class="profile-header-content">
+                <div class="profile-avatar">${initials}</div>
+                <div class="profile-info">
+                    <div class="profile-name">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
+                    <div class="profile-meta">
+                        <span class="profile-meta-item">&#x1F4BC; ${FormatUtils.escape(a.sp)}</span>
+                        <span class="profile-meta-item">&#x1F3EB; ${FormatUtils.escape(cls ? cls.name : 'Sınıfsız')}</span>
+                        <span class="profile-meta-item">&#x1F4C5; ${age} yaş</span>
+                        <span class="profile-meta-item"><span class="badge ${a.st === 'active' ? 'badge-green' : 'badge-red'}">${statusLabel(a.st)}</span></span>
+                    </div>
+                    <div class="profile-actions">
+                        <button class="btn bp" onclick="editAth('${a.id}')">&#x270F; Düzenle</button>
+                        <button class="btn bs" onclick="go('athletes')">&#x2190; Listeye Dön</button>
+                        <button class="btn bw" onclick="printProfile('${a.id}')">&#x1F5A8; Yazdır</button>
+                    </div>
+                </div>
+                <div class="stats-grid" style="min-width:200px">
+                    <div class="stat-box">
+                        <div class="stat-box-value tb">${attStats.rate}%</div>
+                        <div class="stat-box-label">Devam</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value tg">${FormatUtils.currency(payStats.totalPaid)}</div>
+                        <div class="stat-box-label">Ödenen</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value ${payStats.totalDebt > 0 ? 'tr2' : 'tg'}">${FormatUtils.currency(payStats.totalDebt)}</div>
+                        <div class="stat-box-label">Borç</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchProfileTab('overview')">Genel Bakış</button>
+            <button class="tab-btn" onclick="switchProfileTab('personal')">Kişisel Bilgiler</button>
+            <button class="tab-btn" onclick="switchProfileTab('payments')">Ödemeler</button>
+            <button class="tab-btn" onclick="switchProfileTab('attendance')">Devam Durumu</button>
+            <button class="tab-btn" onclick="switchProfileTab('documents')">Belgeler</button>
+        </div>
+        
+        <div id="tab-overview" class="tab-content active">
+            <div class="profile-grid">
+                <div class="profile-sidebar">
+                    <div class="info-card">
+                        <div class="info-card-title">&#x1F4E7; İletişim Bilgileri</div>
+                        <div class="info-row">
+                            <span class="info-label">Telefon</span>
+                            <span class="info-value">${FormatUtils.escape(a.ph || '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">E-posta</span>
+                            <span class="info-value">${FormatUtils.escape(a.em || '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Adres</span>
+                            <span class="info-value">${FormatUtils.escape(a.address || '-')}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="info-card-title">&#x1F46A; Veli Bilgileri</div>
+                        <div class="info-row">
+                            <span class="info-label">Veli Adı</span>
+                            <span class="info-value">${FormatUtils.escape(a.pn || '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Veli Telefon</span>
+                            <span class="info-value">${FormatUtils.escape(a.pph || '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Veli E-posta</span>
+                            <span class="info-value">${FormatUtils.escape(a.pem || '-')}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="info-card-title">&#x2695; Sağlık Bilgileri</div>
+                        <div class="info-row">
+                            <span class="info-label">Kan Grubu</span>
+                            <span class="info-value">${FormatUtils.escape(a.blood || '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Boy / Kilo</span>
+                            <span class="info-value">${a.height ? a.height + ' cm' : '-'} / ${a.weight ? a.weight + ' kg' : '-'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Sağlık Notu</span>
+                            <span class="info-value">${FormatUtils.escape(a.health || '-')}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="profile-main">
+                    <div class="info-card">
+                        <div class="info-card-title">&#x1F4C8; Son Aktiviteler</div>
+                        ${generateActivityTimeline(a.id)}
+                    </div>
+                    
+                    <div class="g2">
+                        <div class="info-card">
+                            <div class="info-card-title">&#x1F4B3; Finansal Özet</div>
+                            <div class="info-row">
+                                <span class="info-label">Aylık Ücret</span>
+                                <span class="info-value tb">${FormatUtils.currency(a.fee)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Son Ödeme</span>
+                                <span class="info-value">${payStats.lastPayment ? DateUtils.format(payStats.lastPayment.dt) : '-'}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Sonraki Ödeme</span>
+                                <span class="info-value">${a.vd ? DateUtils.format(a.vd) : '-'}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Toplam Ödeme</span>
+                                <span class="info-value tg">${FormatUtils.currency(payStats.totalPaid)}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="info-card">
+                            <div class="info-card-title">&#x26BD; Antrenman Bilgileri</div>
+                            <div class="info-row">
+                                <span class="info-label">Antrenör</span>
+                                <span class="info-value">${FormatUtils.escape(coach ? `${coach.fn} ${coach.ln}` : '-')}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Sınıf</span>
+                                <span class="info-value">${FormatUtils.escape(cls ? cls.name : '-')}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Lisans No</span>
+                                <span class="info-value">${FormatUtils.escape(a.lic || '-')}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Kayıt Tarihi</span>
+                                <span class="info-value">${DateUtils.format(a.rd)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="tab-personal" class="tab-content">
+            <div class="g21">
+                <div class="info-card">
+                    <div class="info-card-title">&#x1F4C4; Kimlik Bilgileri</div>
+                    <div class="info-row">
+                        <span class="info-label">TC Kimlik No</span>
+                        <span class="info-value">${FormatUtils.escape(a.tc)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Ad Soyad</span>
+                        <span class="info-value">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Doğum Tarihi</span>
+                        <span class="info-value">${DateUtils.format(a.bd)} (${age} yaş)</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cinsiyet</span>
+                        <span class="info-value">${a.gn === 'E' ? 'Erkek' : a.gn === 'K' ? 'Kadın' : '-'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Okul</span>
+                        <span class="info-value">${FormatUtils.escape(a.school || '-')}</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <div class="info-card-title">&#x1F3AF; Sporcu Bilgileri</div>
+                    <div class="info-row">
+                        <span class="info-label">Branş</span>
+                        <span class="info-value">${FormatUtils.escape(a.sp)}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Kategori</span>
+                        <span class="info-value">${FormatUtils.escape(a.cat || '-')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Lisans Numarası</span>
+                        <span class="info-value">${FormatUtils.escape(a.lic || '-')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Durum</span>
+                        <span class="info-value"><span class="badge ${a.st === 'active' ? 'badge-green' : 'badge-red'}">${statusLabel(a.st)}</span></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Kayıt Tarihi</span>
+                        <span class="info-value">${DateUtils.format(a.rd)}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-card mt3">
+                <div class="info-card-title">&#x1F4DD; Notlar</div>
+                <p class="tm" style="line-height:1.6">${FormatUtils.escape(a.nt || 'Not bulunmuyor.')}</p>
+            </div>
+        </div>
+        
+        <div id="tab-payments" class="tab-content">
+            <div class="flex fjb fca mb3">
+                <h3 class="tw6">Ödeme Geçmişi</h3>
+                <button class="btn bp" onclick="addPaymentForAthlete('${a.id}')">+ Yeni Ödeme Ekle</button>
+            </div>
+            ${generatePaymentHistory(a.id)}
+        </div>
+        
+        <div id="tab-attendance" class="tab-content">
+            <div class="flex fjb fca mb3">
+                <h3 class="tw6">Devam Durumu</h3>
+                <div class="flex gap2">
+                    <span class="badge badge-green">${attStats.present} Var</span>
+                    <span class="badge badge-red">${attStats.absent} Yok</span>
+                    <span class="badge badge-yellow">${attStats.excused} İzinli</span>
+                </div>
+            </div>
+            ${generateAttendanceCalendar(a.id)}
+        </div>
+        
+        <div id="tab-documents" class="tab-content">
+            <div class="flex fjb fca mb3">
+                <h3 class="tw6">Belgeler</h3>
+                <button class="btn bp" onclick="uploadDocument('${a.id}')">+ Belge Yükle</button>
+            </div>
+            <div class="g2">
+                <div class="document-card" onclick="viewDocument('saglik')">
+                    <div class="document-icon">&#x1F5C3;</div>
+                    <div class="document-info">
+                        <div class="document-title">Sağlık Raporu</div>
+                        <div class="document-meta">PDF • 2.4 MB • 15.03.2024</div>
+                    </div>
+                </div>
+                <div class="document-card" onclick="viewDocument('kimlik')">
+                    <div class="document-icon">&#x1F5C3;</div>
+                    <div class="document-info">
+                        <div class="document-title">Kimlik Fotokopisi</div>
+                        <div class="document-meta">PDF • 1.1 MB • 10.01.2024</div>
+                    </div>
+                </div>
+                <div class="document-card" onclick="viewDocument('lisans')">
+                    <div class="document-icon">&#x1F5C3;</div>
+                    <div class="document-info">
+                        <div class="document-title">Lisans Belgesi</div>
+                        <div class="document-meta">PDF • 3.2 MB • 05.02.2024</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function generateActivityTimeline(aid) {
+    const payments = AppState.data.payments
+        .filter(p => p.aid === aid)
+        .sort((a, b) => new Date(b.dt) - new Date(a.dt))
+        .slice(0, 5);
+    
+    const attendanceDates = Object.keys(AppState.data.attendance)
+        .filter(d => AppState.data.attendance[d][aid])
+        .sort()
+        .reverse()
+        .slice(0, 5);
+    
+    let html = '';
+    
+    if (payments.length === 0 && attendanceDates.length === 0) {
+        return '<p class="tm">Henüz aktivite kaydı bulunmuyor.</p>';
+    }
+    
+    payments.forEach(p => {
+        html += `
+        <div class="timeline-item">
+            <div>
+                <div class="timeline-date">${DateUtils.format(p.dt)}</div>
+                <div class="timeline-content">${p.ty === 'income' ? 'Ödeme Alındı' : 'Gider'} - ${FormatUtils.currency(p.amt)}</div>
+                <div class="timeline-status"><span class="badge ${p.st === 'completed' ? 'badge-green' : p.st === 'overdue' ? 'badge-red' : 'badge-yellow'}">${statusLabel(p.st)}</span></div>
+            </div>
+        </div>`;
+    });
+    
+    attendanceDates.forEach(d => {
+        const status = AppState.data.attendance[d][aid];
+        html += `
+        <div class="timeline-item">
+            <div>
+                <div class="timeline-date">${DateUtils.format(d)}</div>
+                <div class="timeline-content">Yoklama</div>
+                <div class="timeline-status"><span class="badge ${status === 'P' ? 'badge-green' : status === 'A' ? 'badge-red' : 'badge-yellow'}">${status === 'P' ? 'Var' : status === 'A' ? 'Yok' : 'İzinli'}</span></div>
+            </div>
+        </div>`;
+    });
+    
+    return html;
+}
+
+function generatePaymentHistory(aid) {
+    const payments = AppState.data.payments
+        .filter(p => p.aid === aid)
+        .sort((a, b) => new Date(b.dt) - new Date(a.dt));
+    
+    if (payments.length === 0) {
+        return '<div class="al al-y">Henüz ödeme kaydı bulunmuyor.</div>';
+    }
+    
+    let html = '';
+    payments.forEach(p => {
+        html += `
+        <div class="payment-card">
+            <div class="payment-info">
+                <div class="payment-amount ${p.ty === 'income' ? 'tg' : 'tr2'}">${p.ty === 'income' ? '+' : '-'} ${FormatUtils.currency(p.amt)}</div>
+                <div class="payment-date">${DateUtils.format(p.dt)} • ${FormatUtils.escape(p.serviceName || p.ds || 'Aidat')}</div>
+            </div>
+            <span class="badge ${p.st === 'completed' ? 'badge-green' : p.st === 'overdue' ? 'badge-red' : 'badge-yellow'}">${statusLabel(p.st)}</span>
+        </div>`;
+    });
+    
+    return html;
+}
+
+function generateAttendanceCalendar(aid) {
+    const dates = Object.keys(AppState.data.attendance)
+        .filter(d => AppState.data.attendance[d][aid])
+        .sort()
+        .reverse()
+        .slice(0, 28);
+    
+    if (dates.length === 0) {
+        return '<div class="al al-y">Henüz yoklama kaydı bulunmuyor.</div>';
+    }
+    
+    let html = '<div class="attendance-calendar">';
+    const days = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+    days.forEach(d => {
+        html += `<div class="att-day att-day-header">${d}</div>`;
+    });
+    
+    dates.forEach(d => {
+        const status = AppState.data.attendance[d][aid];
+        const dayNum = new Date(d).getDate();
+        const className = status === 'P' ? 'present' : status === 'A' ? 'absent' : '';
+        html += `<div class="att-day ${className}" title="${DateUtils.format(d)}">${dayNum}</div>`;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+window.switchProfileTab = function(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase().includes(tabName) || 
+            (tabName === 'overview' && btn.textContent.includes('Genel')) ||
+            (tabName === 'personal' && btn.textContent.includes('Kişisel')) ||
+            (tabName === 'payments' && btn.textContent.includes('Ödeme')) ||
+            (tabName === 'attendance' && btn.textContent.includes('Devam')) ||
+            (tabName === 'documents' && btn.textContent.includes('Belge'))) {
+            btn.classList.add('active');
+        }
+    });
+    
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+    
+    AppState.ui.profileTab = tabName;
+};
+
+window.initProfileTabs = function() {
+    // Tab initialization if needed
+};
+
+window.addPaymentForAthlete = function(aid) {
+    const a = AppState.data.athletes.find(x => x.id === aid);
+    if (!a) return;
+    
+    modal('Yeni Ödeme Ekle', `
+    <div class="fgr mb2">
+        <label>Sporcu</label>
+        <input value="${FormatUtils.escape(`${a.fn} ${a.ln}`)}" disabled/>
+    </div>
+    <div class="g21">
+        <div class="fgr">
+            <label>Tutar (₺) *</label>
+            <input id="p-amt" type="number" value="${a.fee || ''}"/>
+        </div>
+        <div class="fgr">
+            <label>İşlem Türü</label>
+            <select id="p-ty">
+                <option value="income">Gelir (Tahsilat)</option>
+                <option value="expense">Gider</option>
+            </select>
+        </div>
+    </div>
+    <div class="fgr mt2">
+        <label>Açıklama</label>
+        <input id="p-ds" value="Aylık Aidat"/>
+    </div>
+    <div class="g21 mt2">
+        <div class="fgr">
+            <label>Durum</label>
+            <select id="p-st">
+                <option value="completed">Ödendi</option>
+                <option value="pending">Bekliyor</option>
+            </select>
+        </div>
+        <div class="fgr">
+            <label>Tarih</label>
+            <input id="p-dt" type="date" value="${DateUtils.today()}"/>
+        </div>
+    </div>
+    `, [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: 'Kaydet', cls: 'bp', fn: async () => {
+            const obj = {
+                id: generateId(),
+                aid: aid,
+                an: `${a.fn} ${a.ln}`,
+                amt: UIUtils.getNumber('p-amt'),
+                ds: UIUtils.getValue('p-ds'),
+                st: UIUtils.getValue('p-st'),
+                dt: UIUtils.getValue('p-dt'),
+                ty: UIUtils.getValue('p-ty'),
+                serviceName: UIUtils.getValue('p-ds')
+            };
+            
+            if (!obj.amt) {
+                toast(i18n[AppState.lang].fillRequired, 'e');
+                return;
+            }
+            
+            const result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
+            if (result) {
+                AppState.data.payments.push(obj);
+                toast('Ödeme kaydedildi!', 'g');
+                closeModal();
+                go('athleteProfile', { id: aid });
+            }
+        }}
+    ]);
+};
+
+window.uploadDocument = function(aid) {
+    toast('Belge yükleme özelliği yakında eklenecek', 'y');
+};
+
+window.viewDocument = function(type) {
+    toast('Belge görüntüleme: ' + type, 'g');
+};
+
+window.printProfile = function(aid) {
+    window.print();
+};
+
+// ==================== DİĞER SAYFALAR ====================
 
 function pgDashboard() {
     const { athletes, payments } = AppState.data;
@@ -1033,7 +1605,7 @@ function pgAthletes() {
                     <tr>
                         <td>
                             <div class="flex fca gap2">
-                                ${UIUtils.getAvatar(36)}
+                                ${UIUtils.getAvatar(36, null, FormatUtils.initials(a.fn, a.ln))}
                                 <div>
                                     <div class="tw6">${FormatUtils.escape(a.fn)} ${FormatUtils.escape(a.ln)}</div>
                                     <div class="ts tm">${DateUtils.age(a.bd)} yaş</div>
@@ -1045,7 +1617,8 @@ function pgAthletes() {
                         <td>${FormatUtils.escape(className(a.clsId))}</td>
                         <td><span class="bg ${statusClass(a.st)}">${statusLabel(a.st)}</span></td>
                         <td>
-                            <button class="btn btn-xs bp" onclick="editAth('${a.id}')">Düzenle</button>
+                            <button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${a.id}'})">Profil</button>
+                            <button class="btn btn-xs bs" onclick="editAth('${a.id}')">Düzenle</button>
                             <button class="btn btn-xs bd" onclick="delAth('${a.id}')">Sil</button>
                         </td>
                     </tr>
@@ -1084,8 +1657,40 @@ window.editAth = function(id) {
     </div>
     <div class="g21 mt2">
         <div class="fgr">
+            <label>Cinsiyet</label>
+            <select id="a-gn">
+                <option value="E"${a?.gn === 'E' ? ' selected' : ''}>Erkek</option>
+                <option value="K"${a?.gn === 'K' ? ' selected' : ''}>Kadın</option>
+            </select>
+        </div>
+        <div class="fgr">
             <label>Telefon</label>
             <input id="a-ph" type="tel" value="${FormatUtils.escape(a?.ph || '')}"/>
+        </div>
+    </div>
+    <div class="g21 mt2">
+        <div class="fgr">
+            <label>E-posta</label>
+            <input id="a-em" type="email" value="${FormatUtils.escape(a?.em || '')}"/>
+        </div>
+        <div class="fgr">
+            <label>Okul</label>
+            <input id="a-school" value="${FormatUtils.escape(a?.school || '')}"/>
+        </div>
+    </div>
+    <div class="fgr mt2">
+        <label>Adres</label>
+        <textarea id="a-address" rows="2">${FormatUtils.escape(a?.address || '')}</textarea>
+    </div>
+    <div class="dv"></div>
+    <div class="g21">
+        <div class="fgr">
+            <label>Branş</label>
+            <select id="a-sp">
+                ${AppState.data.sports.map(s => 
+                    `<option value="${FormatUtils.escape(s.name)}"${a?.sp === s.name ? ' selected' : ''}>${FormatUtils.escape(s.name)}</option>`
+                ).join('')}
+            </select>
         </div>
         <div class="fgr">
             <label>Sınıf</label>
@@ -1099,31 +1704,28 @@ window.editAth = function(id) {
     </div>
     <div class="g21 mt2">
         <div class="fgr">
-            <label>Branş</label>
-            <select id="a-sp">
-                ${AppState.data.sports.map(s => 
-                    `<option value="${FormatUtils.escape(s.name)}"${a?.sp === s.name ? ' selected' : ''}>${FormatUtils.escape(s.name)}</option>`
-                ).join('')}
-            </select>
-        </div>
-        <div class="fgr">
             <label>Durum</label>
             <select id="a-st">
                 <option value="active"${a?.st === 'active' ? ' selected' : ''}>Aktif</option>
                 <option value="inactive"${a?.st === 'inactive' ? ' selected' : ''}>Pasif</option>
             </select>
         </div>
+        <div class="fgr">
+            <label>Lisans No</label>
+            <input id="a-lic" value="${FormatUtils.escape(a?.lic || '')}"/>
+        </div>
     </div>`;
     
     if (!isCoach) {
         html += `
-        <div class="g21 mt2">
+        <div class="dv"></div>
+        <div class="g21">
             <div class="fgr">
                 <label>Aylık Ücret (₺)</label>
                 <input id="a-fee" type="number" value="${a?.fee || ''}"/>
             </div>
             <div class="fgr">
-                <label>Vade Takvimi</label>
+                <label>Sonraki Ödeme Tarihi</label>
                 <input id="a-vd" type="date" value="${FormatUtils.escape(a?.vd || '')}"/>
             </div>
         </div>`;
@@ -1131,7 +1733,7 @@ window.editAth = function(id) {
     
     html += `
     <div class="dv"></div>
-    <div class="tw6 tsm mb2">Veli Bilgileri & Şifre</div>
+    <div class="tw6 tsm mb2">Veli Bilgileri</div>
     <div class="g21">
         <div class="fgr">
             <label>Veli Ad Soyad</label>
@@ -1143,6 +1745,38 @@ window.editAth = function(id) {
         </div>
     </div>
     <div class="fgr mt2">
+        <label>Veli E-posta</label>
+        <input id="a-pem" type="email" value="${FormatUtils.escape(a?.pem || '')}"/>
+    </div>
+    <div class="dv"></div>
+    <div class="tw6 tsm mb2">Sağlık Bilgileri</div>
+    <div class="g21">
+        <div class="fgr">
+            <label>Kan Grubu</label>
+            <input id="a-blood" value="${FormatUtils.escape(a?.blood || '')}" placeholder="Örn: A Rh+"/>
+        </div>
+        <div class="fgr">
+            <label>Acil Durum Kişisi</label>
+            <input id="a-emergency" value="${FormatUtils.escape(a?.emergency || '')}"/>
+        </div>
+    </div>
+    <div class="g21 mt2">
+        <div class="fgr">
+            <label>Boy (cm)</label>
+            <input id="a-height" type="number" value="${a?.height || ''}"/>
+        </div>
+        <div class="fgr">
+            <label>Kilo (kg)</label>
+            <input id="a-weight" type="number" value="${a?.weight || ''}"/>
+        </div>
+    </div>
+    <div class="fgr mt2">
+        <label>Sağlık Notu / Alerjiler</label>
+        <textarea id="a-health" rows="2">${FormatUtils.escape(a?.health || '')}</textarea>
+    </div>
+    <div class="dv"></div>
+    <div class="tw6 tsm mb2">Güvenlik</div>
+    <div class="fgr">
         <label>Sporcu Şifresi (Boş = TC son 4)</label>
         <input id="a-sppass" type="text" placeholder="Örn: 123456" value="${FormatUtils.escape(a?.spPass || '')}"/>
     </div>`;
@@ -1156,15 +1790,25 @@ window.editAth = function(id) {
                 ln: UIUtils.getValue('a-ln'),
                 tc: UIUtils.getValue('a-tc'),
                 bd: UIUtils.getValue('a-bd'),
+                gn: UIUtils.getValue('a-gn'),
                 ph: UIUtils.getValue('a-ph'),
+                em: UIUtils.getValue('a-em'),
                 sp: UIUtils.getValue('a-sp'),
                 st: UIUtils.getValue('a-st'),
                 clsId: UIUtils.getValue('a-cls'),
                 pn: UIUtils.getValue('a-pn'),
                 pph: UIUtils.getValue('a-pph'),
+                pem: UIUtils.getValue('a-pem'),
                 spPass: UIUtils.getValue('a-sppass'),
-                gn: 'E', em: '', cat: '', lic: '',
-                rd: DateUtils.today(), nt: '', pem: ''
+                lic: UIUtils.getValue('a-lic'),
+                address: UIUtils.getValue('a-address'),
+                school: UIUtils.getValue('a-school'),
+                blood: UIUtils.getValue('a-blood'),
+                emergency: UIUtils.getValue('a-emergency'),
+                height: UIUtils.getNumber('a-height'),
+                weight: UIUtils.getNumber('a-weight'),
+                health: UIUtils.getValue('a-health'),
+                cat: '', rd: a?.rd || DateUtils.today(), nt: ''
             };
             
             if (!isCoach) {
@@ -1201,7 +1845,11 @@ window.editAth = function(id) {
                 }
                 toast(i18n[AppState.lang].saveSuccess, 'g');
                 closeModal();
-                go('athletes');
+                if (!isNew && AppState.ui.curPage === 'athleteProfile') {
+                    go('athleteProfile', { id: obj.id });
+                } else {
+                    go('athletes');
+                }
             }
         }}
     ]);
@@ -1271,7 +1919,7 @@ window.viewClassAthletes = function(cid) {
         `<div class="tw">
             <table>
                 <thead>
-                    <tr><th>Ad Soyad</th><th>TC</th><th>Veli</th></tr>
+                    <tr><th>Ad Soyad</th><th>TC</th><th>Veli</th><th>İşlem</th></tr>
                 </thead>
                 <tbody>
                     ${list.map(a => `
@@ -1279,6 +1927,7 @@ window.viewClassAthletes = function(cid) {
                         <td class="tw6">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</td>
                         <td>${FormatUtils.escape(a.tc)}</td>
                         <td>${a.pn ? FormatUtils.escape(`${a.pn} (${a.pph})`) : '-'}</td>
+                        <td><button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${a.id}'}); closeModal()">Profil</button></td>
                     </tr>
                     `).join('')}
                 </tbody>
@@ -1375,7 +2024,7 @@ function pgSports() {
         ${AppState.data.sports.map(s => {
             const count = AppState.data.athletes.filter(a => a.sp === s.name).length;
             return `
-            <div class="card">
+            <div class="card card-hover">
                 <div class="flex fca gap2">
                     <div style="font-size:32px">${sportEmoji(s.name)}</div>
                     <div>
@@ -1467,17 +2116,18 @@ function pgAttendance() {
             const st = AppState.data.attendance[today]?.[a.id] || '';
             return `
             <div class="att-row">
-                <div class="flex fca gap2" style="flex:1">
-                    ${UIUtils.getAvatar(32)}
+                <div class="flex fca gap2" style="flex:1;cursor:pointer" onclick="go('athleteProfile', {id:'${a.id}'})">
+                    ${UIUtils.getAvatar(32, null, FormatUtils.initials(a.fn, a.ln))}
                     <div>
                         <div class="tw6 tsm">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
                         <div class="ts tm">${FormatUtils.escape(className(a.clsId))}</div>
                     </div>
                 </div>
                 <div class="att-btns">
-                    <button class="att-b${st === 'P' ? ' ap' : ''}" onclick="setAtt('${a.id}', 'P')">Var</button>
-                    <button class="att-b${st === 'A' ? ' aa' : ''}" onclick="setAtt('${a.id}', 'A')">Yok</button>
-                    <button class="att-b" onclick="setAtt('${a.id}')">Sil</button>
+                    <button class="att-b${st === 'P' ? ' ap' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'P')">Var</button>
+                    <button class="att-b${st === 'A' ? ' aa' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'A')">Yok</button>
+                    <button class="att-b${st === 'E' ? ' al2' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'E')">İzinli</button>
+                    <button class="att-b" onclick="event.stopPropagation();setAtt('${a.id}')">Sil</button>
                 </div>
             </div>`;
         }).join('')}
@@ -1545,7 +2195,9 @@ function pgPayments() {
                     ${list.map(p => `
                     <tr>
                         <td>${DateUtils.format(p.dt)}</td>
-                        <td>${FormatUtils.escape(p.an)}</td>
+                        <td>
+                            ${p.aid ? `<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile', {id:'${p.aid}'})">${FormatUtils.escape(p.an)}</span>` : FormatUtils.escape(p.an)}
+                        </td>
                         <td>${FormatUtils.escape(p.serviceName || p.ds || '-')}</td>
                         <td class="tw6 ${p.ty === 'income' ? 'tg' : 'tr2'}">${FormatUtils.currency(p.amt)}</td>
                         <td><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
@@ -1981,6 +2633,8 @@ window.showAddAdminModal = function() {
     ]);
 };
 
+// ==================== SPORCU PORTAL ====================
+
 window.spTab = function(tab) {
     document.querySelectorAll('.sp-tab').forEach(el => {
         el.classList.remove('on');
@@ -2009,32 +2663,143 @@ window.spTab = function(tab) {
 function spProfil() {
     const a = AppState.currentSporcu;
     if (!a) return '';
-    const rate = attendanceRate(a.id);
+    
+    const initials = FormatUtils.initials(a.fn, a.ln);
+    const age = DateUtils.age(a.bd);
+    const attStats = getAttendanceStats(a.id);
+    const payStats = getPaymentStats(a.id);
+    const cls = AppState.data.classes.find(c => c.id === a.clsId);
+    const coach = cls ? AppState.data.coaches.find(c => c.id === cls.coachId) : null;
     
     return `
-    <div class="profile-hero">
-        <div class="flex fca gap3">
-            ${UIUtils.getAvatar(64)}
-            <div>
-                <div class="tw6" style="font-size:18px">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
-                <div class="ts tm">${FormatUtils.escape(a.tc)}</div>
+    <div class="profile-container">
+        <div class="profile-header">
+            <div class="profile-header-content">
+                <div class="profile-avatar">${initials}</div>
+                <div class="profile-info">
+                    <div class="profile-name">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
+                    <div class="profile-meta">
+                        <span class="profile-meta-item">&#x1F4BC; ${FormatUtils.escape(a.sp)}</span>
+                        <span class="profile-meta-item">&#x1F3EB; ${FormatUtils.escape(cls ? cls.name : 'Sınıfsız')}</span>
+                        <span class="profile-meta-item">&#x1F4C5; ${age} yaş</span>
+                        <span class="profile-meta-item"><span class="badge ${a.st === 'active' ? 'badge-green' : 'badge-red'}">${statusLabel(a.st)}</span></span>
+                    </div>
+                </div>
+                <div class="stats-grid" style="min-width:200px">
+                    <div class="stat-box">
+                        <div class="stat-box-value tb">${attStats.rate}%</div>
+                        <div class="stat-box-label">Devam</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value tg">${FormatUtils.currency(payStats.totalPaid)}</div>
+                        <div class="stat-box-label">Ödenen</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-value ${payStats.totalDebt > 0 ? 'tr2' : 'tg'}">${FormatUtils.currency(payStats.totalDebt)}</div>
+                        <div class="stat-box-label">Borç</div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="card">
-        ${row('Devam Oranı', `%${rate}`)}
-        ${row('Branş', FormatUtils.escape(a.sp))}
-        ${row('Veli Adı', FormatUtils.escape(a.pn || '-'))}
-        ${row('Veli Telefon', FormatUtils.escape(a.pph || '-'))}
-        ${row('Doğum Tarihi', DateUtils.format(a.bd))}
-    </div>`;
-}
-
-function row(label, value) {
-    return `
-    <div class="dr">
-        <span class="tm">${label}</span>
-        <span class="tw6">${value}</span>
+        
+        <div class="profile-grid">
+            <div class="profile-sidebar">
+                <div class="info-card">
+                    <div class="info-card-title">&#x1F4E7; İletişim Bilgilerim</div>
+                    <div class="info-row">
+                        <span class="info-label">Telefon</span>
+                        <span class="info-value">${FormatUtils.escape(a.ph || '-')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">E-posta</span>
+                        <span class="info-value">${FormatUtils.escape(a.em || '-')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Adres</span>
+                        <span class="info-value">${FormatUtils.escape(a.address || '-')}</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <div class="info-card-title">&#x1F46A; Veli Bilgileri</div>
+                    <div class="info-row">
+                        <span class="info-label">Veli Adı</span>
+                        <span class="info-value">${FormatUtils.escape(a.pn || '-')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Veli Telefon</span>
+                        <span class="info-value">${FormatUtils.escape(a.pph || '-')}</span>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <div class="info-card-title">&#x2695; Sağlık Bilgilerim</div>
+                    <div class="info-row">
+                        <span class="info-label">Kan Grubu</span>
+                        <span class="info-value">${FormatUtils.escape(a.blood || '-')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Boy / Kilo</span>
+                        <span class="info-value">${a.height ? a.height + ' cm' : '-'} / ${a.weight ? a.weight + ' kg' : '-'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Acil Durum</span>
+                        <span class="info-value">${FormatUtils.escape(a.emergency || '-')}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="profile-main">
+                <div class="info-card">
+                    <div class="info-card-title">&#x26BD; Antrenman Bilgilerim</div>
+                    <div class="g21">
+                        <div class="info-row">
+                            <span class="info-label">Antrenörüm</span>
+                            <span class="info-value">${FormatUtils.escape(coach ? `${coach.fn} ${coach.ln}` : '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Sınıfım</span>
+                            <span class="info-value">${FormatUtils.escape(cls ? cls.name : '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Lisans No</span>
+                            <span class="info-value">${FormatUtils.escape(a.lic || '-')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Kayıt Tarihi</span>
+                            <span class="info-value">${DateUtils.format(a.rd)}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <div class="info-card-title">&#x1F4B3; Finansal Bilgilerim</div>
+                    <div class="g21">
+                        <div class="info-row">
+                            <span class="info-label">Aylık Ücret</span>
+                            <span class="info-value tb">${FormatUtils.currency(a.fee)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Sonraki Ödeme</span>
+                            <span class="info-value">${a.vd ? DateUtils.format(a.vd) : '-'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Toplam Ödenen</span>
+                            <span class="info-value tg">${FormatUtils.currency(payStats.totalPaid)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Kalan Borç</span>
+                            <span class="info-value ${payStats.totalDebt > 0 ? 'tr2' : 'tg'}">${FormatUtils.currency(payStats.totalDebt)}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <div class="info-card-title">&#x1F4C8; Son Aktivitelerim</div>
+                    ${generateActivityTimeline(a.id)}
+                </div>
+            </div>
+        </div>
     </div>`;
 }
 
@@ -2042,76 +2807,148 @@ function spYoklama() {
     const a = AppState.currentSporcu;
     if (!a) return '';
     
+    const attStats = getAttendanceStats(a.id);
     const dates = Object.keys(AppState.data.attendance)
+        .filter(d => AppState.data.attendance[d][a.id])
         .sort()
-        .reverse()
-        .slice(0, 30);
+        .reverse();
     
-    let html = '<div class="card"><div class="tw6 tsm mb2">Son Yoklamalar</div>';
-    
-    if (!dates.length) {
-        html += '<p class="tm">Kayıt yok.</p>';
-    } else {
-        html += dates.map(d => {
-            const st = AppState.data.attendance[d]?.[a.id];
-            const status = st === 'P' ? '<span class="bg bg-g">Var</span>' : 
-                          st === 'A' ? '<span class="bg bg-r">Yok</span>' : 
-                          '<span class="tm">-</span>';
-            return `
-            <div class="att-row">
-                <span class="tm">${DateUtils.format(d)}</span>
-                ${status}
-            </div>`;
-        }).join('');
-    }
-    
-    return html + '</div>';
+    return `
+    <div class="card">
+        <div class="flex fjb fca mb3">
+            <div>
+                <div class="tw6 tsm mb1">Devam Oranı</div>
+                <div class="flex gap2">
+                    <span class="badge badge-green">${attStats.present} Var</span>
+                    <span class="badge badge-red">${attStats.absent} Yok</span>
+                    <span class="badge badge-yellow">${attStats.excused} İzinli</span>
+                </div>
+            </div>
+            <div class="progress-ring">
+                <svg width="120" height="120">
+                    <circle class="progress-ring-bg" cx="60" cy="60" r="52"/>
+                    <circle class="progress-ring-fill" cx="60" cy="60" r="52" 
+                            stroke-dasharray="${attStats.rate * 3.27} 327"/>
+                </svg>
+                <div class="progress-text">${attStats.rate}%</div>
+            </div>
+        </div>
+        <div class="dv"></div>
+        <div class="tw6 tsm mb2">Son Yoklamalar</div>
+        ${dates.length === 0 ? '<p class="tm">Henüz yoklama kaydı bulunmuyor.</p>' : 
+          dates.slice(0, 30).map(d => {
+              const st = AppState.data.attendance[d][a.id];
+              return `
+              <div class="att-row">
+                  <span class="tm">${DateUtils.format(d)}</span>
+                  <span class="badge ${st === 'P' ? 'badge-green' : st === 'A' ? 'badge-red' : 'badge-yellow'}">
+                      ${st === 'P' ? 'Var' : st === 'A' ? 'Yok' : 'İzinli'}
+                  </span>
+              </div>`;
+          }).join('')}
+    </div>`;
 }
 
 function spOdemeler() {
     const a = AppState.currentSporcu;
     if (!a) return '';
     
-    const myPayments = AppState.data.payments.filter(p => p.aid === a.id);
+    const myPayments = AppState.data.payments
+        .filter(p => p.aid === a.id)
+        .sort((a, b) => new Date(b.dt) - new Date(a.dt));
+    
+    const payStats = getPaymentStats(a.id);
     
     return `
-    <div class="card">
-        <div class="tw6 tsm mb2">Ödemelerim</div>
-        <div class="tw">
-            <table>
-                <tbody>
-                    ${myPayments.map(p => `
-                    <tr>
-                        <td>${DateUtils.format(p.dt)}</td>
-                        <td class="tw6">${FormatUtils.currency(p.amt)}</td>
-                        <td><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span></td>
-                    </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+    <div class="card mb3">
+        <div class="g3">
+            <div class="stat-box">
+                <div class="stat-box-value tg">${FormatUtils.currency(payStats.totalPaid)}</div>
+                <div class="stat-box-label">Toplam Ödenen</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-box-value ${payStats.totalDebt > 0 ? 'tr2' : 'tg'}">${FormatUtils.currency(payStats.totalDebt)}</div>
+                <div class="stat-box-label">Kalan Borç</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-box-value tb">${myPayments.length}</div>
+                <div class="stat-box-label">İşlem Sayısı</div>
+            </div>
         </div>
+    </div>
+    <div class="card">
+        <div class="tw6 tsm mb2">Ödeme Geçmişim</div>
+        ${myPayments.length === 0 ? '<p class="tm">Henüz ödeme kaydı bulunmuyor.</p>' : 
+          myPayments.map(p => `
+          <div class="payment-card">
+              <div class="payment-info">
+                  <div class="payment-amount tg">+ ${FormatUtils.currency(p.amt)}</div>
+                  <div class="payment-date">${DateUtils.format(p.dt)} • ${FormatUtils.escape(p.serviceName || p.ds || 'Aidat')}</div>
+              </div>
+              <span class="badge ${p.st === 'completed' ? 'badge-green' : p.st === 'overdue' ? 'badge-red' : 'badge-yellow'}">${statusLabel(p.st)}</span>
+          </div>
+          `).join('')}
     </div>`;
 }
 
 function spOdemeYap() {
     const s = AppState.data.settings;
+    const a = AppState.currentSporcu;
     
     return `
     <div class="card">
+        <div class="profile-header" style="margin-bottom:20px">
+            <div class="profile-header-content">
+                <div class="profile-avatar" style="width:80px;height:80px;font-size:32px">${FormatUtils.initials(a.fn, a.ln)}</div>
+                <div class="profile-info">
+                    <div class="profile-name">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
+                    <div class="profile-meta">
+                        <span class="profile-meta-item">Aylık Ücret: <strong>${FormatUtils.currency(a.fee)}</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="al al-b mb3">
             <strong>Banka:</strong> ${FormatUtils.escape(s?.bankName || '-')}<br>
             <strong>Alıcı:</strong> ${FormatUtils.escape(s?.accountName || '-')}<br>
             <strong>IBAN:</strong> ${FormatUtils.escape(s?.iban || '-')}
         </div>
+        
         <div class="fgr mb2">
-            <label>Tutar (₺)</label>
-            <input id="sp-amt" type="number"/>
+            <label>Ödeme Tutarı (₺)</label>
+            <input id="sp-amt" type="number" value="${a.fee || ''}"/>
         </div>
-        <button class="btn bp w100" onclick="toast('Ödeme bildirimi alındı!', 'g')">
+        <div class="fgr mb3">
+            <label>Açıklama</label>
+            <input id="sp-desc" value="${DateUtils.today()} tarihli ödeme"/>
+        </div>
+        <button class="btn bp w100" onclick="submitPayment()">
             Havale Bildirimi Yap
         </button>
+        
+        <div class="mt3" style="padding:16px;background:var(--bg3);border-radius:12px;border:1px solid var(--border)">
+            <div class="tsm tw6 mb2">&#x1F4A1; Ödeme Nasıl Yapılır?</div>
+            <ol class="tm" style="margin-left:20px;line-height:1.8">
+                <li>Yukarıdaki IBAN'a havale/EFT yapın</li>
+                <li>Ödeme tutarını ve açıklamayı girin</li>
+                <li>"Havale Bildirimi Yap" butonuna tıklayın</li>
+                <li>Yönetici onayından sonra ödemeniz işleme alınacaktır</li>
+            </ol>
+        </div>
     </div>`;
 }
+
+window.submitPayment = function() {
+    const amt = UIUtils.getNumber('sp-amt');
+    if (!amt) {
+        toast('Lütfen tutar giriniz!', 'e');
+        return;
+    }
+    toast('Ödeme bildiriminiz alındı! Yönetici onayından sonra işleme alınacaktır.', 'g');
+};
+
+// ==================== EXPORT & UTILS ====================
 
 window.exportAthletes = function() {
     const data = AppState.data.athletes.map(a => ({
@@ -2119,12 +2956,14 @@ window.exportAthletes = function() {
         Soyad: a.ln,
         TC: a.tc,
         Telefon: a.ph,
+        Email: a.em,
         Branş: a.sp,
         Sınıf: className(a.clsId),
         Durum: statusLabel(a.st),
         'Aylık Ücret': a.fee,
         Veli: a.pn,
-        'Veli Telefon': a.pph
+        'Veli Telefon': a.pph,
+        'Kayıt Tarihi': DateUtils.format(a.rd)
     }));
     
     exportToExcel(data, 'Sporcular');
