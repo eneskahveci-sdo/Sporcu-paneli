@@ -1,25 +1,19 @@
 /* ============================================================
    DRAGOS FUTBOL AKADEMISI - TAM DUZELTILMIS SURUM
-   Tüm hatalar giderildi, güvenlik iyileştirildi, performans optimize edildi
    ============================================================ */
 
-// Global hata yakalama
 window.onerror = function(msg, url, line, col, error) {
     console.error('Global Error:', { msg, url, line, col, error });
-    toast('Bir hata oluştu. Lütfen sayfayı yenileyin.', 'e');
     return true;
 };
 
-// Supabase yapılandırması - GERÇEK PROJENİZİN BİLGİLERİNİ GİRİN
 const SUPABASE_CONFIG = {
     url: 'https://wfarbydojxtufnkjuhtc.supabase.co',
-    anonKey: 'sb_publishable_w1_nk_7TM1ePWHMN2CDcQ_1ufk0kYC'
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw'
 };
 
-// Fallback logo (base64 encoded mini futbol)
 const DEFAULT_LOGO = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIzMCIgZmlsbD0iIzNiODJmNiIvPjxwYXRoIGQ9Ik0zMiAxMEw0MiAyOEwyNCAyOEwzMiAxMFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTMyIDU0TDQyIDM2TDI0IDM2TDMyIDU0WiIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTAgMzJMMjggMjJMMjggNDJMMTAgMzJaIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik01NCAzMkwzNiAyMkwzNiA0Mkw1NCAzMloiIGZpbGw9IndoaXRlIi8+PC9zdmc+';
 
-// Uygulama durumu
 const AppState = {
     sb: null,
     currentUser: null,
@@ -49,12 +43,10 @@ const AppState = {
     }
 };
 
-// Çok dilli destek
 const i18n = {
     TR: {
-        loading: 'Yükleniyor...',
-        menuMain: 'Ana Menü', menuDash: 'Gösterge', menuAth: 'Sporcular', menuSpo: 'Branşlar',
-        menuCls: 'Sınıflar', menuAtt: 'Devam (Yoklama)', menuCoa: 'Antrenörler',
+        loading: 'Yükleniyor...', menuMain: 'Ana Menü', menuDash: 'Gösterge', menuAth: 'Sporcular',
+        menuSpo: 'Branşlar', menuCls: 'Sınıflar', menuAtt: 'Devam (Yoklama)', menuCoa: 'Antrenörler',
         menuFinSec: 'Yönetim (Muhasebe)', menuPay: 'Ödemeler', menuAcc: 'Finans / Rapor',
         menuSms: 'SMS Duyuru', menuSysSec: 'Sistem', menuSet: 'Ayarlar',
         roleAdmin: 'Yönetici', roleCoach: 'Antrenör', btnLogout: 'Çıkış Yap',
@@ -65,9 +57,8 @@ const i18n = {
         noData: 'Veri bulunamadı', exportSuccess: 'Dışa aktarıldı!'
     },
     EN: {
-        loading: 'Loading...',
-        menuMain: 'Main Menu', menuDash: 'Dashboard', menuAth: 'Athletes', menuSpo: 'Sports',
-        menuCls: 'Classes', menuAtt: 'Attendance', menuCoa: 'Coaches',
+        loading: 'Loading...', menuMain: 'Main Menu', menuDash: 'Dashboard', menuAth: 'Athletes',
+        menuSpo: 'Sports', menuCls: 'Classes', menuAtt: 'Attendance', menuCoa: 'Coaches',
         menuFinSec: 'Finance', menuPay: 'Payments', menuAcc: 'Financial Report',
         menuSms: 'SMS Alerts', menuSysSec: 'System', menuSet: 'Settings',
         roleAdmin: 'Administrator', roleCoach: 'Coach', btnLogout: 'Log Out',
@@ -79,7 +70,6 @@ const i18n = {
     }
 };
 
-// Tarih yardımcıları
 const DateUtils = {
     today() {
         const d = new Date();
@@ -103,7 +93,6 @@ const DateUtils = {
     }
 };
 
-// Format yardımcıları
 const FormatUtils = {
     number(n) {
         return Number(n || 0).toLocaleString('tr-TR');
@@ -125,7 +114,6 @@ const FormatUtils = {
     }
 };
 
-// UUID oluşturucu
 function generateId() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
@@ -133,13 +121,11 @@ function generateId() {
     });
 }
 
-// SHA256 hash
 async function sha256(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Supabase bağlantısı
 function getSupabase() {
     if (!AppState.sb) {
         try {
@@ -152,25 +138,19 @@ function getSupabase() {
     return AppState.sb;
 }
 
-// Toast bildirim sistemi (memory leak önlemli)
 const ToastManager = {
     activeToasts: [],
-    
     show(msg, type = 'info') {
-        // Maksimum 3 toast göster
         while (this.activeToasts.length >= 3) {
             const old = this.activeToasts.shift();
             old.remove();
         }
-        
         const t = document.createElement('div');
         t.className = `toast ${type === 'e' ? 'toast-e' : type === 'g' ? 'toast-g' : ''}`;
         t.textContent = msg;
         document.body.appendChild(t);
         this.activeToasts.push(t);
-        
         requestAnimationFrame(() => t.classList.add('show'));
-        
         setTimeout(() => {
             t.classList.remove('show');
             setTimeout(() => {
@@ -183,16 +163,13 @@ const ToastManager = {
 };
 const toast = (msg, type) => ToastManager.show(msg, type);
 
-// Modal sistemi
 const ModalManager = {
     open(title, body, buttons) {
         const m = document.getElementById('modal');
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-body').innerHTML = body;
-        
         const mf = document.getElementById('modal-footer');
         mf.innerHTML = '';
-        
         (buttons || []).forEach(btn => {
             const b = document.createElement('button');
             b.className = `btn ${btn.cls}`;
@@ -209,14 +186,11 @@ const ModalManager = {
             };
             mf.appendChild(b);
         });
-        
         m.classList.add('show');
     },
-    
     close() {
         document.getElementById('modal').classList.remove('show');
     },
-    
     confirm(title, message, onConfirm) {
         this.open(title, `<p class="tsm tm">${FormatUtils.escape(message)}</p>`, [
             { lbl: AppState.lang === 'TR' ? 'Vazgeç' : 'Cancel', cls: 'bs', fn: () => this.close() },
@@ -228,52 +202,44 @@ const modal = ModalManager.open.bind(ModalManager);
 const closeModal = ModalManager.close.bind(ModalManager);
 const confirm2 = ModalManager.confirm.bind(ModalManager);
 
-// UI yardımcıları
 const UIUtils = {
     getValue(id) {
         const el = document.getElementById(id);
         return el ? el.value.trim() : '';
     },
-    
     getNumber(id) {
         return parseFloat(this.getValue(id)) || 0;
     },
-    
     setLoading(show) {
         const el = document.getElementById('loading-overlay');
         if (el) el.style.display = show ? 'flex' : 'none';
     },
-    
     getAvatar(size, url) {
-        const logoUrl = url || AppState.data.settings?.logo_url || DEFAULT_LOGO;
+        const logoUrl = url || AppState.data.settings?.logoUrl || DEFAULT_LOGO;
         return `<div class="ava" style="width:${size}px;height:${size}px;flex-shrink:0;background-image:url('${logoUrl}');background-size:cover;background-position:center;border:1px solid var(--border);background-color:var(--bg3)"></div>`;
     },
-    
     setElementAvatar(id, url) {
         const el = document.getElementById(id);
         if (!el) return;
-        const logoUrl = url || AppState.data.settings?.logo_url || DEFAULT_LOGO;
+        const logoUrl = url || AppState.data.settings?.logoUrl || DEFAULT_LOGO;
         el.innerHTML = '';
         el.style.cssText = `background-image:url("${logoUrl}");background-size:cover;background-position:center;`;
     }
 };
 
-// Tema yönetimi
 function applyTheme(theme) {
     const isLight = theme === 'light';
     const btn = document.getElementById('theme-btn');
     const spBtn = document.getElementById('sp-theme-btn');
-    
     if (isLight) {
         document.documentElement.setAttribute('data-theme', 'light');
-        if (btn) btn.innerHTML = '&#x1F319;'; // Ay (dark moda geçiş için)
+        if (btn) btn.innerHTML = '&#x1F319;';
         if (spBtn) spBtn.innerHTML = '&#x1F319;';
     } else {
         document.documentElement.removeAttribute('data-theme');
-        if (btn) btn.innerHTML = '&#x1F31E;'; // Güneş (light moda geçiş için)
+        if (btn) btn.innerHTML = '&#x1F31E;';
         if (spBtn) spBtn.innerHTML = '&#x1F31E;';
     }
-    
     localStorage.setItem('sporcu_theme', theme);
     AppState.theme = theme;
 }
@@ -282,14 +248,11 @@ function toggleTheme() {
     applyTheme(AppState.theme === 'dark' ? 'light' : 'dark');
 }
 
-// Dil yönetimi
 function applyLang(lang) {
     AppState.lang = lang;
     localStorage.setItem('sporcu_lang', lang);
-    
     const btn = document.getElementById('lang-btn');
     if (btn) btn.textContent = lang === 'TR' ? 'EN' : 'TR';
-    
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (i18n[lang] && i18n[lang][key]) {
@@ -306,11 +269,9 @@ function toggleLang() {
     }
 }
 
-// Login tab geçişi
 window.switchLoginTab = function(tab) {
     document.getElementById('login-sporcu').classList.toggle('dn', tab !== 'sporcu');
     document.getElementById('login-coach').classList.toggle('dn', tab !== 'coach');
-    
     const tabs = document.querySelectorAll('#login-tabs .ltab');
     if (tabs.length > 1) {
         tabs[0].classList.toggle('on', tab === 'sporcu');
@@ -318,7 +279,6 @@ window.switchLoginTab = function(tab) {
     }
 };
 
-// Hukuki linkler
 window.showLegal = function(type) {
     const content = {
         kvkk: {
@@ -330,9 +290,7 @@ window.showLegal = function(type) {
                     <li>Kişisel verileriniz yalnızca sporcu kayıt ve takip süreçleri için işlenmektedir.</li>
                     <li>Verileriniz 3. şahıslarla paylaşılmaz.</li>
                     <li>Veri saklama süresi: Kayıt tarihinden itibaren 10 yıl.</li>
-                    <li>Haklarınız: Bilgi talep etme, düzeltme, silme, işlemeyi sınırlama.</li>
                 </ul>
-                <p>İletişim: kvkk@dragosakademi.com</p>
             </div>`
         },
         kullanim: {
@@ -341,20 +299,14 @@ window.showLegal = function(type) {
                 <p class="mb2"><strong>1. Kabul</strong></p>
                 <p class="mb2">Bu sistemi kullanarak kullanım şartlarını kabul etmiş olursunuz.</p>
                 <p class="mb2"><strong>2. Hesap Güvenliği</strong></p>
-                <p class="mb2">TC kimlik numaranız ve şifreniz size özeldir. Başkalarıyla paylaşmayın.</p>
-                <p class="mb2"><strong>3. Sorumluluk</strong></p>
-                <p>Sistem üzerinden yapılan işlemlerden kullanıcı sorumludur.</p>
+                <p>TC kimlik numaranız ve şifreniz size özeldir.</p>
             </div>`
         }
     };
-    
     const info = content[type];
-    modal(info.title, info.body, [
-        { lbl: AppState.lang === 'TR' ? 'Kapat' : 'Close', cls: 'bs', fn: closeModal }
-    ]);
+    modal(info.title, info.body, [{ lbl: AppState.lang === 'TR' ? 'Kapat' : 'Close', cls: 'bs', fn: closeModal }]);
 };
 
-// Veritabanı modelleri
 const DB = {
     mappers: {
         toAthlete(r) {
@@ -366,7 +318,6 @@ const DB = {
                 spPass: r.sp_pass, orgId: r.org_id, branchId: r.branch_id
             };
         },
-        
         fromAthlete(a) {
             return {
                 id: a.id, org_id: a.orgId || AppState.currentOrgId,
@@ -378,7 +329,6 @@ const DB = {
                 pn: a.pn, pph: a.pph, pem: a.pem, sp_pass: a.spPass
             };
         },
-        
         toPayment(r) {
             return {
                 id: r.id, aid: r.aid, an: r.an, amt: r.amt || 0,
@@ -387,7 +337,6 @@ const DB = {
                 serviceName: r.service_name || ''
             };
         },
-        
         fromPayment(p) {
             return {
                 id: p.id, org_id: AppState.currentOrgId,
@@ -397,7 +346,6 @@ const DB = {
                 inv: p.inv, dd: p.dd, service_name: p.serviceName
             };
         },
-        
         toCoach(r) {
             return {
                 id: r.id, fn: r.fn, ln: r.ln, tc: r.tc,
@@ -406,7 +354,6 @@ const DB = {
                 orgId: r.org_id, branchId: r.branch_id
             };
         },
-        
         fromCoach(c) {
             return {
                 id: c.id, org_id: c.orgId || AppState.currentOrgId,
@@ -416,11 +363,9 @@ const DB = {
                 coach_pass: c.coachPass
             };
         },
-        
         toClass(r) {
             return { id: r.id, name: r.name, spId: r.sp_id, coachId: r.coach_id, cap: r.cap };
         },
-        
         fromClass(c) {
             return {
                 id: c.id, org_id: AppState.currentOrgId,
@@ -429,11 +374,9 @@ const DB = {
                 coach_id: c.coachId, cap: c.cap
             };
         },
-        
         toSport(r) {
             return { id: r.id, name: r.name, icon: r.icon };
         },
-        
         fromSport(s) {
             return {
                 id: s.id, org_id: AppState.currentOrgId,
@@ -441,7 +384,6 @@ const DB = {
                 name: s.name, icon: s.icon
             };
         },
-        
         toSettings(r) {
             return {
                 id: r.id, schoolName: r.school_name, logoUrl: r.logo_url,
@@ -451,7 +393,6 @@ const DB = {
                 netgsmPass: r.netgsm_pass, netgsmHeader: r.netgsm_header
             };
         },
-        
         fromSettings(s) {
             return {
                 id: s.id || generateId(), org_id: AppState.currentOrgId,
@@ -464,16 +405,13 @@ const DB = {
             };
         }
     },
-    
     async query(table, filters = {}) {
         try {
             const sb = getSupabase();
             let q = sb.from(table).select('*');
-            
             Object.entries(filters).forEach(([key, val]) => {
                 q = q.eq(key, val);
             });
-            
             const { data, error } = await q;
             if (error) throw error;
             return data || [];
@@ -483,7 +421,6 @@ const DB = {
             return null;
         }
     },
-    
     async upsert(table, data) {
         try {
             const sb = getSupabase();
@@ -497,7 +434,6 @@ const DB = {
             return null;
         }
     },
-    
     async remove(table, filters) {
         try {
             const sb = getSupabase();
@@ -515,7 +451,6 @@ const DB = {
     }
 };
 
-// Giriş işlemleri
 window.doNormalLogin = async function(type) {
     const isCoach = type === 'coach';
     const tcId = isCoach ? 'lc-tc' : 'ls-tc';
@@ -526,7 +461,6 @@ window.doNormalLogin = async function(type) {
     const pass = UIUtils.getValue(passId);
     const errEl = document.getElementById(errId);
     
-    // Validasyon
     if (!tc || !pass) {
         errEl.textContent = AppState.lang === 'TR' ? 'TC ve şifre giriniz!' : 'Enter ID and password!';
         errEl.classList.remove('dn');
@@ -557,7 +491,6 @@ window.doNormalLogin = async function(type) {
             const expected = expectedPass || tc.slice(-4);
             const expectedHash = await sha256(expected);
             
-            // Güvenli karşılaştırma (timing attack önlemi için basit)
             if ((pass === expected) || (inputHash === expectedHash)) {
                 found = r;
                 break;
@@ -568,7 +501,6 @@ window.doNormalLogin = async function(type) {
             throw new Error('Invalid password');
         }
         
-        // Başarılı giriş
         if (isCoach) {
             AppState.currentUser = {
                 id: found.id,
@@ -606,19 +538,15 @@ window.doNormalLogin = async function(type) {
             
             document.getElementById('lbox-wrap').style.display = 'none';
             document.getElementById('sporcu-portal').style.display = 'flex';
-            document.getElementById('sp-name').textContent = 
-                `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
-            document.getElementById('sp-orgname').textContent = 
-                AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
+            document.getElementById('sp-name').textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
+            document.getElementById('sp-orgname').textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
             
             spTab('profil');
         }
         
     } catch (e) {
         console.error('Login error:', e);
-        errEl.textContent = AppState.lang === 'TR' ? 
-            'Kayıt bulunamadı veya şifre hatalı!' : 
-            'Record not found or incorrect password!';
+        errEl.textContent = AppState.lang === 'TR' ? 'Kayıt bulunamadı veya şifre hatalı!' : 'Record not found or incorrect password!';
         errEl.classList.remove('dn');
     } finally {
         UIUtils.setLoading(false);
@@ -626,7 +554,7 @@ window.doNormalLogin = async function(type) {
 };
 
 window.doLogin = async function() {
-    const email = UIUtils.getValue('le');
+    const email = UIUtils.getValue('le').toLowerCase().trim();
     const password = UIUtils.getValue('lp');
     const errEl = document.getElementById('lerr');
     
@@ -641,40 +569,59 @@ window.doLogin = async function() {
     
     try {
         const sb = getSupabase();
-        const { data: authData, error: authError } = await sb.auth.signInWithPassword({ 
-            email, 
-            password 
-        });
+        await sb.auth.signOut();
         
-        if (authError) throw authError;
+        const { data: authData, error: authError } = await sb.auth.signInWithPassword({ email, password });
         
-        // Kullanıcı bilgilerini al
-        const { data: userData, error: userError } = await sb
-            .from('users')
-            .select('*')
-            .eq('id', authData.user.id)
-            .single();
+        if (authError) {
+            console.error('Auth error:', authError);
+            errEl.textContent = AppState.lang === 'TR' ? 'Hatalı e-posta veya şifre' : 'Invalid email or password';
+            errEl.classList.remove('dn');
+            return;
+        }
         
-        const user = userData || {
-            id: authData.user.id,
-            email: email,
-            role: 'admin',
-            org_id: 'org-default',
-            branch_id: 'br-default',
-            name: 'Yönetici'
-        };
+        let userData = null;
+        try {
+            const { data } = await sb.from('users').select('*').eq('id', authData.user.id).single();
+            userData = data;
+        } catch (e) {
+            console.log('User query error:', e);
+        }
+        
+        if (!userData) {
+            userData = {
+                id: authData.user.id,
+                email: authData.user.email,
+                name: authData.user.user_metadata?.full_name || email.split('@')[0],
+                role: 'admin',
+                org_id: 'org-dragos',
+                branch_id: 'br-dragos-main'
+            };
+            try {
+                await sb.from('users').upsert({
+                    id: userData.id,
+                    email: userData.email,
+                    name: userData.name,
+                    role: userData.role,
+                    org_id: userData.org_id,
+                    branch_id: userData.branch_id
+                });
+            } catch (e) {
+                console.log('Upsert error:', e);
+            }
+        }
         
         AppState.currentUser = {
-            id: user.id,
-            email: user.email,
-            orgId: user.org_id,
-            branchId: user.branch_id,
-            role: user.role,
-            name: user.name
+            id: userData.id,
+            email: userData.email,
+            orgId: userData.org_id,
+            branchId: userData.branch_id,
+            role: userData.role,
+            name: userData.name
         };
         
-        AppState.currentOrgId = user.org_id;
-        AppState.currentBranchId = user.branch_id;
+        AppState.currentOrgId = userData.org_id;
+        AppState.currentBranchId = userData.branch_id;
         
         localStorage.setItem('sporcu_app_user', JSON.stringify(AppState.currentUser));
         localStorage.setItem('sporcu_app_org', AppState.currentOrgId);
@@ -690,10 +637,8 @@ window.doLogin = async function() {
         go('dashboard');
         
     } catch (err) {
-        console.error('Admin login error:', err);
-        errEl.textContent = AppState.lang === 'TR' ? 
-            'Hatalı yönetici girişi' : 
-            'Invalid admin credentials';
+        console.error('Login error:', err);
+        errEl.textContent = AppState.lang === 'TR' ? 'Giriş hatası' : 'Login error';
         errEl.classList.remove('dn');
     } finally {
         UIUtils.setLoading(false);
@@ -704,7 +649,6 @@ async function restoreSession() {
     UIUtils.setLoading(true);
     
     try {
-        // Önce sporcu kontrolü
         const storedSporcu = localStorage.getItem('sporcu_app_sporcu');
         if (storedSporcu) {
             const parsed = JSON.parse(storedSporcu);
@@ -716,28 +660,23 @@ async function restoreSession() {
             
             document.getElementById('lbox-wrap').style.display = 'none';
             document.getElementById('sporcu-portal').style.display = 'flex';
-            document.getElementById('sp-name').textContent = 
-                `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
-            document.getElementById('sp-orgname').textContent = 
-                AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
+            document.getElementById('sp-name').textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
+            document.getElementById('sp-orgname').textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
             
             spTab('profil');
             return;
         }
         
-        // Sonra admin/coach kontrolü
         const storedUser = localStorage.getItem('sporcu_app_user');
         if (storedUser) {
             AppState.currentUser = JSON.parse(storedUser);
             AppState.currentOrgId = localStorage.getItem('sporcu_app_org');
             AppState.currentBranchId = localStorage.getItem('sporcu_app_branch');
             
-            // Supabase session kontrolü
             const sb = getSupabase();
             const { data: { session } } = await sb.auth.getSession();
             
             if (AppState.currentUser.role === 'admin' && !session) {
-                // Admin için session yoksa çıkış yap
                 throw new Error('No session');
             }
             
@@ -787,12 +726,10 @@ async function loadBranchData() {
         DB.query('classes', { branch_id: bid })
     ]);
     
-    // Map veriler
     AppState.data.athletes = (results[0] || []).map(DB.mappers.toAthlete);
     AppState.data.payments = (results[1] || []).map(DB.mappers.toPayment);
     AppState.data.coaches = (results[2] || []).map(DB.mappers.toCoach);
     
-    // Attendance yapılandırma
     AppState.data.attendance = {};
     (results[3] || []).forEach(r => {
         if (!AppState.data.attendance[r.att_date]) {
@@ -813,7 +750,6 @@ async function loadBranchData() {
     AppState.data.sports = (results[6] || []).map(DB.mappers.toSport);
     AppState.data.classes = (results[7] || []).map(DB.mappers.toClass);
     
-    // Gecikmiş ödemeleri kontrol et
     checkOverdue();
 }
 
@@ -825,7 +761,6 @@ function updateBranchUI() {
         nameEl.textContent = settings?.schoolName || 'Dragos Futbol Akademisi';
     }
     
-    // Logo güncelle
     const logoUrl = settings?.logoUrl || DEFAULT_LOGO;
     UIUtils.setElementAvatar('sava', logoUrl);
     UIUtils.setElementAvatar('bar-ava', logoUrl);
@@ -833,7 +768,6 @@ function updateBranchUI() {
     UIUtils.setElementAvatar('login-logo', logoUrl);
     UIUtils.setElementAvatar('sp-avatar', logoUrl);
     
-    // Antrenör yetki kısıtlamaları
     if (AppState.currentUser?.role === 'coach') {
         const restricted = ['ni-dashboard', 'ni-payments', 'ni-accounting', 
                           'ni-settings', 'ni-sms', 'ni-sports', 'ni-classes'];
@@ -852,15 +786,11 @@ function updateBranchUI() {
     }
 }
 
-// Sayfa yönlendirme
 window.go = function(page) {
-    // Yetki kontrolü
     if (AppState.currentUser?.role === 'coach') {
         const restricted = ['dashboard', 'payments', 'accounting', 'settings', 'sms', 'sports', 'classes'];
         if (restricted.includes(page)) {
-            toast(AppState.lang === 'TR' ? 
-                'Bu sayfaya erişim yetkiniz yok.' : 
-                'You do not have permission to access this page.', 'e');
+            toast(AppState.lang === 'TR' ? 'Bu sayfaya erişim yetkiniz yok.' : 'You do not have permission to access this page.', 'e');
             return;
         }
     }
@@ -888,7 +818,6 @@ window.go = function(page) {
         main.style.opacity = '1';
     }, 100);
     
-    // Nav güncelle
     document.querySelectorAll('.ni').forEach(el => {
         el.classList.toggle('on', el.id === `ni-${page}`);
     });
@@ -909,7 +838,6 @@ window.closeSide = function() {
     document.getElementById('overlay').classList.remove('show');
 };
 
-// Yardımcı fonksiyonlar
 function checkOverdue() {
     const today = DateUtils.today();
     AppState.data.payments.forEach(p => {
@@ -966,7 +894,6 @@ function className(id) {
     return c ? c.name : '-';
 }
 
-// Sayfa render fonksiyonları
 function pgDashboard() {
     const { athletes, payments } = AppState.data;
     const active = athletes.filter(a => a.st === 'active').length;
@@ -1248,7 +1175,6 @@ window.editAth = function(id) {
                 obj.vd = a.vd;
             }
             
-            // Validasyon
             if (!obj.fn || !obj.ln || !obj.tc) {
                 toast(i18n[AppState.lang].fillRequired, 'e');
                 return;
@@ -1259,7 +1185,6 @@ window.editAth = function(id) {
                 return;
             }
             
-            // TC benzersizlik kontrolü
             const existing = AppState.data.athletes.find(x => x.tc === obj.tc && x.id !== obj.id);
             if (existing) {
                 toast('Bu TC numarası zaten kayıtlı!', 'e');
@@ -1429,7 +1354,6 @@ window.delClass = function(id) {
     confirm2('Sınıf Sil', i18n[AppState.lang].deleteConfirm, async () => {
         if (await DB.remove('classes', { id })) {
             AppState.data.classes = AppState.data.classes.filter(x => x.id !== id);
-            // Sınıfa bağlı sporcuları temizle
             AppState.data.athletes.forEach(a => {
                 if (a.clsId === id) a.clsId = '';
             });
@@ -1870,7 +1794,6 @@ window.editCoach = function(id) {
                 return;
             }
             
-            // TC benzersizlik kontrolü
             const existing = AppState.data.coaches.find(x => x.tc === obj.tc && x.id !== obj.id);
             if (existing) {
                 toast('Bu TC numarası zaten kayıtlı!', 'e');
@@ -1911,20 +1834,17 @@ function pgSms() {
     <div class="card">
         <div class="al al-y mb3">
             <strong>Bilgi:</strong> SMS gönderimi için NetGSM entegrasyonu gereklidir.
-            Ayarlar menüsünden API bilgilerinizi giriniz.
         </div>
         <div class="fgr mb2">
             <label>Alıcı Grubu</label>
             <select id="sms-group">
                 <option value="all">Tüm Aktif Sporcular</option>
                 <option value="overdue">Gecikmiş Ödemesi Olanlar</option>
-                <option value="class">Belirli Sınıf</option>
             </select>
         </div>
         <div class="fgr mb2">
             <label>Mesaj İçeriği</label>
             <textarea id="sms-body" rows="4" maxlength="160" placeholder="Mesajınızı yazın..."></textarea>
-            <div class="ts tm" style="text-align:right"><span id="sms-count">0</span>/160</div>
         </div>
         <button class="btn bp w100" onclick="sendBulkSms()">Gönder</button>
     </div>`;
@@ -1936,7 +1856,7 @@ window.sendBulkSms = function() {
         toast('Mesaj içeriği giriniz!', 'e');
         return;
     }
-    toast('SMS gönderimi simüle edildi (Entegrasyon gerekli)', 'g');
+    toast('SMS gönderimi simüle edildi', 'g');
 };
 
 function pgSettings() {
@@ -1954,35 +1874,6 @@ function pgSettings() {
         <div class="flex gap2">
             <button class="btn bsu" onclick="showAddAdminModal()">+ Yeni Yönetici Ekle</button>
         </div>
-    </div>
-
-    <div class="card mb3" style="border-left: 4px solid var(--purple)">
-        <div class="tw6 tsm mb2">&#x1F916; Otomatik Bildirimler</div>
-        <div class="flex fjb fca mb2 pb2" style="border-bottom:1px solid var(--border)">
-            <span class="tsm">Vadesi geçen ödemeler için otomatik hatırlatma</span>
-            <input type="checkbox" id="auto-overdue" style="width:20px;height:20px" checked>
-        </div>
-        <div class="flex fjb fca mb2 pb2" style="border-bottom:1px solid var(--border)">
-            <span class="tsm">Yoklamada "Yok" yazılan öğrencinin velisine SMS</span>
-            <input type="checkbox" id="auto-absent" style="width:20px;height:20px">
-        </div>
-        <button class="btn bp mt2" onclick="toast('Ayarlar kaydedildi','g')">Kaydet</button>
-    </div>
-
-    <div class="card mb3" style="border-left: 4px solid var(--green)">
-        <div class="tw6 tsm mb2">&#x1F4B3; Sanal POS API</div>
-        <p class="ts tm mb2">Ödeme sağlayıcınızın bilgilerini girin.</p>
-        <div class="g21">
-            <div class="fgr mb2">
-                <label>Sağlayıcı</label>
-                <select><option>PayTR</option><option>Iyzico</option></select>
-            </div>
-            <div class="fgr mb2">
-                <label>Merchant ID</label>
-                <input type="password" value="********"/>
-            </div>
-        </div>
-        <button class="btn bp" onclick="toast('POS ayarları kaydedildi','g')">Kaydet</button>
     </div>
 
     <div class="card mb3" style="border-left: 4px solid var(--text2)">
@@ -2007,16 +1898,6 @@ function pgSettings() {
                 <input id="s-iban" value="${FormatUtils.escape(s?.iban || '')}"/>
             </div>
         </div>
-        <div class="g21">
-            <div class="fgr mb2">
-                <label>NetGSM Kullanıcı</label>
-                <input id="s-ngu" value="${FormatUtils.escape(s?.netgsmUser || '')}"/>
-            </div>
-            <div class="fgr mb2">
-                <label>NetGSM Şifre</label>
-                <input type="password" id="s-ngp"/>
-            </div>
-        </div>
         <button class="btn bp mt2" onclick="saveGeneralSettings()">Genel Ayarları Kaydet</button>
     </div>`;
 }
@@ -2028,12 +1909,8 @@ window.saveGeneralSettings = async function() {
         bankName: UIUtils.getValue('s-bank'),
         accountName: UIUtils.getValue('s-acc'),
         iban: UIUtils.getValue('s-iban'),
-        netgsmUser: UIUtils.getValue('s-ngu'),
         logoUrl: AppState.data.settings?.logoUrl || DEFAULT_LOGO
     };
-    
-    const pass = UIUtils.getValue('s-ngp');
-    if (pass) obj.netgsmPass = pass;
     
     const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
     if (result) {
@@ -2086,7 +1963,6 @@ window.showAddAdminModal = function() {
                 
                 if (error) throw error;
                 
-                // users tablosuna ekle
                 await DB.upsert('users', {
                     id: data.user.id,
                     email: email,
@@ -2096,7 +1972,7 @@ window.showAddAdminModal = function() {
                     branch_id: AppState.currentBranchId
                 });
                 
-                toast('Yönetici eklendi! E-posta onayı gönderildi.', 'g');
+                toast('Yönetici eklendi!', 'g');
                 closeModal();
             } catch (e) {
                 toast('Hata: ' + e.message, 'e');
@@ -2105,7 +1981,6 @@ window.showAddAdminModal = function() {
     ]);
 };
 
-// Sporcu portalı
 window.spTab = function(tab) {
     document.querySelectorAll('.sp-tab').forEach(el => {
         el.classList.remove('on');
@@ -2238,7 +2113,6 @@ function spOdemeYap() {
     </div>`;
 }
 
-// Dışa aktarma fonksiyonları
 window.exportAthletes = function() {
     const data = AppState.data.athletes.map(a => ({
         Ad: a.fn,
@@ -2283,7 +2157,6 @@ function exportToExcel(data, filename) {
         toast(i18n[AppState.lang].exportSuccess, 'g');
     } catch (e) {
         console.error('Export error:', e);
-        // Fallback to CSV
         const csv = convertToCSV(data);
         downloadFile(csv, `${filename}.csv`, 'text/csv');
     }
@@ -2312,13 +2185,10 @@ function downloadFile(content, filename, type) {
     URL.revokeObjectURL(url);
 }
 
-// Başlatma
 document.addEventListener('DOMContentLoaded', async () => {
-    // Tema ve dil
     applyTheme(AppState.theme);
     applyLang(AppState.lang);
     
-    // Gizli admin kontrolü
     if (window.location.href.includes('admin')) {
         document.getElementById('login-tabs').classList.add('dn');
         document.getElementById('login-sporcu').classList.add('dn');
@@ -2326,6 +2196,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('login-admin').classList.remove('dn');
     }
     
-    // Session kontrolü
     await restoreSession();
 });
