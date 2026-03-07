@@ -1,9 +1,9 @@
 /* ============================================================
-   SPORCU PANELI — script.js (GÜNCEL: Global Hata Yakalayıcı & Tam Onarım)
+   SPORCU PANELI — script.js (GÜNCEL: İsim Çakışması ve Crash Fix)
    Dragos Futbol Akademisi Yönetim Sistemi
    ============================================================ */
 
-// ANA HATA YAKALAYICI: Eğer sistem çökerse bize sebebini ekranda söyleyecek!
+// ANA HATA YAKALAYICI
 window.onerror = function(msg, url, line, col, error) {
     var err = "SİSTEM HATASI!\nMesaj: " + msg + "\nSatır: " + line;
     console.error(err, error);
@@ -150,7 +150,13 @@ function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&
 function fmtN(n) { return Number(n || 0).toLocaleString('tr-TR'); }
 function fmtD(s) { if (!s) return '-'; try { var d = new Date(s); return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear(); } catch(e) { return s; } }
 function age(bd) { if (!bd) return '-'; var d = new Date(bd), now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }
-function gv(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+// GÜVENLİ VERİ OKUMA: Hatalı kutu veya tanımsız ID'lerde çökmeyi önler
+function gv(id) { 
+    var el = document.getElementById(id); 
+    return (el && el.value !== undefined) ? String(el.value).trim() : ''; 
+}
+
 function gvn(id) { return parseFloat(gv(id)) || 0; }
 function stl(s) { var m = { active: 'Aktif', inactive: 'Pasif', pending: 'Bekliyor', completed: 'Tamamlandı', overdue: 'Gecikti', cancelled: 'İptal' }; return m[s] || s || '-'; }
 function stc(s) { var m = { active: 'bg-g', inactive: 'bg-r', pending: 'bg-y', completed: 'bg-g', overdue: 'bg-r', cancelled: 'bg-r' }; return m[s] || 'bg-b'; }
@@ -226,11 +232,13 @@ async function loadBranchData(forceRefresh = false) {
   try {
     var bid = currentBranchId; var cacheKey = 'branchData_' + bid;
     
+    // GUVENLI CACHE YUKLEME (KENDI KENDINI ONARIR)
     if (!forceRefresh) { 
         var cached = localStorage.getItem(cacheKey); 
         if (cached) { 
             try { 
                 var parsed = JSON.parse(cached); 
+                // Eger onbellek bozuksa (settings vs yoksa) sildirip veritabanina yonlendir
                 if (!parsed || !parsed.settings) throw new Error("Bozuk Onbellek");
                 
                 if (Date.now() - parsed.timestamp < 5 * 60 * 1000) { 
@@ -247,7 +255,7 @@ async function loadBranchData(forceRefresh = false) {
                     return; 
                 } 
             } catch(e) {
-                localStorage.removeItem(cacheKey); 
+                localStorage.removeItem(cacheKey); // Bozuk cache'i sil ve DB'den cekmeye devam et
             } 
         } 
     }
@@ -258,12 +266,8 @@ async function loadBranchData(forceRefresh = false) {
     attData = {}; (res[3] || []).forEach(function(r) { if (!attData[r.att_date]) attData[r.att_date] = {}; attData[r.att_date][r.athlete_id] = r.status; });
     messages = (res[4] || []).map(dbToMsg);
     var branch = getBranch(bid);
-    
-    if (res[5] && res[5][0]) { settings = dbToSettings(res[5][0]) || {}; } 
-    else { settings = { id: uid(), schoolName: branch ? branch.name : 'Sube' }; }
-    
+    if (res[5] && res[5][0]) { settings = dbToSettings(res[5][0]) || {}; } else { settings = { id: uid(), schoolName: branch ? branch.name : 'Sube' }; }
     if (!settings.schoolName || settings.schoolName === 'Sube') settings.schoolName = branch ? branch.name : 'Dragos Futbol Akademisi';
-    
     sports = (res[6] || []).map(dbToSport); classes = (res[7] || []).map(dbToClass);
     if (settings.netgsmUser) { NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader || 'SPORCU'; }
     var dataToCache = { timestamp: Date.now(), athletes: athletes, payments: payments, coaches: coaches, settings: settings, sports: sports, classes: classes, attData: attData, messages: messages };
@@ -406,7 +410,6 @@ function pgDashboard() { updateBadges(); var total = athletes.length, active = a
 function renderDashCharts(inc, exp) { var el = document.getElementById('dash-chart'); if (!el) return; el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:center"><div style="display:flex;align-items:center;gap:10px"><div style="width:12px;height:12px;border-radius:50%;background:var(--green)"></div><span style="font-size:13px">Gelir: <b>' + fmtN(inc) + ' &#x20BA;</b></span></div><div style="display:flex;align-items:center;gap:10px"><div style="width:12px;height:12px;border-radius:50%;background:var(--red)"></div><span style="font-size:13px">Gider: <b>' + fmtN(exp) + ' &#x20BA;</b></span></div><div style="height:20px;background:var(--bg3);border-radius:10px;overflow:hidden"><div style="width:' + (inc + exp > 0 ? inc / (inc + exp) * 100 : 50) + '%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div></div>'; var spData = {}; athletes.forEach(function(a) { var sp = a.sp || 'Diger'; spData[sp] = (spData[sp] || 0) + 1; }); var spEl = document.getElementById('dash-sport-chart'); if (spEl) { var bars = Object.keys(spData).map(function(k) { return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:100%;max-width:40px;background:var(--grad);border-radius:4px 4px 0 0;min-height:3px;height:' + (spData[k] * 8) + 'px"></div><span style="font-size:10px;color:var(--text2)">' + esc(k) + '</span></div>'; }).join(''); spEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:6px;height:100%;padding:0 10px">' + bars + '</div>'; } }
 
 function pgAthletes() { var list = athletes; if (_athFilter.sp) list = list.filter(function(a) { return a.sp === _athFilter.sp; }); if (_athFilter.st) list = list.filter(function(a) { return a.st === _athFilter.st; }); if (_athFilter.cls) list = list.filter(function(a) { return a.clsId === _athFilter.cls; }); if (_athFilter.q) { var q = _athFilter.q.toLowerCase(); list = list.filter(function(a) { return (a.fn + ' ' + a.ln).toLowerCase().indexOf(q) >= 0 || a.tc.indexOf(q) >= 0; }); } return '<div class="ph"><div class="stit">Sporcular</div><div class="ssub">Kayıtlı sporcuları yönet</div></div><div class="filters mb3"><select class="fs" onchange="_athFilter.sp=this.value;go(\'athletes\')"><option value="">Tüm Branşlar</option>' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (_athFilter.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select><select class="fs" onchange="_athFilter.st=this.value;go(\'athletes\')"><option value="">Tüm Durumlar</option><option value="active"' + (_athFilter.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (_athFilter.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select><select class="fs" onchange="_athFilter.cls=this.value;go(\'athletes\')"><option value="">Tüm Sınıflar</option>' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (_athFilter.cls === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select><input class="fs" type="text" placeholder="Ara..." value="' + esc(_athFilter.q) + '" onchange="_athFilter.q=this.value;go(\'athletes\')"/></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editAth()">+ Yeni Sporcu</button><button class="btn bs" onclick="importExcelAthletes()">&#x1F4E5; Excel Yükle</button><button class="btn bs" onclick="exportAthletes()">&#x1F4E4; Excel İndir</button></div><div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Branş</th><th>Sınıf</th><th>Durum</th><th>Ücret</th><th>İşlemler</th></tr></thead><tbody>' + list.map(function(a) { return '<tr><td><div class="flex fca gap2">' + getAvaStr(36) + '<div><div class="tw6">' + esc(a.fn) + ' ' + esc(a.ln) + '</div><div class="ts tm">' + age(a.bd) + ' yaş</div></div></div></td><td>' + esc(a.tc) + '</td><td>' + semi(a.sp) + ' ' + esc(a.sp) + '</td><td>' + esc(clsName(a.clsId)) + '</td><td><span class="bg ' + stc(a.st) + '">' + stl(a.st) + '</span></td><td class="tw6">' + fmtN(a.fee) + ' &#x20BA;</td><td><button class="btn btn-xs bp" onclick="editAth(\'' + a.id + '\')">Düzenle</button> <button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button></td></tr>'; }).join('') + '</tbody></table></div></div>'; }
-
 function editAth(id) { 
   var a = id ? athletes.find(function(x) { return x.id === id; }) : null; var isNew = !a; 
   modal(isNew ? 'Yeni Sporcu' : 'Sporcu Düzenle', '<div class="g21"><div class="fgr"><label>Ad</label><input id="a-fn" value="' + esc(a ? a.fn : '') + '"/></div><div class="fgr"><label>Soyad</label><input id="a-ln" value="' + esc(a ? a.ln : '') + '"/></div></div><div class="g21"><div class="fgr"><label>TC Kimlik</label><input id="a-tc" type="tel" maxlength="11" value="' + esc(a ? a.tc : '') + '"/></div><div class="fgr"><label>Doğum Tarihi</label><input id="a-bd" type="date" value="' + esc(a ? a.bd : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Cinsiyet</label><select id="a-gn"><option value="E"' + (a && a.gn === 'E' ? ' selected' : '') + '>Erkek</option><option value="K"' + (a && a.gn === 'K' ? ' selected' : '') + '>Kadın</option></select></div><div class="fgr"><label>Telefon</label><input id="a-ph" type="tel" value="' + esc(a ? a.ph : '') + '"/></div></div><div class="fgr mb2"><label>E-posta</label><input id="a-em" type="email" value="' + esc(a ? a.em : '') + '"/></div><div class="g21"><div class="fgr"><label>Branş</label><select id="a-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (a && a.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Sınıf</label><select id="a-cls">' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (a && a.clsId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></div></div><div class="g21"><div class="fgr"><label>Kategori</label><input id="a-cat" value="' + esc(a ? a.cat : '') + '"/></div><div class="fgr"><label>Lisans No</label><input id="a-lic" value="' + esc(a ? a.lic : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Kayıt Tarihi</label><input id="a-rd" type="date" value="' + esc(a ? a.rd : tod()) + '"/></div><div class="fgr"><label>Durum</label><select id="a-st"><option value="active"' + (a && a.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (a && a.st === 'inactive' ? ' selected' : '') + '>Pasif</option><option value="pending"' + (a && a.st === 'pending' ? ' selected' : '') + '>Bekliyor</option></select></div></div><div class="g21"><div class="fgr"><label>Aylık Ücret</label><input id="a-fee" type="number" value="' + (a ? a.fee : '') + '"/></div><div class="fgr"><label>Vade Günü</label><input id="a-vd" type="number" value="' + (a ? a.vd : '5') + '"/></div></div><div class="fgr mb2"><label>Notlar</label><textarea id="a-nt">' + esc(a ? a.nt : '') + '</textarea></div><div class="dv"></div><div class="tw6 tsm mb2">Veli Bilgileri</div><div class="g21"><div class="fgr"><label>Veli Ad Soyad</label><input id="a-pn" value="' + esc(a ? a.pn : '') + '"/></div><div class="fgr"><label>Veli Telefon</label><input id="a-pph" type="tel" value="' + esc(a ? a.pph : '') + '"/></div></div><div class="fgr mb2"><label>Veli E-posta</label><input id="a-pem" type="email" value="' + esc(a ? a.pem : '') + '"/></div><div class="fgr mb2"><label>Sporcu Şifresi (Varsayılan: TC son 4)</label><input id="a-sppass" type="text" placeholder="Boş bırak = TC son 4" value="' + esc(a ? a.spPass : '') + '"/></div>', [
@@ -566,12 +569,14 @@ function editBranch() { modal('Yeni Şube', '<div class="fgr mb2"><label>Şube A
 function switchBranch(id) { currentBranchId = id; loadBranchData(true).then(function() { toast('Şube değiştirildi!', 'g'); go('dashboard'); }); }
 
 function pgSports() { return '<div class="ph"><div class="stit">Branşlar</div><div class="ssub">Spor branşları</div></div><div class="flex fjb fca mb3 gap2"><button class="btn bp" onclick="editSport()">+ Yeni Branş</button></div><div class="g2">' + sports.map(function(s) { return '<div class="card"><div class="flex fca gap2"><div style="font-size:32px">' + semi(s.name) + '</div><div><div class="tw6">' + esc(s.name) + '</div><div class="ts tm">' + athletes.filter(function(a) { return a.sp === s.name; }).length + ' sporcu</div></div></div></div>'; }).join('') + '</div>'; }
+
 function editSport() { 
-    modal('Yeni Branş', '<div class="fgr mb2"><label>Branş Adı</label><input id="sp-name"/></div><div class="fgr mb2"><label>İkon (emoji)</label><input id="sp-icon" placeholder="&#x26BD;"/></div>', [
+    // DİKKAT: İD ÇAKIŞMASI BURADA DÜZELTİLDİ ("sp-name" yerine "sport-name" yapıldı)
+    modal('Yeni Branş', '<div class="fgr mb2"><label>Branş Adı</label><input id="sport-name"/></div><div class="fgr mb2"><label>İkon (emoji)</label><input id="sport-icon" placeholder="&#x26BD;"/></div>', [
         { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
         { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
             try {
-                var name = gv('sp-name'), icon = gv('sp-icon'); 
+                var name = gv('sport-name'), icon = gv('sport-icon'); 
                 if (!name) { toast('Branş adı zorunlu!', 'e'); return; } 
                 var obj = { id: uid(), org_id: currentOrgId, branch_id: currentBranchId, name: name, icon: icon }; 
                 var res = await dbSaveSport(obj); 
@@ -649,4 +654,4 @@ async function submitSpPayment() {
 
 function spDuyurular() { var html = '<div class="card"><div class="tw6 tsm mb2">Duyurular</div>'; var announcements = messages.filter(function(m) { return m.role === 'admin'; }); if (!announcements.length) html += '<p class="tm ts">Henüz duyuru yok.</p>'; else { html += announcements.map(function(m) { return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div><div class="ts" style="margin-top:4px">' + esc(m.body.slice(0, 100)) + (m.body.length > 100 ? '...' : '') + '</div></div></div>'; }).join(''); } html += '</div>'; return html; }
 
-document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli Yüklendi - Hata Koruyucu Sürüm'); });
+document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli Yüklendi - Kesin Çözüm Sürümü'); });
