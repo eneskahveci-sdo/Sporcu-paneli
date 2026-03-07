@@ -387,14 +387,16 @@ function editAth(id) {
   modal(isNew ? 'Yeni Sporcu' : 'Sporcu Düzenle', '<div class="g21"><div class="fgr"><label>Ad</label><input id="a-fn" value="' + esc(a ? a.fn : '') + '"/></div><div class="fgr"><label>Soyad</label><input id="a-ln" value="' + esc(a ? a.ln : '') + '"/></div></div><div class="g21"><div class="fgr"><label>TC Kimlik</label><input id="a-tc" type="tel" maxlength="11" value="' + esc(a ? a.tc : '') + '"/></div><div class="fgr"><label>Doğum Tarihi</label><input id="a-bd" type="date" value="' + esc(a ? a.bd : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Cinsiyet</label><select id="a-gn"><option value="E"' + (a && a.gn === 'E' ? ' selected' : '') + '>Erkek</option><option value="K"' + (a && a.gn === 'K' ? ' selected' : '') + '>Kadın</option></select></div><div class="fgr"><label>Telefon</label><input id="a-ph" type="tel" value="' + esc(a ? a.ph : '') + '"/></div></div><div class="fgr mb2"><label>E-posta</label><input id="a-em" type="email" value="' + esc(a ? a.em : '') + '"/></div><div class="g21"><div class="fgr"><label>Branş</label><select id="a-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (a && a.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Sınıf</label><select id="a-cls">' + classes.map(function(c) { return '<option value="' + esc(c.id) + '"' + (a && a.clsId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select></div></div><div class="g21"><div class="fgr"><label>Kategori</label><input id="a-cat" value="' + esc(a ? a.cat : '') + '"/></div><div class="fgr"><label>Lisans No</label><input id="a-lic" value="' + esc(a ? a.lic : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Kayıt Tarihi</label><input id="a-rd" type="date" value="' + esc(a ? a.rd : tod()) + '"/></div><div class="fgr"><label>Durum</label><select id="a-st"><option value="active"' + (a && a.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (a && a.st === 'inactive' ? ' selected' : '') + '>Pasif</option><option value="pending"' + (a && a.st === 'pending' ? ' selected' : '') + '>Bekliyor</option></select></div></div><div class="g21"><div class="fgr"><label>Aylık Ücret</label><input id="a-fee" type="number" value="' + (a ? a.fee : '') + '"/></div><div class="fgr"><label>Vade Günü</label><input id="a-vd" type="number" value="' + (a ? a.vd : '5') + '"/></div></div><div class="fgr mb2"><label>Notlar</label><textarea id="a-nt">' + esc(a ? a.nt : '') + '</textarea></div><div class="dv"></div><div class="tw6 tsm mb2">Veli Bilgileri</div><div class="g21"><div class="fgr"><label>Veli Ad Soyad</label><input id="a-pn" value="' + esc(a ? a.pn : '') + '"/></div><div class="fgr"><label>Veli Telefon</label><input id="a-pph" type="tel" value="' + esc(a ? a.pph : '') + '"/></div></div><div class="fgr mb2"><label>Veli E-posta</label><input id="a-pem" type="email" value="' + esc(a ? a.pem : '') + '"/></div><div class="fgr mb2"><label>Sporcu Şifresi (Varsayılan: TC son 4)</label><input id="a-sppass" type="text" placeholder="Boş bırak = TC son 4" value="' + esc(a ? a.spPass : '') + '"/></div>', [
     { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
     { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
-        var obj = { id: a ? a.id : uid(), fn: gv('a-fn'), ln: gv('a-ln'), tc: gv('a-tc'), bd: gv('a-bd'), gn: gv('a-gn'), ph: gv('a-ph'), em: gv('a-em'), sp: gv('a-sp'), cat: gv('a-cat'), lic: gv('a-lic'), rd: gv('a-rd'), st: gv('a-st'), fee: gvn('a-fee'), vd: gvn('a-vd'), nt: gv('a-nt'), clsId: gv('a-cls'), pn: gv('a-pn'), pph: gv('a-pph'), pem: gv('a-pem'), spPass: gv('a-sppass') }; 
-        if (!obj.fn || !obj.ln || !obj.tc) { toast('Ad, soyad ve TC zorunlu!', 'e'); return; } 
-        var res = await dbSaveAth(obj); 
-        if(res) { 
-            if (isNew) athletes.push(obj); 
-            else { var idx = athletes.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) athletes[idx] = obj; } 
-            toast('Sporcu kaydedildi!', 'g'); closeModal(); go('athletes'); 
-        } 
+        try {
+            var obj = { id: a ? a.id : uid(), fn: gv('a-fn'), ln: gv('a-ln'), tc: gv('a-tc'), bd: gv('a-bd'), gn: gv('a-gn'), ph: gv('a-ph'), em: gv('a-em'), sp: gv('a-sp'), cat: gv('a-cat'), lic: gv('a-lic'), rd: gv('a-rd'), st: gv('a-st'), fee: gvn('a-fee'), vd: gvn('a-vd'), nt: gv('a-nt'), clsId: gv('a-cls'), pn: gv('a-pn'), pph: gv('a-pph'), pem: gv('a-pem'), spPass: gv('a-sppass') }; 
+            if (!obj.fn || !obj.ln || !obj.tc) { toast('Ad, soyad ve TC zorunlu!', 'e'); return; } 
+            var res = await dbSaveAth(obj); 
+            if(res) { 
+                if (isNew) athletes.push(obj); 
+                else { var idx = athletes.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) athletes[idx] = obj; } 
+                toast('Sporcu kaydedildi!', 'g'); closeModal(); go('athletes'); 
+            } 
+        } catch(err) { console.error(err); toast("Kayıt sırasında hata oluştu!", "e"); }
     }}
   ]); 
 }
@@ -440,20 +442,22 @@ function editPay(id) {
     '<div class="fgr"><label>Fatura No</label><input id="p-inv" value="' + esc(p ? p.inv : '') + '"/></div></div>', [
         { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
         { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
-            var aid = gv('p-aid'), ath = athletes.find(function(a) { return a && a.id === aid; }); 
-            var obj = { 
-                id: p ? p.id : uid(), aid: aid, an: ath ? ath.fn + ' ' + ath.ln : '', 
-                amt: gvn('p-amt'), dt: gv('p-dt'), ty: gv('p-ty'), cat: gv('p-srv') || 'Aidat', 
-                ds: gv('p-ds'), st: gv('p-st'), inv: gv('p-inv'), dd: gv('p-dt'),
-                serviceName: gv('p-srv'), installmentName: gv('p-inst'), discount: gvn('p-disc'), vatRate: gvn('p-vat')
-            }; 
-            if (!obj.amt) { toast('Tutar zorunlu!', 'e'); return; } 
-            var res = await dbSavePay(obj); 
-            if(res) { 
-                if (isNew) payments.push(obj); 
-                else { var idx = payments.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) payments[idx] = obj; } 
-                toast('Ödeme kaydedildi!', 'g'); closeModal(); go('payments'); 
-            } 
+            try {
+                var aid = gv('p-aid'), ath = athletes.find(function(a) { return a && a.id === aid; }); 
+                var obj = { 
+                    id: p ? p.id : uid(), aid: aid, an: ath ? ath.fn + ' ' + ath.ln : '', 
+                    amt: gvn('p-amt'), dt: gv('p-dt'), ty: gv('p-ty'), cat: gv('p-srv') || 'Aidat', 
+                    ds: gv('p-ds'), st: gv('p-st'), inv: gv('p-inv'), dd: gv('p-dt'),
+                    serviceName: gv('p-srv'), installmentName: gv('p-inst'), discount: gvn('p-disc'), vatRate: gvn('p-vat')
+                }; 
+                if (!obj.amt) { toast('Tutar zorunlu!', 'e'); return; } 
+                var res = await dbSavePay(obj); 
+                if(res) { 
+                    if (isNew) payments.push(obj); 
+                    else { var idx = payments.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) payments[idx] = obj; } 
+                    toast('Ödeme kaydedildi!', 'g'); closeModal(); go('payments'); 
+                } 
+            } catch(err) { console.error(err); toast("Ödeme kaydı hatası!", "e"); }
         }}
     ]); 
 }
@@ -485,14 +489,16 @@ function editCoach(id) {
     modal(isNew ? 'Yeni Antrenör' : 'Antrenör Düzenle', '<div class="g21"><div class="fgr"><label>Ad</label><input id="c-fn" value="' + esc(c ? c.fn : '') + '"/></div><div class="fgr"><label>Soyad</label><input id="c-ln" value="' + esc(c ? c.ln : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Telefon</label><input id="c-ph" type="tel" value="' + esc(c ? c.ph : '') + '"/></div><div class="fgr"><label>E-posta</label><input id="c-em" type="email" value="' + esc(c ? c.em : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Branş</label><select id="c-sp">' + sports.map(function(s) { return '<option value="' + esc(s.name) + '"' + (c && c.sp === s.name ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Maaş</label><input id="c-sal" type="number" value="' + (c ? c.sal : '') + '"/></div></div><div class="g21"><div class="fgr"><label>Durum</label><select id="c-st"><option value="active"' + (c && c.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (c && c.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select></div><div class="fgr"><label>Başlama Tarihi</label><input id="c-sd" type="date" value="' + esc(c ? c.sd : tod()) + '"/></div></div><div class="fgr mb2"><label>Notlar</label><textarea id="c-nt">' + esc(c ? c.nt : '') + '</textarea></div>', [
         { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
         { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
-            var obj = { id: c ? c.id : uid(), fn: gv('c-fn'), ln: gv('c-ln'), ph: gv('c-ph'), em: gv('c-em'), sp: gv('c-sp'), sal: gvn('c-sal'), st: gv('c-st'), sd: gv('c-sd'), nt: gv('c-nt') }; 
-            if (!obj.fn || !obj.ln) { toast('Ad ve soyad zorunlu!', 'e'); return; } 
-            var res = await dbSaveCoach(obj); 
-            if(res){ 
-                if (isNew) coaches.push(obj); 
-                else { var idx = coaches.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) coaches[idx] = obj; } 
-                toast('Antrenör kaydedildi!', 'g'); closeModal(); go('coaches'); 
-            } 
+            try {
+                var obj = { id: c ? c.id : uid(), fn: gv('c-fn'), ln: gv('c-ln'), ph: gv('c-ph'), em: gv('c-em'), sp: gv('c-sp'), sal: gvn('c-sal'), st: gv('c-st'), sd: gv('c-sd'), nt: gv('c-nt') }; 
+                if (!obj.fn || !obj.ln) { toast('Ad ve soyad zorunlu!', 'e'); return; } 
+                var res = await dbSaveCoach(obj); 
+                if(res){ 
+                    if (isNew) coaches.push(obj); 
+                    else { var idx = coaches.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) coaches[idx] = obj; } 
+                    toast('Antrenör kaydedildi!', 'g'); closeModal(); go('coaches'); 
+                } 
+            } catch (err) { console.error(err); toast("Antrenör kayıt hatası!", "e"); }
         }}
     ]); 
 }
@@ -554,12 +560,14 @@ function editSettings() {
     modal('Ayarlar Düzenle', '<div class="fgr mb2"><label>Kurum Adı</label><input id="s-name" value="' + esc(settings ? settings.schoolName : '') + '"/></div><div class="fgr mb2"><label>Adres</label><textarea id="s-addr">' + esc(settings ? settings.address : '') + '</textarea></div><div class="fgr mb2"><label>Telefon</label><input id="s-phone" value="' + esc(settings ? settings.ownerPhone : '') + '"/></div><div class="dv"></div><div class="fgr mb2"><label>Banka Adı</label><input id="s-bank" value="' + esc(settings ? settings.bankName : '') + '"/></div><div class="fgr mb2"><label>Hesap Adı</label><input id="s-acc" value="' + esc(settings ? settings.accountName : '') + '"/></div><div class="fgr mb2"><label>IBAN</label><input id="s-iban" value="' + esc(settings ? settings.iban : '') + '"/></div><div class="dv"></div><div class="fgr mb2"><label>NetGSM Kullanıcı</label><input id="s-ng-user" value="' + esc(settings ? settings.netgsmUser : '') + '"/></div><div class="fgr mb2"><label>NetGSM Şifre</label><input id="s-ng-pass" type="password" placeholder="Değiştirmek için girin"/></div><div class="fgr mb2"><label>NetGSM Başlık</label><input id="s-ng-head" value="' + esc(settings ? settings.netgsmHeader || 'SPORCU' : 'SPORCU') + '"/></div>', [
         { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
         { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
-            if(!settings) settings = {}; 
-            settings.schoolName = gv('s-name'); settings.address = gv('s-addr'); settings.ownerPhone = gv('s-phone'); settings.bankName = gv('s-bank'); settings.accountName = gv('s-acc'); settings.iban = gv('s-iban'); settings.netgsmUser = gv('s-ng-user'); 
-            var np = gv('s-ng-pass'); if (np) settings.netgsmPass = np; settings.netgsmHeader = gv('s-ng-head'); 
-            NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader; 
-            var success = await saveS(); 
-            if(success) { toast('Ayarlar kaydedildi!', 'g'); closeModal(); go('settings'); } 
+            try {
+                if(!settings) settings = {}; 
+                settings.schoolName = gv('s-name'); settings.address = gv('s-addr'); settings.ownerPhone = gv('s-phone'); settings.bankName = gv('s-bank'); settings.accountName = gv('s-acc'); settings.iban = gv('s-iban'); settings.netgsmUser = gv('s-ng-user'); 
+                var np = gv('s-ng-pass'); if (np) settings.netgsmPass = np; settings.netgsmHeader = gv('s-ng-head'); 
+                NETGSM_USER = settings.netgsmUser; NETGSM_PASS = settings.netgsmPass || ''; NETGSM_HEADER = settings.netgsmHeader; 
+                var success = await saveS(); 
+                if(success) { toast('Ayarlar kaydedildi!', 'g'); closeModal(); go('settings'); } 
+            } catch (err) { toast("Ayarlar kaydedilemedi: " + err, 'e'); }
         }}
     ]); 
 }
@@ -578,11 +586,13 @@ function editSport() {
     modal('Yeni Branş', '<div class="fgr mb2"><label>Branş Adı</label><input id="sport-name"/></div><div class="fgr mb2"><label>İkon (emoji)</label><input id="sport-icon" placeholder="&#x26BD;"/></div>', [
         { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
         { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
-            var name = gv('sport-name'), icon = gv('sport-icon'); 
-            if (!name) { toast('Branş adı zorunlu!', 'e'); return; } 
-            var obj = { id: uid(), org_id: currentOrgId, branch_id: currentBranchId, name: name, icon: icon }; 
-            var res = await dbSaveSport(obj); 
-            if(res) { sports.push(obj); toast('Branş eklendi!', 'g'); closeModal(); go('sports'); } 
+            try {
+                var name = gv('sport-name'), icon = gv('sport-icon'); 
+                if (!name) { toast('Branş adı zorunlu!', 'e'); return; } 
+                var obj = { id: uid(), org_id: currentOrgId, branch_id: currentBranchId, name: name, icon: icon }; 
+                var res = await dbSaveSport(obj); 
+                if(res) { sports.push(obj); toast('Branş eklendi!', 'g'); closeModal(); go('sports'); } 
+            } catch (err) { toast("Branş kayıt hatası!", "e"); }
         }}
     ]); 
 }
@@ -593,14 +603,16 @@ function editClass(id) {
     modal(isNew ? 'Yeni Sınıf' : 'Sınıf Düzenle', '<div class="fgr mb2"><label>Sınıf Adı</label><input id="cls-name" value="' + esc(c ? c.name : '') + '"/></div><div class="g21"><div class="fgr"><label>Branş</label><select id="cls-sp">' + sports.map(function(s) { return '<option value="' + esc(s.id) + '"' + (c && c.spId === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="fgr"><label>Antrenör</label><select id="cls-coach"><option value="">Seçiniz</option>' + coaches.map(function(co) { return '<option value="' + esc(co.id) + '"' + (c && c.coachId === co.id ? ' selected' : '') + '>' + esc(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div></div><div class="g21"><div class="fgr"><label>Kapasite</label><input id="cls-cap" type="number" value="' + (c ? c.cap : '20') + '"/></div><div class="fgr"><label>Program</label><input id="cls-sch" value="' + esc(c ? c.schedule : '') + '" placeholder="Pzt-Cmt 18:00-20:00"/></div></div>', [
         { lbl: 'İptal', cls: 'bs', fn: function(){ closeModal(); } }, 
         { lbl: 'Kaydet', cls: 'bp', fn: async function() { 
-            var obj = { id: c ? c.id : uid(), name: gv('cls-name'), spId: gv('cls-sp'), coachId: gv('cls-coach'), cap: gvn('cls-cap'), schedule: gv('cls-sch') }; 
-            if (!obj.name) { toast('Sınıf adı zorunlu!', 'e'); return; } 
-            var res = await dbSaveClass(obj); 
-            if(res) { 
-                if (isNew) classes.push(obj); 
-                else { var idx = classes.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) classes[idx] = obj; } 
-                toast('Sınıf kaydedildi!', 'g'); closeModal(); go('classes'); 
-            } 
+            try {
+                var obj = { id: c ? c.id : uid(), name: gv('cls-name'), spId: gv('cls-sp'), coachId: gv('cls-coach'), cap: gvn('cls-cap'), schedule: gv('cls-sch') }; 
+                if (!obj.name) { toast('Sınıf adı zorunlu!', 'e'); return; } 
+                var res = await dbSaveClass(obj); 
+                if(res) { 
+                    if (isNew) classes.push(obj); 
+                    else { var idx = classes.findIndex(function(x) { return x && x.id === obj.id; }); if (idx >= 0) classes[idx] = obj; } 
+                    toast('Sınıf kaydedildi!', 'g'); closeModal(); go('classes'); 
+                } 
+            } catch (err) { toast("Sınıf kayıt hatası!", "e"); }
         }}
     ]); 
 }
