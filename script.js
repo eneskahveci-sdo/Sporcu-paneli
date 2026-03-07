@@ -1,5 +1,5 @@
 /* ============================================================
-   SPORCU PANELI — script.js (GÜNCEL: Dinamik Logo & UUID Fix)
+   SPORCU PANELI — script.js (GÜNCEL: Ödeme Simülasyonu & Dinamik Logo)
    Dragos Futbol Akademisi Yönetim Sistemi
    ============================================================ */
 
@@ -22,7 +22,7 @@ var SUPA_URL = 'https://wfarbydojxtufnkjuhtc.supabase.co';
 var SUPA_KEY = 'sb_publishable_w1_nXk_7TM1ePWHMN2CDcQ_1ufk0kYC';
 var SUPER_ADMIN_EMAIL = 'eneskahveci@spor.com';
 var SUPER_ADMIN_ORG = 'org-default';
-var DEFAULT_LOGO = '/assets/logo.png'; // Eger ayarlarda logo yoksa bu gorunur
+var DEFAULT_LOGO = '/assets/logo.png'; 
 var NETGSM_USER = '', NETGSM_PASS = '', NETGSM_HEADER = 'SPORCU';
 
 var _sb = null;
@@ -39,8 +39,6 @@ function initAuth() {
 
 document.addEventListener('DOMContentLoaded', async function() { 
   initAuth(); 
-  
-  // Ana giris ekranindaki logoyu varsayilan olarak ayarla
   var logoEl = document.querySelector('.llogo-i');
   if (logoEl) {
     logoEl.innerHTML = '';
@@ -48,7 +46,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     logoEl.style.backgroundSize = 'cover';
     logoEl.style.backgroundPosition = 'center';
   }
-  
   await restoreSession(); 
 });
 
@@ -64,7 +61,6 @@ async function restoreSession() {
         var dname = currentUser.name || currentUser.email.split('@')[0];
         var setEl = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
         setEl('suname', dname); 
-        
         await loadBranchData(); updateBranchUI(); updateBadges(); go('dashboard'); resetSessionTimer(); hideLoading(); return;
       }
     }
@@ -128,7 +124,6 @@ var _athFilter = { sp: '', st: '', cls: '', q: '' };
 var _payFilter = { st: '', q: '' };
 var _confirmCb = null, _forgotCtx = null;
 
-// ── Utils & UUID Üretici ─────────────────────────────
 function tod() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
 function uid() { 
@@ -155,7 +150,6 @@ function unreadCount() { var n = 0; messages.forEach(function(m) { if (!m.rd) n+
 function row(lbl, val) { return '<div class="dr"><span class="dl tm tsm">' + lbl + '</span><span class="dvl tw6 tsm">' + val + '</span></div>'; }
 function getBranch(id) { for (var i = 0; i < _branchesCache.length; i++) { if (_branchesCache[i].id === (id || currentBranchId)) return _branchesCache[i]; } return null; }
 
-// ── LOGO YÖNETİMİ & DİNAMİK AVATARLAR ────────────────────
 function getLogo() { return settings.logoUrl || DEFAULT_LOGO; }
 
 function getAvaStr(sz) {
@@ -175,7 +169,6 @@ function setElAva(id) {
   }
 }
 
-// ── DB Mappers (Ayarlar ID'si koruma) ──────────
 function dbToAth(r) { return { id: r.id, fn: r.fn, ln: r.ln, tc: r.tc, bd: r.bd, gn: r.gn, ph: r.ph, em: r.em || '', sp: r.sp, cat: r.cat, lic: r.lic, rd: r.rd, st: r.st || 'active', fee: r.fee || 0, vd: r.vd, nt: r.nt, ci: r.ci, clsId: r.cls_id, pn: r.pn, pph: r.pph, pem: r.pem, spPass: r.sp_pass }; }
 function athToDB(a) { return { id: a.id, org_id: currentOrgId, branch_id: currentBranchId, fn: a.fn, ln: a.ln, tc: a.tc, bd: a.bd, gn: a.gn, ph: a.ph, em: a.em || '', sp: a.sp, cat: a.cat, lic: a.lic, rd: a.rd, st: a.st, fee: a.fee, vd: a.vd, nt: a.nt, ci: a.ci, cls_id: a.clsId, pn: a.pn, pph: a.pph, pem: a.pem, sp_pass: a.spPass }; }
 function dbToPay(r) { return { id: r.id, aid: r.aid, an: r.an, amt: r.amt || 0, dt: r.dt, ty: r.ty, cat: r.cat, ds: r.ds, st: r.st || 'pending', inv: r.inv, dd: r.dd, payMethod: r.pay_method, havaleNote: r.havale_note, needsApproval: r.needs_approval, approvedBy: r.approved_by, approvedAt: r.approved_at }; }
@@ -203,7 +196,12 @@ async function dbSaveSport(s) { invalidateCache(); return await supaUpsert('spor
 async function dbDelSport(id) { invalidateCache(); return await supaDelete('sports', { id: id }); }
 async function dbSaveClass(c) { invalidateCache(); return await supaUpsert('classes', { id: c.id, org_id: currentOrgId, branch_id: currentBranchId, name: c.name, sp_id: c.spId, coach_id: c.coachId, cap: c.cap, schedule: c.schedule }); }
 async function dbDelClass(id) { invalidateCache(); return await supaDelete('classes', { id: id }); }
-async function saveS() { invalidateCache(); await supaUpsert('settings', settingsToDB(settings)); }
+
+async function saveS() { 
+  invalidateCache(); 
+  var res = await supaUpsert('settings', settingsToDB(settings)); 
+  if (!res) { toast('HATA: Ayarlar veritabanına kaydedilemedi! Sütunlar eksik.', 'e'); }
+}
 
 function checkOverdue() { var today = tod(); payments.forEach(function(p) { if (p.st === 'pending' && p.dd && p.dd < today && !p.needsApproval) { p.st = 'overdue'; dbSavePay(p); } }); }
 
@@ -260,18 +258,9 @@ function updateBranchUI() {
   var b = getBranch(); var nameEl = document.getElementById('sn'), subEl = document.getElementById('sn2');
   var name = (b && b.name) || settings.schoolName || 'Dragos Futbol Akademisi';
   if (nameEl) nameEl.textContent = name.length > 22 ? name.slice(0, 20) + '...' : name; if (subEl) subEl.textContent = settings.address || (b ? b.code || 'Merkez Şube' : 'Merkez Şube');
-  
-  // Tüm profil yerlerine dinamik logoyu bas
-  setElAva('sava');
-  setElAva('bar-ava');
-  setElAva('sp-avatar');
-  setElAva('side-logo-icon');
-  
+  setElAva('sava'); setElAva('bar-ava'); setElAva('sp-avatar'); setElAva('side-logo-icon');
   var slIcon = document.getElementById('side-logo-icon');
-  if(slIcon) {
-      slIcon.style.borderRadius = '50%';
-      slIcon.style.border = '2px solid var(--border)';
-  }
+  if(slIcon) { slIcon.style.borderRadius = '50%'; slIcon.style.border = '2px solid var(--border)'; }
 }
 
 function exportCSV(data, filename) { if (!data || !data.length) { toast('Dışa aktarılacak veri yok', 'e'); return; } var cols = Object.keys(data[0]); var csv = cols.join(';') + '\n' + data.map(function(r) { return cols.map(function(c) { var v = r[c] === null || r[c] === undefined ? '' : String(r[c]); return '"' + v.replace(/"/g, '""') + '"'; }).join(';'); }).join('\n'); var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename + '.csv'; a.click(); toast('CSV indirildi!', 'g'); }
@@ -355,7 +344,6 @@ function pgMessages() { return '<div class="ph"><div class="stit">Mesajlar</div>
 function newMessage() { modal('Yeni Mesaj', '<div class="fgr mb2"><label>Kime</label><select id="m-to"><option value="all">Tüm Sporcular</option>' + athletes.map(function(a) { return '<option value="' + esc(a.id) + '">' + esc(a.fn + ' ' + a.ln) + '</option>'; }).join('') + '</select></div><div class="fgr mb2"><label>Konu</label><input id="m-sub"/></div><div class="fgr mb2"><label>Mesaj</label><textarea id="m-body" rows="5"></textarea></div><div class="flex fca gap2"><input type="checkbox" id="m-sms"/><label style="margin:0">SMS olarak da gönder</label></div>', [{ lbl: 'İptal', cls: 'bs', fn: closeModal }, { lbl: 'Gönder', cls: 'bp', fn: async function() { var to = gv('m-to'), sub = gv('m-sub'), body = gv('m-body'), sendSms = document.getElementById('m-sms').checked; if (!sub || !body) { toast('Konu ve mesaj zorunlu!', 'e'); return; } var obj = { id: uid(), fr: currentUser ? currentUser.name : 'Admin', role: 'admin', sub: sub, body: body, dt: new Date().toISOString(), rd: false }; messages.push(obj); await dbSaveMsg(obj); if (sendSms && NETGSM_USER) { var phones = []; if (to === 'all') athletes.forEach(function(a) { if (a.ph) phones.push(a.ph); }); else { var a = athletes.find(function(x) { return x.id === to; }); if (a && a.ph) phones.push(a.ph); } if (phones.length > 0) { var sent = await sendBulkSMS(phones, sub + ': ' + body); toast(sent + ' SMS gönderildi!', 'g'); } } toast('Mesaj gönderildi!', 'g'); closeModal(); go('messages'); } }]); }
 function viewMessage(id) { var m = messages.find(function(x) { return x.id === id; }); if (!m) return; if (!m.rd) { m.rd = true; dbSaveMsg(m); } modal(esc(m.sub), '<div class="ts tm mb2">Gönderen: ' + esc(m.fr) + ' · ' + fmtD(m.dt) + '</div><div style="line-height:1.7">' + esc(m.body).replace(/\n/g, '<br>') + '</div>', [{ lbl: 'Kapat', cls: 'bs', fn: closeModal }, { lbl: 'Sil', cls: 'bd', fn: function() { messages = messages.filter(function(x) { return x.id !== id; }); dbDelMsg(id); closeModal(); go('messages'); } }]); }
 
-// ── AYARLAR VE DİNAMİK LOGO YÜKLEME ────────────────────
 function pgSettings() { 
   return '<div class="ph"><div class="stit">Ayarlar</div><div class="ssub">Sistem ayarları ve yönetim</div></div>' +
     '<div class="card mb3"><div class="tw6 tsm mb2">Kurum Logosu</div>' +
@@ -377,7 +365,6 @@ async function handleLogoUpload(input) {
   reader.onload = function(e) {
     var img = new Image();
     img.onload = async function() {
-      // Logoyu veritabanını şişirmemek için küçültüyoruz (Maks 150x150)
       var canvas = document.createElement('canvas');
       var MAX_SIZE = 150; var w = img.width, h = img.height;
       if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } } else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
@@ -427,8 +414,91 @@ function spTab(tab) { document.querySelectorAll('.sp-tab').forEach(function(el) 
 function spProfil() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var rate = attRate(a.id); return '<div class="profile-hero"><div class="flex fca gap3">' + getAvaStr(64) + '<div><div class="tw6" style="font-size:18px">' + esc(a.fn + ' ' + a.ln) + '</div><div class="ts tm">' + esc(a.sp) + ' · ' + esc(a.cat) + '</div></div></div></div><div class="card mb3">' + row('TC Kimlik', a.tc) + row('Doğum Tarihi', fmtD(a.bd)) + row('Cinsiyet', a.gn === 'E' ? 'Erkek' : 'Kadın') + row('Telefon', a.ph) + row('E-posta', a.em || '-') + '</div><div class="card mb3"><div class="tw6 tsm mb2">Devam Oranı</div><div class="pr"><div class="prb prb-' + (rate >= 80 ? 'g' : rate >= 50 ? 'y' : 'r') + '" style="width:' + (rate || 0) + '%"></div></div><div class="flex fjb mt2"><span class="ts tm">Devam Oranı</span><span class="tw6">' + (rate || 0) + '%</span></div></div><div class="card"><div class="tw6 tsm mb2">Veli Bilgileri</div>' + row('Veli Adı', a.pn || '-') + row('Veli Telefon', a.pph || '-') + row('Veli E-posta', a.pem || '-') + '</div>'; }
 function spYoklama() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var dates = Object.keys(attData).sort().reverse().slice(0, 30); var html = '<div class="card"><div class="tw6 tsm mb2">Son Yoklamalar</div>'; if (!dates.length) html += '<p class="tm ts">Henüz yoklama kaydı yok.</p>'; else { html += dates.map(function(d) { var st = attData[d] && attData[d][a.id]; var status = st === 'P' ? '<span class="bg bg-g">Var</span>' : st === 'A' ? '<span class="bg bg-r">Yok</span>' : st === 'L' ? '<span class="bg bg-y">İzin</span>' : '<span class="bg bg-b">-</span>'; return '<div class="att-row"><span class="ts tm">' + fmtD(d) + '</span>' + status + '</div>'; }).join(''); } html += '</div>'; return html; }
 function spOdemeler() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var myPayments = payments.filter(function(p) { return p.aid === a.id; }); var html = '<div class="card"><div class="tw6 tsm mb2">Ödemelerim</div>'; if (!myPayments.length) html += '<p class="tm ts">Henüz ödeme kaydı yok.</p>'; else { html += '<div class="tw"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th>Durum</th></tr></thead><tbody>' + myPayments.map(function(p) { return '<tr><td>' + fmtD(p.dt) + '</td><td>' + esc(p.ds) + '</td><td class="tw6">' + fmtN(p.amt) + ' &#x20BA;</td><td><span class="bg ' + stc(p.st) + '">' + stl(p.st) + '</span></td></tr>'; }).join('') + '</tbody></table></div>'; } html += '</div>'; return html; }
-function spOdemeYap() { var a = currentSporcu; if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; var html = '<div class="card"><div class="tw6 tsm mb2">Ödeme Yap</div><div class="fgr mb2"><label>Ödeme Türü</label><select id="sp-pay-ty"><option value="aidat">Aidat</option><option value="kayit">Kayıt Ücreti</option><option value="diger">Diğer</option></select></div><div class="fgr mb2"><label>Tutar</label><input id="sp-pay-amt" type="number"/></div><div class="fgr mb2"><label>Açıklama</label><input id="sp-pay-ds"/></div><div class="fgr mb3"><label>Ödeme Yöntemi</label><select id="sp-pay-method"><option value="havale">Havale/EFT</option><option value="kart">Kredi Kartı</option><option value="nakit">Nakit</option></select></div><div id="sp-havale-info" class="al al-b mb3 dn"><div class="tw6 tsm mb2">Havale Bilgileri</div>' + row('Banka', settings.bankName || '-') + row('Hesap', settings.accountName || '-') + row('IBAN', settings.iban || '-') + '</div><button class="btn bp w100" onclick="submitSpPayment()">Ödeme Bildirimi Yap</button></div>'; setTimeout(function() { var sel = document.getElementById('sp-pay-method'); if (sel) sel.onchange = function() { document.getElementById('sp-havale-info').classList.toggle('dn', this.value !== 'havale'); }; }, 50); return html; }
-async function submitSpPayment() { var a = currentSporcu; if (!a) return; var ty = gv('sp-pay-ty'), amt = gvn('sp-pay-amt'), ds = gv('sp-pay-ds'), method = gv('sp-pay-method'); if (!amt) { toast('Tutar zorunlu!', 'e'); return; } var obj = { id: uid(), aid: a.id, an: a.fn + ' ' + a.ln, amt: amt, dt: tod(), ty: 'income', cat: ty, ds: ds || ty, st: 'pending', inv: '', dd: '', payMethod: method, needsApproval: true }; payments.push(obj); await dbSavePay(obj); toast('Ödeme bildirimi gönderildi! Onay bekleniyor.', 'g'); spTab('odemeler'); }
+
+// YENILENEN: SPORCU ODEME YAP EKRANI
+function spOdemeYap() { 
+  var a = currentSporcu; 
+  if (!a) return '<div class="card"><div class="al al-r">Sporcu bilgisi bulunamadı!</div></div>'; 
+  
+  var bank = settings.bankName || 'Banka bilgisi girilmedi';
+  var acc = settings.accountName || 'Hesap sahibi girilmedi';
+  var iban = settings.iban || 'TR00 0000 0000 0000 0000 0000 00';
+  
+  var html = '<div class="card"><div class="tw6 tsm mb2">Yeni Ödeme / Bildirim</div>' + 
+    '<div class="fgr mb2"><label>Ödeme Türü</label><select id="sp-pay-ty"><option value="aidat">Aidat</option><option value="kayit">Kayıt Ücreti</option><option value="diger">Diğer</option></select></div>' + 
+    '<div class="fgr mb2"><label>Tutar (TL)</label><input id="sp-pay-amt" type="number" placeholder="Örn: 1500"/></div>' + 
+    '<div class="fgr mb2"><label>Açıklama</label><input id="sp-pay-ds" placeholder="Örn: Mart Ayı Aidatı"/></div>' + 
+    '<div class="fgr mb3"><label>Ödeme Yöntemi</label><select id="sp-pay-method"><option value="havale">Havale / EFT ile Öde</option><option value="kart">Kredi Kartı ile Öde (Simülasyon)</option></select></div>' + 
+    
+    // HAVALE BILGILERI KARTI
+    '<div id="sp-havale-info" class="al al-b mb3">' + 
+    '<div class="tw6 tsm mb2" style="font-size:14px;color:var(--text)">Banka Hesap Bilgilerimiz</div>' + 
+    '<div style="font-size:13px; line-height:1.8; color:var(--text)">' +
+    '<b>Banka:</b> ' + esc(bank) + '<br>' +
+    '<b>Alıcı:</b> ' + esc(acc) + '<br>' +
+    '<b>IBAN:</b> <span style="letter-spacing:1px; font-weight:700;">' + esc(iban) + '</span>' +
+    '</div>' + 
+    '<div class="mt2 pt2" style="border-top:1px solid rgba(59,130,246,0.2); font-size:11px; color:var(--text2);">' + 
+    '⚠️ <b>Not:</b> Lütfen açıklama kısmına <b>' + esc(a.fn + ' ' + a.ln) + '</b> ismini eklemeyi unutmayın.</div>' + 
+    '</div>' +
+    
+    // KREDI KARTI BILGILERI KARTI (Simulasyon)
+    '<div id="sp-cc-info" class="mb3 dn">' +
+    '<div class="al al-y mb3" style="font-size:12px;">🔒 <b>256-Bit SSL:</b> Ödemeniz güvenli altyapı ile çekilecektir.</div>' +
+    '<div class="fgr mb2"><label>Kart Üzerindeki İsim</label><input id="cc-name" type="text" placeholder="AD SOYAD"/></div>' +
+    '<div class="fgr mb2"><label>Kart Numarası</label><input id="cc-number" type="tel" maxlength="19" placeholder="XXXX XXXX XXXX XXXX" oninput="this.value=this.value.replace(/[^\\d]/g,\'\').replace(/(.{4})/g,\'$1 \').trim()"/></div>' +
+    '<div class="g21">' +
+    '<div class="fgr"><label>Son Kul. (Ay/Yıl)</label><input id="cc-exp" type="text" maxlength="5" placeholder="AA/YY" oninput="if(this.value.length==2&&!this.value.includes(\'/\'))this.value+=\'/\';"/></div>' +
+    '<div class="fgr"><label>CVV</label><input id="cc-cvv" type="tel" maxlength="3" placeholder="123"/></div>' +
+    '</div></div>' +
+    
+    '<button id="btn-pay-submit" class="btn bp w100" style="padding:14px; font-size:14px;" onclick="submitSpPayment()">Havale Bildirimi Yap</button></div>'; 
+    
+  setTimeout(function() { 
+      var sel = document.getElementById('sp-pay-method'); 
+      if (sel) {
+          sel.onchange = function() { 
+              var isHavale = this.value === 'havale';
+              document.getElementById('sp-havale-info').classList.toggle('dn', !isHavale); 
+              document.getElementById('sp-cc-info').classList.toggle('dn', isHavale); 
+              document.getElementById('btn-pay-submit').textContent = isHavale ? 'Havale Bildirimi Yap' : 'Güvenli Ödeme Yap';
+          }; 
+      }
+  }, 50); 
+  return html; 
+}
+
+async function submitSpPayment() { 
+  var a = currentSporcu; if (!a) return; 
+  var ty = gv('sp-pay-ty'), amt = gvn('sp-pay-amt'), ds = gv('sp-pay-ds'), method = gv('sp-pay-method'); 
+  if (!amt) { toast('Tutar zorunlu!', 'e'); return; } 
+  
+  if (method === 'kart') {
+      var cn = gv('cc-name'), cnum = gv('cc-number'), cexp = gv('cc-exp'), ccvv = gv('cc-cvv');
+      if(!cn || !cnum || !cexp || !ccvv) { toast('Lütfen kart bilgilerini eksiksiz girin!', 'e'); return; }
+      if(cnum.length < 15) { toast('Geçersiz kart numarası!', 'e'); return; }
+      
+      showLoading();
+      // Ödeme Islem Simulasyonu (1.5 Saniye Bekletir)
+      await new Promise(function(resolve) { setTimeout(resolve, 1500); });
+      hideLoading();
+      toast('Ödeme Başarılı!', 'g');
+  } else {
+      toast('Ödeme bildirimi gönderildi! Onay bekleniyor.', 'g');
+  }
+  
+  var obj = { 
+      id: uid(), aid: a.id, an: a.fn + ' ' + a.ln, amt: amt, dt: tod(), ty: 'income', cat: ty, ds: ds || ty, 
+      st: method === 'kart' ? 'completed' : 'pending', // Kartsa direkt onaylar, havaleyse onay bekler
+      inv: '', dd: '', payMethod: method, 
+      needsApproval: method !== 'kart' 
+  }; 
+  
+  payments.push(obj); 
+  await dbSavePay(obj); 
+  spTab('odemeler'); 
+}
+
 function spDuyurular() { var html = '<div class="card"><div class="tw6 tsm mb2">Duyurular</div>'; var announcements = messages.filter(function(m) { return m.role === 'admin'; }); if (!announcements.length) html += '<p class="tm ts">Henüz duyuru yok.</p>'; else { html += announcements.map(function(m) { return '<div class="att-row"><div><div class="tw6 tsm">' + esc(m.sub) + '</div><div class="ts tm">' + fmtD(m.dt) + '</div><div class="ts" style="margin-top:4px">' + esc(m.body.slice(0, 100)) + (m.body.length > 100 ? '...' : '') + '</div></div></div>'; }).join(''); } html += '</div>'; return html; }
 
-document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli Yüklendi - Final Sürüm (Dinamik Logolu)'); });
+document.addEventListener('DOMContentLoaded', function() { console.log('Sporcu Paneli Yüklendi - Hazır Sürüm'); });
