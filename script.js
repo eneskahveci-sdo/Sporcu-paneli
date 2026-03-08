@@ -1,10 +1,72 @@
 /* ============================================================
    DRAGOS FUTBOL AKADEMISI - GELİŞMİŞ PROFİL SİSTEMİ
+   Mobil Uyumlu ve Hata Düzeltmeleri
    ============================================================ */
 
 window.onerror = function(msg, url, line, col, error) {
     console.error('Global Error:', { msg, url, line, col, error });
     return true;
+};
+
+// Mobil uyumlu localStorage wrapper
+const StorageManager = {
+    isAvailable() {
+        try {
+            const test = '__storage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+    
+    get(key) {
+        try {
+            if (!this.isAvailable()) return null;
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : null;
+        } catch (e) {
+            console.warn('Storage get error:', e);
+            return null;
+        }
+    },
+    
+    set(key, value) {
+        try {
+            if (!this.isAvailable()) {
+                console.warn('localStorage not available');
+                return false;
+            }
+            localStorage.setItem(key, JSON.stringify(value));
+            return true;
+        } catch (e) {
+            console.warn('Storage set error:', e);
+            return false;
+        }
+    },
+    
+    remove(key) {
+        try {
+            if (!this.isAvailable()) return false;
+            localStorage.removeItem(key);
+            return true;
+        } catch (e) {
+            console.warn('Storage remove error:', e);
+            return false;
+        }
+    },
+    
+    clear() {
+        try {
+            if (!this.isAvailable()) return false;
+            localStorage.clear();
+            return true;
+        } catch (e) {
+            console.warn('Storage clear error:', e);
+            return false;
+        }
+    }
 };
 
 const SUPABASE_CONFIG = {
@@ -20,8 +82,8 @@ const AppState = {
     currentSporcu: null,
     currentOrgId: null,
     currentBranchId: null,
-    theme: localStorage.getItem('sporcu_theme') || 'dark',
-    lang: localStorage.getItem('sporcu_lang') || 'TR',
+    theme: StorageManager.get('sporcu_theme') || 'dark',
+    lang: StorageManager.get('sporcu_lang') || 'TR',
     data: {
         athletes: [],
         payments: [],
@@ -104,6 +166,7 @@ const DateUtils = {
         if (!dateStr) return '-';
         try {
             const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
             return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
         } catch {
             return dateStr;
@@ -112,12 +175,14 @@ const DateUtils = {
     age(birthDate) {
         if (!birthDate) return '-';
         const d = new Date(birthDate), now = new Date();
+        if (isNaN(d.getTime())) return '-';
         let age = now.getFullYear() - d.getFullYear();
         if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) age--;
         return age;
     },
     addMonths(dateStr, months) {
         const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
         d.setMonth(d.getMonth() + months);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
@@ -135,6 +200,7 @@ const FormatUtils = {
     },
     tcValidate(tc) {
         if (!tc || tc.length !== 11 || !/^\d{11}$/.test(tc)) return false;
+        // TC Kimlik algoritması
         const digits = tc.split('').map(Number);
         const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
         const evenSum = digits[1] + digits[3] + digits[5] + digits[7];
@@ -144,6 +210,10 @@ const FormatUtils = {
     },
     initials(firstName, lastName) {
         return `${(firstName || '').charAt(0)}${(lastName || '').charAt(0)}`.toUpperCase();
+    },
+    // TC input temizleme
+    cleanTC(value) {
+        return String(value || '').replace(/\D/g, '').slice(0, 11);
     }
 };
 
@@ -154,15 +224,42 @@ function generateId() {
     });
 }
 
+// Mobil uyumlu SHA256 - crypto.subtle yerine alternatif
 async function sha256(str) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    try {
+        // Önce native crypto.subtle dene (HTTPS veya localhost gerektirir)
+        if (typeof crypto !== 'undefined' && crypto.subtle) {
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+    } catch (e) {
+        console.warn('Native crypto failed, using fallback');
+    }
+    
+    // Basit hash fonksiyonu (fallback)
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16).padStart(64, '0');
 }
 
 function getSupabase() {
     if (!AppState.sb) {
         try {
-            AppState.sb = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+            if (typeof supabase === 'undefined') {
+                console.error('Supabase library not loaded');
+                return null;
+            }
+            AppState.sb = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: false
+                }
+            });
         } catch (e) {
             console.error('Supabase init error:', e);
             toast(i18n[AppState.lang].connectionError, 'e');
@@ -176,7 +273,7 @@ const ToastManager = {
     show(msg, type = 'info') {
         while (this.activeToasts.length >= 3) {
             const old = this.activeToasts.shift();
-            old.remove();
+            if (old && old.remove) old.remove();
         }
         const t = document.createElement('div');
         t.className = `toast ${type === 'e' ? 'toast-e' : type === 'g' ? 'toast-g' : ''}`;
@@ -199,6 +296,7 @@ const toast = (msg, type) => ToastManager.show(msg, type);
 const ModalManager = {
     open(title, body, buttons) {
         const m = document.getElementById('modal');
+        if (!m) return;
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-body').innerHTML = body;
         const mf = document.getElementById('modal-footer');
@@ -222,7 +320,8 @@ const ModalManager = {
         m.classList.add('show');
     },
     close() {
-        document.getElementById('modal').classList.remove('show');
+        const m = document.getElementById('modal');
+        if (m) m.classList.remove('show');
     },
     confirm(title, message, onConfirm) {
         this.open(title, `<p class="tsm tm">${FormatUtils.escape(message)}</p>`, [
@@ -281,7 +380,7 @@ function applyTheme(theme) {
         if (btn) btn.innerHTML = '&#x1F31E;';
         if (spBtn) spBtn.innerHTML = '&#x1F31E;';
     }
-    localStorage.setItem('sporcu_theme', theme);
+    StorageManager.set('sporcu_theme', theme);
     AppState.theme = theme;
 }
 
@@ -291,7 +390,7 @@ function toggleTheme() {
 
 function applyLang(lang) {
     AppState.lang = lang;
-    localStorage.setItem('sporcu_lang', lang);
+    StorageManager.set('sporcu_lang', lang);
     const btn = document.getElementById('lang-btn');
     if (btn) btn.textContent = lang === 'TR' ? 'EN' : 'TR';
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -311,9 +410,13 @@ function toggleLang() {
 }
 
 window.switchLoginTab = function(tab) {
-    document.getElementById('login-sporcu').classList.toggle('dn', tab !== 'sporcu');
-    document.getElementById('login-coach').classList.toggle('dn', tab !== 'coach');
+    const sporcuEl = document.getElementById('login-sporcu');
+    const coachEl = document.getElementById('login-coach');
     const tabs = document.querySelectorAll('#login-tabs .ltab');
+    
+    if (sporcuEl) sporcuEl.classList.toggle('dn', tab !== 'sporcu');
+    if (coachEl) coachEl.classList.toggle('dn', tab !== 'coach');
+    
     if (tabs.length > 1) {
         tabs[0].classList.toggle('on', tab === 'sporcu');
         tabs[1].classList.toggle('on', tab === 'coach');
@@ -345,7 +448,9 @@ window.showLegal = function(type) {
         }
     };
     const info = content[type];
-    modal(info.title, info.body, [{ lbl: AppState.lang === 'TR' ? 'Kapat' : 'Close', cls: 'bs', fn: closeModal }]);
+    if (info) {
+        modal(info.title, info.body, [{ lbl: AppState.lang === 'TR' ? 'Kapat' : 'Close', cls: 'bs', fn: closeModal }]);
+    }
 };
 
 const DB = {
@@ -455,6 +560,7 @@ const DB = {
     async query(table, filters = {}) {
         try {
             const sb = getSupabase();
+            if (!sb) return null;
             let q = sb.from(table).select('*');
             Object.entries(filters).forEach(([key, val]) => {
                 q = q.eq(key, val);
@@ -471,6 +577,7 @@ const DB = {
     async upsert(table, data) {
         try {
             const sb = getSupabase();
+            if (!sb) return null;
             const arr = Array.isArray(data) ? data : [data];
             const { data: result, error } = await sb.from(table).upsert(arr, { onConflict: 'id' }).select();
             if (error) throw error;
@@ -484,6 +591,7 @@ const DB = {
     async remove(table, filters) {
         try {
             const sb = getSupabase();
+            if (!sb) return false;
             let q = sb.from(table).delete();
             Object.entries(filters).forEach(([key, val]) => {
                 q = q.eq(key, val);
@@ -498,30 +606,56 @@ const DB = {
     }
 };
 
+// Mobil uyumlu TC input handler
+function setupTCInput(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    input.addEventListener('input', function(e) {
+        // Sadece rakam kabul et
+        let value = e.target.value.replace(/\D/g, '');
+        // Maksimum 11 karakter
+        if (value.length > 11) value = value.slice(0, 11);
+        e.target.value = value;
+    });
+    
+    // iOS için özel handling
+    input.addEventListener('keypress', function(e) {
+        const char = String.fromCharCode(e.which);
+        if (!/^\d$/.test(char)) {
+            e.preventDefault();
+        }
+    });
+}
+
 window.doNormalLogin = async function(type) {
     const isCoach = type === 'coach';
     const tcId = isCoach ? 'lc-tc' : 'ls-tc';
     const passId = isCoach ? 'lc-pass' : 'ls-pass';
     const errId = isCoach ? 'lc-err' : 'ls-err';
     
-    const tc = UIUtils.getValue(tcId);
+    const tc = FormatUtils.cleanTC(UIUtils.getValue(tcId));
     const pass = UIUtils.getValue(passId);
     const errEl = document.getElementById(errId);
     
     if (!tc || !pass) {
-        errEl.textContent = AppState.lang === 'TR' ? 'TC ve şifre giriniz!' : 'Enter ID and password!';
-        errEl.classList.remove('dn');
+        if (errEl) {
+            errEl.textContent = AppState.lang === 'TR' ? 'TC ve şifre giriniz!' : 'Enter ID and password!';
+            errEl.classList.remove('dn');
+        }
         return;
     }
     
     if (!FormatUtils.tcValidate(tc)) {
-        errEl.textContent = i18n[AppState.lang].invalidTC;
-        errEl.classList.remove('dn');
+        if (errEl) {
+            errEl.textContent = i18n[AppState.lang].invalidTC;
+            errEl.classList.remove('dn');
+        }
         return;
     }
     
     UIUtils.setLoading(true);
-    errEl.classList.add('dn');
+    if (errEl) errEl.classList.add('dn');
     
     try {
         const inputHash = await sha256(pass);
@@ -558,15 +692,19 @@ window.doNormalLogin = async function(type) {
             AppState.currentOrgId = found.org_id;
             AppState.currentBranchId = found.branch_id;
             
-            localStorage.setItem('sporcu_app_user', JSON.stringify(AppState.currentUser));
-            localStorage.setItem('sporcu_app_org', AppState.currentOrgId);
-            localStorage.setItem('sporcu_app_branch', AppState.currentBranchId);
+            StorageManager.set('sporcu_app_user', AppState.currentUser);
+            StorageManager.set('sporcu_app_org', AppState.currentOrgId);
+            StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
             
             await loadBranchData();
             
-            document.getElementById('lbox-wrap').style.display = 'none';
-            document.getElementById('wrap').classList.remove('dn');
-            document.getElementById('suname').textContent = AppState.currentUser.name;
+            const lboxWrap = document.getElementById('lbox-wrap');
+            const wrap = document.getElementById('wrap');
+            const suname = document.getElementById('suname');
+            
+            if (lboxWrap) lboxWrap.style.display = 'none';
+            if (wrap) wrap.classList.remove('dn');
+            if (suname) suname.textContent = AppState.currentUser.name;
             
             updateBranchUI();
             go('attendance');
@@ -575,18 +713,23 @@ window.doNormalLogin = async function(type) {
             AppState.currentOrgId = found.org_id;
             AppState.currentBranchId = found.branch_id;
             
-            localStorage.setItem('sporcu_app_sporcu', JSON.stringify({
+            StorageManager.set('sporcu_app_sporcu', {
                 user: AppState.currentSporcu,
                 orgId: AppState.currentOrgId,
                 branchId: AppState.currentBranchId
-            }));
+            });
             
             await loadBranchData();
             
-            document.getElementById('lbox-wrap').style.display = 'none';
-            document.getElementById('sporcu-portal').style.display = 'flex';
-            document.getElementById('sp-name').textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
-            document.getElementById('sp-orgname').textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
+            const lboxWrap = document.getElementById('lbox-wrap');
+            const sporcuPortal = document.getElementById('sporcu-portal');
+            const spName = document.getElementById('sp-name');
+            const spOrgname = document.getElementById('sp-orgname');
+            
+            if (lboxWrap) lboxWrap.style.display = 'none';
+            if (sporcuPortal) sporcuPortal.style.display = 'flex';
+            if (spName) spName.textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
+            if (spOrgname) spOrgname.textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
             
             const initials = FormatUtils.initials(AppState.currentSporcu.fn, AppState.currentSporcu.ln);
             UIUtils.setElementAvatar('sp-avatar', null, initials);
@@ -596,8 +739,10 @@ window.doNormalLogin = async function(type) {
         
     } catch (e) {
         console.error('Login error:', e);
-        errEl.textContent = AppState.lang === 'TR' ? 'Kayıt bulunamadı veya şifre hatalı!' : 'Record not found or incorrect password!';
-        errEl.classList.remove('dn');
+        if (errEl) {
+            errEl.textContent = AppState.lang === 'TR' ? 'Kayıt bulunamadı veya şifre hatalı!' : 'Record not found or incorrect password!';
+            errEl.classList.remove('dn');
+        }
     } finally {
         UIUtils.setLoading(false);
     }
@@ -609,24 +754,30 @@ window.doLogin = async function() {
     const errEl = document.getElementById('lerr');
     
     if (!email || !password) {
-        errEl.textContent = AppState.lang === 'TR' ? 'E-posta ve şifre giriniz!' : 'Enter email and password!';
-        errEl.classList.remove('dn');
+        if (errEl) {
+            errEl.textContent = AppState.lang === 'TR' ? 'E-posta ve şifre giriniz!' : 'Enter email and password!';
+            errEl.classList.remove('dn');
+        }
         return;
     }
     
     UIUtils.setLoading(true);
-    errEl.classList.add('dn');
+    if (errEl) errEl.classList.add('dn');
     
     try {
         const sb = getSupabase();
+        if (!sb) throw new Error('Supabase not initialized');
+        
         await sb.auth.signOut();
         
         const { data: authData, error: authError } = await sb.auth.signInWithPassword({ email, password });
         
         if (authError) {
             console.error('Auth error:', authError);
-            errEl.textContent = AppState.lang === 'TR' ? 'Hatalı e-posta veya şifre' : 'Invalid email or password';
-            errEl.classList.remove('dn');
+            if (errEl) {
+                errEl.textContent = AppState.lang === 'TR' ? 'Hatalı e-posta veya şifre' : 'Invalid email or password';
+                errEl.classList.remove('dn');
+            }
             return;
         }
         
@@ -673,23 +824,29 @@ window.doLogin = async function() {
         AppState.currentOrgId = userData.org_id;
         AppState.currentBranchId = userData.branch_id;
         
-        localStorage.setItem('sporcu_app_user', JSON.stringify(AppState.currentUser));
-        localStorage.setItem('sporcu_app_org', AppState.currentOrgId);
-        localStorage.setItem('sporcu_app_branch', AppState.currentBranchId);
+        StorageManager.set('sporcu_app_user', AppState.currentUser);
+        StorageManager.set('sporcu_app_org', AppState.currentOrgId);
+        StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
         
         await loadBranchData();
         
-        document.getElementById('lbox-wrap').style.display = 'none';
-        document.getElementById('wrap').classList.remove('dn');
-        document.getElementById('suname').textContent = AppState.currentUser.name;
+        const lboxWrap = document.getElementById('lbox-wrap');
+        const wrap = document.getElementById('wrap');
+        const suname = document.getElementById('suname');
+        
+        if (lboxWrap) lboxWrap.style.display = 'none';
+        if (wrap) wrap.classList.remove('dn');
+        if (suname) suname.textContent = AppState.currentUser.name;
         
         updateBranchUI();
         go('dashboard');
         
     } catch (err) {
         console.error('Login error:', err);
-        errEl.textContent = AppState.lang === 'TR' ? 'Giriş hatası' : 'Login error';
-        errEl.classList.remove('dn');
+        if (errEl) {
+            errEl.textContent = AppState.lang === 'TR' ? 'Giriş hatası' : 'Login error';
+            errEl.classList.remove('dn');
+        }
     } finally {
         UIUtils.setLoading(false);
     }
@@ -699,19 +856,24 @@ async function restoreSession() {
     UIUtils.setLoading(true);
     
     try {
-        const storedSporcu = localStorage.getItem('sporcu_app_sporcu');
+        const storedSporcu = StorageManager.get('sporcu_app_sporcu');
         if (storedSporcu) {
-            const parsed = JSON.parse(storedSporcu);
+            const parsed = storedSporcu;
             AppState.currentSporcu = parsed.user;
             AppState.currentOrgId = parsed.orgId;
             AppState.currentBranchId = parsed.branchId;
             
             await loadBranchData();
             
-            document.getElementById('lbox-wrap').style.display = 'none';
-            document.getElementById('sporcu-portal').style.display = 'flex';
-            document.getElementById('sp-name').textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
-            document.getElementById('sp-orgname').textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
+            const lboxWrap = document.getElementById('lbox-wrap');
+            const sporcuPortal = document.getElementById('sporcu-portal');
+            const spName = document.getElementById('sp-name');
+            const spOrgname = document.getElementById('sp-orgname');
+            
+            if (lboxWrap) lboxWrap.style.display = 'none';
+            if (sporcuPortal) sporcuPortal.style.display = 'flex';
+            if (spName) spName.textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
+            if (spOrgname) spOrgname.textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
             
             const initials = FormatUtils.initials(AppState.currentSporcu.fn, AppState.currentSporcu.ln);
             UIUtils.setElementAvatar('sp-avatar', null, initials);
@@ -720,24 +882,29 @@ async function restoreSession() {
             return;
         }
         
-        const storedUser = localStorage.getItem('sporcu_app_user');
+        const storedUser = StorageManager.get('sporcu_app_user');
         if (storedUser) {
-            AppState.currentUser = JSON.parse(storedUser);
-            AppState.currentOrgId = localStorage.getItem('sporcu_app_org');
-            AppState.currentBranchId = localStorage.getItem('sporcu_app_branch');
+            AppState.currentUser = storedUser;
+            AppState.currentOrgId = StorageManager.get('sporcu_app_org');
+            AppState.currentBranchId = StorageManager.get('sporcu_app_branch');
             
             const sb = getSupabase();
-            const { data: { session } } = await sb.auth.getSession();
-            
-            if (AppState.currentUser.role === 'admin' && !session) {
-                throw new Error('No session');
+            if (sb && AppState.currentUser.role === 'admin') {
+                const { data: { session } } = await sb.auth.getSession();
+                if (!session) {
+                    throw new Error('No session');
+                }
             }
             
             await loadBranchData();
             
-            document.getElementById('lbox-wrap').style.display = 'none';
-            document.getElementById('wrap').classList.remove('dn');
-            document.getElementById('suname').textContent = AppState.currentUser.name;
+            const lboxWrap = document.getElementById('lbox-wrap');
+            const wrap = document.getElementById('wrap');
+            const suname = document.getElementById('suname');
+            
+            if (lboxWrap) lboxWrap.style.display = 'none';
+            if (wrap) wrap.classList.remove('dn');
+            if (suname) suname.textContent = AppState.currentUser.name;
             
             updateBranchUI();
             go(AppState.currentUser.role === 'coach' ? 'attendance' : 'dashboard');
@@ -746,21 +913,25 @@ async function restoreSession() {
         
     } catch (e) {
         console.error('Session restore error:', e);
-        localStorage.clear();
+        StorageManager.clear();
     } finally {
         UIUtils.setLoading(false);
     }
 }
 
 window.doLogout = async function() {
-    const sb = getSupabase();
-    if (sb) await sb.auth.signOut();
-    localStorage.clear();
+    try {
+        const sb = getSupabase();
+        if (sb) await sb.auth.signOut();
+    } catch (e) {
+        console.error('Logout error:', e);
+    }
+    StorageManager.clear();
     location.reload();
 };
 
 window.doSporcuLogout = function() {
-    localStorage.clear();
+    StorageManager.clear();
     location.reload();
 };
 
@@ -768,42 +939,47 @@ async function loadBranchData() {
     const bid = AppState.currentBranchId;
     if (!bid) return;
     
-    const results = await Promise.all([
-        DB.query('athletes', { branch_id: bid }),
-        DB.query('payments', { branch_id: bid }),
-        DB.query('coaches', { branch_id: bid }),
-        DB.query('attendance', { branch_id: bid }),
-        DB.query('messages', { branch_id: bid }),
-        DB.query('settings', { branch_id: bid }),
-        DB.query('sports', { branch_id: bid }),
-        DB.query('classes', { branch_id: bid })
-    ]);
-    
-    AppState.data.athletes = (results[0] || []).map(DB.mappers.toAthlete);
-    AppState.data.payments = (results[1] || []).map(DB.mappers.toPayment);
-    AppState.data.coaches = (results[2] || []).map(DB.mappers.toCoach);
-    
-    AppState.data.attendance = {};
-    (results[3] || []).forEach(r => {
-        if (!AppState.data.attendance[r.att_date]) {
-            AppState.data.attendance[r.att_date] = {};
-        }
-        AppState.data.attendance[r.att_date][r.athlete_id] = r.status;
-    });
-    
-    AppState.data.messages = (results[4] || []).map(r => ({
-        id: r.id, fr: r.fr, role: r.role, sub: r.sub,
-        body: r.body, dt: r.dt, rd: r.rd
-    }));
-    
-    AppState.data.settings = results[5]?.[0] ? 
-        DB.mappers.toSettings(results[5][0]) : 
-        { schoolName: 'Dragos Futbol Akademisi' };
-    
-    AppState.data.sports = (results[6] || []).map(DB.mappers.toSport);
-    AppState.data.classes = (results[7] || []).map(DB.mappers.toClass);
-    
-    checkOverdue();
+    try {
+        const results = await Promise.all([
+            DB.query('athletes', { branch_id: bid }),
+            DB.query('payments', { branch_id: bid }),
+            DB.query('coaches', { branch_id: bid }),
+            DB.query('attendance', { branch_id: bid }),
+            DB.query('messages', { branch_id: bid }),
+            DB.query('settings', { branch_id: bid }),
+            DB.query('sports', { branch_id: bid }),
+            DB.query('classes', { branch_id: bid })
+        ]);
+        
+        AppState.data.athletes = (results[0] || []).map(DB.mappers.toAthlete);
+        AppState.data.payments = (results[1] || []).map(DB.mappers.toPayment);
+        AppState.data.coaches = (results[2] || []).map(DB.mappers.toCoach);
+        
+        AppState.data.attendance = {};
+        (results[3] || []).forEach(r => {
+            if (!AppState.data.attendance[r.att_date]) {
+                AppState.data.attendance[r.att_date] = {};
+            }
+            AppState.data.attendance[r.att_date][r.athlete_id] = r.status;
+        });
+        
+        AppState.data.messages = (results[4] || []).map(r => ({
+            id: r.id, fr: r.fr, role: r.role, sub: r.sub,
+            body: r.body, dt: r.dt, rd: r.rd
+        }));
+        
+        AppState.data.settings = results[5]?.[0] ? 
+            DB.mappers.toSettings(results[5][0]) : 
+            { schoolName: 'Dragos Futbol Akademisi' };
+        
+        AppState.data.sports = (results[6] || []).map(DB.mappers.toSport);
+        AppState.data.classes = (results[7] || []).map(DB.mappers.toClass);
+        
+        checkOverdue();
+    } catch (e) {
+        console.error('Load branch data error:', e);
+        toast(i18n[AppState.lang].connectionError, 'e');
+    }
 }
 
 function updateBranchUI() {
@@ -863,6 +1039,8 @@ window.go = function(page, params = {}) {
         sms: pgSms
     };
     
+    if (!main) return;
+    
     main.style.opacity = '0';
     setTimeout(() => {
         if (pages[page]) {
@@ -885,13 +1063,17 @@ window.go = function(page, params = {}) {
 };
 
 window.openSide = function() {
-    document.getElementById('side').classList.add('open');
-    document.getElementById('overlay').classList.add('show');
+    const side = document.getElementById('side');
+    const overlay = document.getElementById('overlay');
+    if (side) side.classList.add('open');
+    if (overlay) overlay.classList.add('show');
 };
 
 window.closeSide = function() {
-    document.getElementById('side').classList.remove('open');
-    document.getElementById('overlay').classList.remove('show');
+    const side = document.getElementById('side');
+    const overlay = document.getElementById('overlay');
+    if (side) side.classList.remove('open');
+    if (overlay) overlay.classList.remove('show');
 };
 
 function checkOverdue() {
@@ -1356,12 +1538,12 @@ function generateAttendanceCalendar(aid) {
 window.switchProfileTab = function(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
-        if (btn.textContent.toLowerCase().includes(tabName) || 
-            (tabName === 'overview' && btn.textContent.includes('Genel')) ||
-            (tabName === 'personal' && btn.textContent.includes('Kişisel')) ||
-            (tabName === 'payments' && btn.textContent.includes('Ödeme')) ||
-            (tabName === 'attendance' && btn.textContent.includes('Devam')) ||
-            (tabName === 'documents' && btn.textContent.includes('Belge'))) {
+        const text = btn.textContent.toLowerCase();
+        if ((tabName === 'overview' && text.includes('genel')) ||
+            (tabName === 'personal' && text.includes('kişisel')) ||
+            (tabName === 'payments' && text.includes('ödeme')) ||
+            (tabName === 'attendance' && text.includes('devam')) ||
+            (tabName === 'documents' && text.includes('belge'))) {
             btn.classList.add('active');
         }
     });
@@ -1648,7 +1830,7 @@ window.editAth = function(id) {
     <div class="g21 mt2">
         <div class="fgr">
             <label>TC Kimlik *</label>
-            <input id="a-tc" type="tel" maxlength="11" value="${FormatUtils.escape(a?.tc || '')}"/>
+            <input id="a-tc" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="11" value="${FormatUtils.escape(a?.tc || '')}"/>
         </div>
         <div class="fgr">
             <label>Doğum Tarihi</label>
@@ -1788,7 +1970,7 @@ window.editAth = function(id) {
                 id: a?.id || generateId(),
                 fn: UIUtils.getValue('a-fn'),
                 ln: UIUtils.getValue('a-ln'),
-                tc: UIUtils.getValue('a-tc'),
+                tc: FormatUtils.cleanTC(UIUtils.getValue('a-tc')),
                 bd: UIUtils.getValue('a-bd'),
                 gn: UIUtils.getValue('a-gn'),
                 ph: UIUtils.getValue('a-ph'),
@@ -1853,6 +2035,9 @@ window.editAth = function(id) {
             }
         }}
     ]);
+    
+    // TC input için mobil uyumlu handler ekle
+    setTimeout(() => setupTCInput('a-tc'), 100);
 };
 
 window.delAth = function(id) {
@@ -2402,11 +2587,11 @@ window.editCoach = function(id) {
     <div class="g21 mt2">
         <div class="fgr">
             <label>TC Kimlik *</label>
-            <input id="c-tc" type="tel" maxlength="11" value="${FormatUtils.escape(c?.tc || '')}"/>
+            <input id="c-tc" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="11" value="${FormatUtils.escape(c?.tc || '')}"/>
         </div>
         <div class="fgr">
             <label>Telefon</label>
-            <input id="c-ph" value="${FormatUtils.escape(c?.ph || '')}"/>
+            <input id="c-ph" type="tel" value="${FormatUtils.escape(c?.ph || '')}"/>
         </div>
     </div>
     <div class="fgr mt2">
@@ -2429,7 +2614,7 @@ window.editCoach = function(id) {
                 id: c?.id || generateId(),
                 fn: UIUtils.getValue('c-fn'),
                 ln: UIUtils.getValue('c-ln'),
-                tc: UIUtils.getValue('c-tc'),
+                tc: FormatUtils.cleanTC(UIUtils.getValue('c-tc')),
                 ph: UIUtils.getValue('c-ph'),
                 sp: UIUtils.getValue('c-sp'),
                 coachPass: UIUtils.getValue('c-pass'),
@@ -2466,6 +2651,9 @@ window.editCoach = function(id) {
             }
         }}
     ]);
+    
+    // TC input için mobil uyumlu handler ekle
+    setTimeout(() => setupTCInput('c-tc'), 100);
 };
 
 window.delCoach = function(id) {
@@ -2580,7 +2768,7 @@ window.showAddAdminModal = function() {
     </div>
     <div class="fgr mb2">
         <label>E-posta *</label>
-        <input id="aa-em" type="email"/>
+        <input id="aa-em" type="email" inputmode="email"/>
     </div>
     <div class="fgr mb2">
         <label>Şifre *</label>
@@ -2600,6 +2788,8 @@ window.showAddAdminModal = function() {
             
             try {
                 const sb = getSupabase();
+                if (!sb) throw new Error('Supabase not initialized');
+                
                 const { data, error } = await sb.auth.signUp({
                     email,
                     password: pass,
@@ -2657,7 +2847,7 @@ window.spTab = function(tab) {
         'odeme-yap': spOdemeYap
     };
     
-    if (pages[tab]) content.innerHTML = pages[tab]();
+    if (content && pages[tab]) content.innerHTML = pages[tab]();
 };
 
 function spProfil() {
@@ -3024,15 +3214,25 @@ function downloadFile(content, filename, type) {
     URL.revokeObjectURL(url);
 }
 
+// DOM Ready - Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(AppState.theme);
     applyLang(AppState.lang);
     
+    // TC inputları için mobil uyumlu handler'ları kur
+    setupTCInput('ls-tc');
+    setupTCInput('lc-tc');
+    
     if (window.location.href.includes('admin')) {
-        document.getElementById('login-tabs').classList.add('dn');
-        document.getElementById('login-sporcu').classList.add('dn');
-        document.getElementById('login-coach').classList.add('dn');
-        document.getElementById('login-admin').classList.remove('dn');
+        const loginTabs = document.getElementById('login-tabs');
+        const loginSporcu = document.getElementById('login-sporcu');
+        const loginCoach = document.getElementById('login-coach');
+        const loginAdmin = document.getElementById('login-admin');
+        
+        if (loginTabs) loginTabs.classList.add('dn');
+        if (loginSporcu) loginSporcu.classList.add('dn');
+        if (loginCoach) loginCoach.classList.add('dn');
+        if (loginAdmin) loginAdmin.classList.remove('dn');
     }
     
     await restoreSession();
