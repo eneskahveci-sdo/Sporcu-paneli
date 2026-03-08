@@ -32,7 +32,7 @@ html[data-theme="light"] {
 html[data-theme="light"] .ni.on { color: #FFED00; }
 html[data-theme="light"] .bp { color: #FFED00; }
 html[data-theme="light"] .ava { color: #FFED00; }
-*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;user-select:none;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;overflow-x:hidden;transition:background 0.3s, color 0.3s;}
 a{color:inherit;text-decoration:none}
 button{background:none;border:none;color:inherit;cursor:pointer;font:inherit;outline:none}
@@ -250,6 +250,18 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
 .document-info{flex:1}
 .document-title{font-weight:600;font-size:14px}
 .document-meta{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* Mobil TC Input Fix */
+input[type="tel"], input[type="number"], input[type="text"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-size: 16px; /* Prevent zoom on iOS */
+}
+input[type="tel"]:focus, input[type="number"]:focus {
+  font-size: 16px;
+}
+
 @media (max-width:1024px){
     .profile-grid{grid-template-columns:1fr}
     .profile-header-content{flex-direction:column;align-items:center;text-align:center}
@@ -269,6 +281,8 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
     .stats-grid{grid-template-columns:repeat(2,1fr)}
     .profile-name{font-size:22px}
     .profile-avatar{width:80px;height:80px;font-size:32px}
+    .ltab{font-size:12px;padding:8px;}
+    .lbox{padding:20px;}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -302,20 +316,20 @@ html[data-theme="light"] .llogo-i { color: #FFED00; }
         </div>
         <div id="login-admin" class="dn">
             <div class="al al-y mb3" style="font-size:12px">&#x1F512; Yönetici Giriş Modu Aktif</div>
-            <div class="fgr mb2"><label>Yönetici E-posta</label><input id="le" type="email" placeholder="admin@spor.com"/></div>
-            <div class="fgr mb3"><label>Şifre</label><input id="lp" type="password" placeholder="••••••••"/></div>
+            <div class="fgr mb2"><label>Yönetici E-posta</label><input id="le" type="email" placeholder="admin@spor.com" inputmode="email" autocomplete="email"/></div>
+            <div class="fgr mb3"><label>Şifre</label><input id="lp" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
             <div id="lerr" class="lerr dn"></div>
             <button class="btn bp w100 mb2" style="padding:14px;font-size:15px" onclick="doLogin()">Yönetici Olarak Gir</button>
         </div>
         <div id="login-sporcu">
-            <div class="fgr mb2"><label>Öğrenci TC Kimlik No</label><input id="ls-tc" type="tel" maxlength="11" placeholder="11 Haneli TC Giriniz"/></div>
-            <div class="fgr mb3"><label>Sistem Şifresi</label><input id="ls-pass" type="password" placeholder="Şifre veya TC Son 4 Hane"/></div>
+            <div class="fgr mb2"><label>Öğrenci TC Kimlik No</label><input id="ls-tc" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="11" placeholder="11 Haneli TC Giriniz" autocomplete="off"/></div>
+            <div class="fgr mb3"><label>Sistem Şifresi</label><input id="ls-pass" type="password" placeholder="Şifre veya TC Son 4 Hane" autocomplete="off"/></div>
             <div id="ls-err" class="lerr dn"></div>
             <button class="btn bp w100" style="padding:14px;font-size:15px" onclick="doNormalLogin('sporcu')">Öğrenci Girişi Yap</button>
         </div>
         <div id="login-coach" class="dn">
-            <div class="fgr mb2"><label>Antrenör TC Kimlik No</label><input id="lc-tc" type="tel" maxlength="11" placeholder="11 Haneli TC Giriniz"/></div>
-            <div class="fgr mb3"><label>Sistem Şifresi</label><input id="lc-pass" type="password" placeholder="Şifre veya TC Son 4 Hane"/></div>
+            <div class="fgr mb2"><label>Antrenör TC Kimlik No</label><input id="lc-tc" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="11" placeholder="11 Haneli TC Giriniz" autocomplete="off"/></div>
+            <div class="fgr mb3"><label>Sistem Şifresi</label><input id="lc-pass" type="password" placeholder="Şifre veya TC Son 4 Hane" autocomplete="off"/></div>
             <div id="lc-err" class="lerr dn"></div>
             <button class="btn bp w100" style="padding:14px;font-size:15px;background:var(--blue2)" onclick="doNormalLogin('coach')">Antrenör Girişi Yap</button>
         </div>
