@@ -1068,8 +1068,6 @@ console.log('✅ Script-fixes V8 yüklendi — spTab fix + finans grafikleri + m
    ========================================================================= */
 
 (function initV8Patch() {
-    // 1. BAĞLANTI KANITI (Sistemin çalıştığını teyit etmek için)
-    alert("V8 Yaması Eski Fixes Dosyası Üzerinden Başarıyla Çalıştı!");
 
     // 2. KESİN GÖRÜNÜRLÜK CSS'İ (Menüyü zorla ekrana getirir)
     const v8Styles = `
