@@ -1,7 +1,13 @@
 // =================================================================
 // DRAGOS AKADEMİ - OTOMATİK GÜVENLİ GİRİŞ VE MİGRASYON SİSTEMİ
 // Eski güvenlik yamalarına gerek kalmadan Supabase RLS ile çalışır.
-// =================================================================
+// ================================================================= 
+// Dosyanın en üstüne, console.log'dan ÖNCE ekle:
+function getAuthClient() {
+    return window.AppState && window.AppState.sb 
+        ? window.AppState.sb 
+        : window.getSupabase ? window.getSupabase() : null;
+}
 console.log("🛡️ Dragos Pro: Akıllı Kapı Görevlisi ve RLS Aktif!");
 
 // Orijinal doNormalLogin fonksiyonunu güvenli versiyonla eziyoruz
@@ -32,7 +38,7 @@ window.doNormalLogin = async function(role) {
         if (btn) btn.innerText = 'Giriş Yapılıyor...';
 
         // 1. ADIM: Doğrudan güvenli sistemden (Supabase Auth) girmeyi dene
-        let { data: authData, error: authError } = await window.supabase.auth.signInWithPassword({
+        let { data: authData, error: authError } = await getAuthClient().auth.signInWithPassword({
             email: email,
             password: pass
         });
@@ -42,7 +48,7 @@ window.doNormalLogin = async function(role) {
             console.log("İlk giriş tespit edildi, yetki kontrolü yapılıyor...");
             
             // Veritabanında (athletes/coaches) bu TC ve şifre var mı sor
-            const { data: isValid, error: rpcError } = await window.supabase.rpc('verify_user_credentials', {
+            const { data: isValid, error: rpcError } = await getAuthClient().rpc('verify_user_credentials', {
                 p_tc: tc,
                 p_pass: pass,
                 p_role: role
@@ -50,7 +56,7 @@ window.doNormalLogin = async function(role) {
 
             if (isValid) {
                 // Kayıt var ve şifre doğru. Arka planda güvenli sisteme kaydet
-                const { error: signUpError } = await window.supabase.auth.signUp({
+                const { error: signUpError } = await getAuthClient().auth.signUp({
                     email: email,
                     password: pass,
                     options: {
@@ -61,7 +67,7 @@ window.doNormalLogin = async function(role) {
                 if (signUpError) throw signUpError;
 
                 // Kayıt başarılı, şimdi asıl girişi yap ve Token'ı al
-                const retryLogin = await window.supabase.auth.signInWithPassword({ email, password: pass });
+                const retryLogin = await getAuthClient().auth.signInWithPassword({ email, password: pass });
                 authData = retryLogin.data;
                 authError = retryLogin.error;
             } else {
