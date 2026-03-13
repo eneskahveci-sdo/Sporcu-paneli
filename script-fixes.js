@@ -1033,50 +1033,92 @@ document.addEventListener('DOMContentLoaded', function() {
         }, { passive: false });
     });
 });
-
-// ── DB.mappers safety guard — script.js yüklenmediyse crash önle
-if (!window.DB || !DB.mappers || typeof DB.mappers.fromSettings !== 'function') {
-    console.error('script-fixes.js: DB.mappers hazır değil — mapper extend atlandı.');
-} else {
-
-// Extend settings mapper to include new fields
-var _origFromSettings = DB.mappers.fromSettings;
-DB.mappers.fromSettings = function(s) {
-    var base = _origFromSettings(s);
-    base.wa_api_token = s.waApiToken || '';
-    base.wa_phone_id = s.waPhoneId || '';
-    base.wa_reminder_day = s.waReminderDay || 1;
-    base.wa_active = s.waActive || false;
-    base.receipt_counter = s.receiptCounter || 0;
-    return base;
-};
-
-var _origToSettings = DB.mappers.toSettings;
-DB.mappers.toSettings = function(r) {
-    var base = _origToSettings(r);
-    base.waApiToken = r.wa_api_token || '';
-    base.waPhoneId = r.wa_phone_id || '';
-    base.waReminderDay = r.wa_reminder_day || 1;
-    base.waActive = r.wa_active || false;
-    base.receiptCounter = r.receipt_counter || 0;
-    return base;
-};
-
-// Extend payment mapper to include receipt_no
-var _origToPayment = DB.mappers.toPayment;
-DB.mappers.toPayment = function(r) {
-    var base = _origToPayment(r);
-    base.receiptNo = r.receipt_no || '';
-    return base;
-};
-
-var _origFromPayment = DB.mappers.fromPayment;
-DB.mappers.fromPayment = function(p) {
-    var base = _origFromPayment(p);
-    base.receipt_no = p.receiptNo || '';
-    return base;
-};
-
-} // end DB.mappers safety guard
-
-console.log('✅ Script-fixes V9 yüklendi — spTab fix + finans grafikleri + makbuz + kasa + WhatsApp + güvenlik düzeltmeleri');
+// ═══════════════════════════════════════════════════════════
+// DB.MAPPERS GUARD FIX — V9.1 PATCH
+// script-fixes.js'in EN SONUNDAKİ DB.mappers guard bloğunun
+// yerini alır. Retry mekanizması ile mapper extend garantisi.
+// ═══════════════════════════════════════════════════════════
+//
+// KULLANIM:
+// script-fixes.js'in en altındaki şu satırları SİLİN:
+//
+//   if (!window.DB || !DB.mappers || typeof DB.mappers.fromSettings !== 'function') {
+//       console.error('script-fixes.js: DB.mappers hazır değil — mapper extend atlandı.');
+//   } else {
+//       ... (tüm extend blokları)
+//   }
+//
+// Yerine aşağıdaki kodu YAPIŞTIRIN:
+// ═══════════════════════════════════════════════════════════
+ 
+function _extendMappers() {
+    if (!window.DB || !DB.mappers || typeof DB.mappers.fromSettings !== 'function') {
+        return false; // henüz hazır değil
+    }
+ 
+    // Zaten extend edilmişse tekrar yapma
+    if (window._mappersExtended) return true;
+    window._mappersExtended = true;
+ 
+    console.log('✅ DB.mappers extend ediliyor...');
+ 
+    // Extend settings mapper
+    var _origFromSettings = DB.mappers.fromSettings;
+    DB.mappers.fromSettings = function(s) {
+        var base = _origFromSettings(s);
+        base.wa_api_token = s.waApiToken || '';
+        base.wa_phone_id = s.waPhoneId || '';
+        base.wa_reminder_day = s.waReminderDay || 1;
+        base.wa_active = s.waActive || false;
+        base.receipt_counter = s.receiptCounter || 0;
+        return base;
+    };
+ 
+    var _origToSettings = DB.mappers.toSettings;
+    DB.mappers.toSettings = function(r) {
+        var base = _origToSettings(r);
+        base.waApiToken = r.wa_api_token || '';
+        base.waPhoneId = r.wa_phone_id || '';
+        base.waReminderDay = r.wa_reminder_day || 1;
+        base.waActive = r.wa_active || false;
+        base.receiptCounter = r.receipt_counter || 0;
+        return base;
+    };
+ 
+    // Extend payment mapper
+    var _origToPayment = DB.mappers.toPayment;
+    DB.mappers.toPayment = function(r) {
+        var base = _origToPayment(r);
+        base.receiptNo = r.receipt_no || '';
+        return base;
+    };
+ 
+    var _origFromPayment = DB.mappers.fromPayment;
+    DB.mappers.fromPayment = function(p) {
+        var base = _origFromPayment(p);
+        base.receipt_no = p.receiptNo || '';
+        return base;
+    };
+ 
+    console.log('✅ DB.mappers extend tamamlandı!');
+    return true;
+}
+ 
+// Hemen dene
+if (!_extendMappers()) {
+    console.warn('⏳ DB.mappers henüz hazır değil — retry başlatılıyor...');
+    // 100ms, 300ms, 500ms, 1000ms, 2000ms aralıklarla dene
+    var _retryDelays = [100, 300, 500, 1000, 2000];
+    _retryDelays.forEach(function(delay) {
+        setTimeout(function() {
+            if (!window._mappersExtended) {
+                if (_extendMappers()) {
+                    console.log('✅ DB.mappers extend ' + delay + 'ms sonra başarılı!');
+                }
+            }
+        }, delay);
+    });
+}
+ 
+console.log('✅ Script-fixes V9.1 yüklendi — DB.mappers retry fix dahil');
+ 
