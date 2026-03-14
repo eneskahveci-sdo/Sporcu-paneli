@@ -739,51 +739,12 @@ function setupTCInput(inputId) {
     });
 }
 
-// Client-side login fallback: RPC yoksa doğrudan tablo sorgusu ile şifre doğrula
-async function _clientSideLoginFallback(sb, tc, pass, role) {
-    var table = role === 'coach' ? 'coaches' : 'athletes';
-    var passCol = role === 'coach' ? 'coach_pass' : 'sp_pass';
-
-    var resp = await sb.from(table).select('*').eq('tc', tc).limit(1).maybeSingle();
-
-    if (resp.error) throw new Error('Veritabanı sorgu hatası: ' + resp.error.message);
-    if (!resp.data) {
-        return { ok: false, error: role === 'coach' ? 'Antrenör bulunamadı' : 'Sporcu bulunamadı' };
-    }
-
-    var storedPass = (resp.data[passCol] || '').trim();
-    var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
-    var validPass = storedPass || defaultPass;
-
-    // 1. Direct plaintext comparison (özel şifre veya varsayılan)
-    if (pass === validPass) {
-        return { ok: true, role: role, data: resp.data };
-    }
-
-    // 2. If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
-    if (validPass.length === 64 && /^[0-9a-f]{64}$/i.test(validPass)) {
-        try {
-            var hashedInput = await sha256(pass);
-            if (hashedInput === validPass.toLowerCase()) {
-                return { ok: true, role: role, data: resp.data };
-            }
-        } catch (hashErr) {
-            console.warn('SHA-256 hash comparison failed:', hashErr);
-        }
-    }
-
-    // 3. Özel şifre eşleşmediyse varsayılan şifreyi de dene
-    //    (sp_pass/coach_pass yanlışlıkla set edilmiş olabilir)
-    if (storedPass && pass === defaultPass) {
-        return { ok: true, role: role, data: resp.data };
-    }
-
-    return { ok: false, error: 'TC veya şifre hatalı!' };
-}
+// Client-side login fallback KALDIRILDI — tüm doğrulama login_with_tc RPC üzerinden yapılır.
+// Security.js yüklenmemişse bu basit RPC-only fonksiyon çalışır.
 
 window.doNormalLogin = async function(type) {
     // Bu fonksiyon Security.js tarafından override edilir.
-    // Security.js yüklenmemişse bu fallback çalışır.
+    // Security.js yüklenmemişse bu RPC-only fallback çalışır.
     const isCoach = type === 'coach';
     const tcId = isCoach ? 'lc-tc' : 'ls-tc';
     const passId = isCoach ? 'lc-pass' : 'ls-pass';
@@ -817,61 +778,58 @@ window.doNormalLogin = async function(type) {
         if (!sb) throw new Error('Supabase başlatılamadı');
 
         // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
-        // Sadece aktif oturum varsa signOut yap, yoksa gereksiz signOut client state bozabilir
         try {
-            var _sess = await sb.auth.getSession();
+            const _sess = await sb.auth.getSession();
             if (_sess?.data?.session) {
                 await sb.auth.signOut();
             }
         } catch(e) { console.warn('signOut check:', e); }
 
         const role = type === 'coach' ? 'coach' : 'sporcu';
-        var loginResult = null;
-        var usedFallback = false;
+        let loginResult = null;
 
-        // Önce RPC dene, başarısız olursa doğrudan tablo sorgusu ile fallback yap
+        // Sadece RPC ile giriş — client-side fallback kaldırıldı
         try {
             const { data: rpcData, error: rpcErr } = await sb.rpc('login_with_tc', {
                 p_tc: tc, p_pass: pass, p_role: role
             });
 
             if (rpcErr) {
-                console.warn('RPC hatası, fallback deneniyor:', rpcErr.code, rpcErr.message);
-                loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
-                usedFallback = true;
-            } else {
-                if (typeof rpcData === 'string') {
-                    try { loginResult = JSON.parse(rpcData); }
-                    catch (parseErr) {
-                        console.warn('RPC JSON parse hatası, fallback deneniyor:', parseErr);
-                        loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
-                        usedFallback = true;
-                    }
-                } else if (rpcData === null || rpcData === undefined) {
-                    // RPC null döndürdü (fonksiyon bulunamadı veya beklenmedik yanıt)
-                    console.warn('RPC null yanıt, fallback deneniyor');
-                    loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
-                    usedFallback = true;
-                } else {
-                    loginResult = rpcData;
+                console.error('RPC hatası:', rpcErr.code, rpcErr.message);
+                if (errEl) {
+                    errEl.textContent = 'Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.';
+                    errEl.classList.remove('dn');
                 }
+                return;
+            }
+
+            if (typeof rpcData === 'string') {
+                try { loginResult = JSON.parse(rpcData); }
+                catch (parseErr) {
+                    console.error('RPC JSON parse hatası:', parseErr);
+                    if (errEl) {
+                        errEl.textContent = 'Giriş servisi geçici olarak kullanılamıyor. Lütfen tekrar deneyin.';
+                        errEl.classList.remove('dn');
+                    }
+                    return;
+                }
+            } else if (rpcData === null || rpcData === undefined) {
+                console.error('RPC null yanıt — fonksiyon bulunamadı');
+                if (errEl) {
+                    errEl.textContent = 'Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.';
+                    errEl.classList.remove('dn');
+                }
+                return;
+            } else {
+                loginResult = rpcData;
             }
         } catch (rpcCatchErr) {
-            console.warn('RPC çağrısı başarısız, fallback deneniyor:', rpcCatchErr);
-            loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
-            usedFallback = true;
-        }
-
-        // RPC başarısız olduysa ve henüz fallback denenmemişse, client-side fallback dene
-        if (!usedFallback && loginResult && !loginResult.ok) {
-            try {
-                var fbResult = await _clientSideLoginFallback(sb, tc, pass, role);
-                if (fbResult && fbResult.ok) {
-                    loginResult = fbResult;
-                }
-            } catch (fbErr) {
-                console.warn('Client-side fallback hatası:', fbErr.message);
+            console.error('RPC çağrısı başarısız:', rpcCatchErr);
+            if (errEl) {
+                errEl.textContent = 'Giriş servisi geçici olarak kullanılamıyor. Lütfen tekrar deneyin.';
+                errEl.classList.remove('dn');
             }
+            return;
         }
 
         if (!loginResult || !loginResult.ok) {
@@ -912,7 +870,7 @@ window.doNormalLogin = async function(type) {
             AppState.currentBranchId = found.branch_id;
             
             StorageManager.set('sporcu_app_sporcu', {
-                user: AppState.currentSporcu,
+                user: { ...AppState.currentSporcu, spPass: undefined },
                 orgId: AppState.currentOrgId,
                 branchId: AppState.currentBranchId
             });
@@ -1453,6 +1411,9 @@ function updateBranchUI() {
     }
 }
 
+const _goHooks = { before: [], after: [] };
+window.registerGoHook = function(phase, fn) { _goHooks[phase].push(fn); };
+
 window.go = function(page, params = {}) {
     if (AppState.currentUser?.role === 'coach') {
         const restricted = ['dashboard', 'payments', 'accounting', 'settings', 'sms', 'sports', 'classes'];
@@ -1460,6 +1421,12 @@ window.go = function(page, params = {}) {
             toast(AppState.lang === 'TR' ? 'Bu sayfaya erişim yetkiniz yok.' : 'You do not have permission to access this page.', 'e');
             return;
         }
+    }
+    
+    // Before hooks
+    for (const hook of _goHooks.before) {
+        const result = hook(page, params);
+        if (result === false) return;
     }
     
     AppState.ui.curPage = page;
@@ -1480,16 +1447,12 @@ window.go = function(page, params = {}) {
     
     if (!main) return;
     
-    main.style.opacity = '0';
-    setTimeout(() => {
-        if (pages[page]) {
-            main.innerHTML = pages[page]();
-            if (page === 'athleteProfile') {
-                initProfileTabs();
-            }
+    if (pages[page]) {
+        main.innerHTML = pages[page]();
+        if (page === 'athleteProfile') {
+            initProfileTabs();
         }
-        main.style.opacity = '1';
-    }, 100);
+    }
     
     document.querySelectorAll('.ni').forEach(el => {
         el.classList.toggle('on', el.id === `ni-${page === 'athleteProfile' ? 'athletes' : page}`);
@@ -1499,6 +1462,11 @@ window.go = function(page, params = {}) {
     });
     
     closeSide();
+    
+    // After hooks
+    for (const hook of _goHooks.after) {
+        hook(page, params);
+    }
 };
 
 window.openSide = function() {
@@ -1515,14 +1483,20 @@ window.closeSide = function() {
     if (overlay) overlay.classList.remove('show');
 };
 
-function checkOverdue() {
+async function checkOverdue() {
     const today = DateUtils.today();
-    AppState.data.payments.forEach(p => {
-        if (p.st === 'pending' && p.dt && p.dt < today) {
-            p.st = 'overdue';
-            DB.upsert('payments', DB.mappers.fromPayment(p));
+    const overdueList = AppState.data.payments.filter(
+        p => p.st === 'pending' && p.dt && p.dt < today
+    );
+    
+    for (const p of overdueList) {
+        p.st = 'overdue';
+        try {
+            await DB.upsert('payments', DB.mappers.fromPayment(p));
+        } catch (err) {
+            console.error('Overdue güncelleme hatası:', err);
         }
-    });
+    }
 }
 
 function attendanceRate(aid) {
@@ -1662,11 +1636,11 @@ function pgAthleteProfile(athleteId) {
         </div>
         
         <div class="tab-nav">
-            <button class="tab-btn active" onclick="switchProfileTab('overview')">Genel Bakış</button>
-            <button class="tab-btn" onclick="switchProfileTab('personal')">Kişisel Bilgiler</button>
-            <button class="tab-btn" onclick="switchProfileTab('payments')">Ödemeler</button>
-            <button class="tab-btn" onclick="switchProfileTab('attendance')">Devam Durumu</button>
-            <button class="tab-btn" onclick="switchProfileTab('documents')">Belgeler</button>
+            <button class="tab-btn active" data-tab="overview" onclick="switchProfileTab('overview')">Genel Bakış</button>
+            <button class="tab-btn" data-tab="personal" onclick="switchProfileTab('personal')">Kişisel Bilgiler</button>
+            <button class="tab-btn" data-tab="payments" onclick="switchProfileTab('payments')">Ödemeler</button>
+            <button class="tab-btn" data-tab="attendance" onclick="switchProfileTab('attendance')">Devam Durumu</button>
+            <button class="tab-btn" data-tab="documents" onclick="switchProfileTab('documents')">Belgeler</button>
         </div>
         
         <div id="tab-overview" class="tab-content active">
@@ -1850,32 +1824,10 @@ function pgAthleteProfile(athleteId) {
         </div>
         
         <div id="tab-documents" class="tab-content">
-            <div class="flex fjb fca mb3">
-                <h3 class="tw6">Belgeler</h3>
-                <button class="btn bp" onclick="uploadDocument('${FormatUtils.escape(a.id)}')">+ Belge Yükle</button>
-            </div>
-            <div class="g2">
-                <div class="document-card" onclick="viewDocument('saglik')">
-                    <div class="document-icon">&#x1F5C3;</div>
-                    <div class="document-info">
-                        <div class="document-title">Sağlık Raporu</div>
-                        <div class="document-meta">PDF • 2.4 MB • 15.03.2024</div>
-                    </div>
-                </div>
-                <div class="document-card" onclick="viewDocument('kimlik')">
-                    <div class="document-icon">&#x1F5C3;</div>
-                    <div class="document-info">
-                        <div class="document-title">Kimlik Fotokopisi</div>
-                        <div class="document-meta">PDF • 1.1 MB • 10.01.2024</div>
-                    </div>
-                </div>
-                <div class="document-card" onclick="viewDocument('lisans')">
-                    <div class="document-icon">&#x1F5C3;</div>
-                    <div class="document-info">
-                        <div class="document-title">Lisans Belgesi</div>
-                        <div class="document-meta">PDF • 3.2 MB • 05.02.2024</div>
-                    </div>
-                </div>
+            <div class="empty-state" style="padding:40px;text-align:center">
+                <div style="font-size:48px;margin-bottom:12px">📁</div>
+                <div class="tw6">Belge Yönetimi Yakında</div>
+                <div class="ts tm mt1">Sağlık raporu, kimlik ve lisans belgelerini yükleyebileceksiniz.</div>
             </div>
         </div>
     </div>`;
@@ -1979,15 +1931,7 @@ function generateAttendanceCalendar(aid) {
 
 window.switchProfileTab = function(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-        const text = btn.textContent.toLowerCase();
-        if ((tabName === 'overview' && text.includes('genel')) ||
-            (tabName === 'personal' && text.includes('kişisel')) ||
-            (tabName === 'payments' && text.includes('ödeme')) ||
-            (tabName === 'attendance' && text.includes('devam')) ||
-            (tabName === 'documents' && text.includes('belge'))) {
-            btn.classList.add('active');
-        }
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
     
     document.querySelectorAll('.tab-content').forEach(content => {

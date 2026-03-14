@@ -179,24 +179,9 @@ function _clearLoginAttempts(tc) {
     _deleteAttempts(_getRateLimitKey(tc));
 }
 
-// ── 3. CSP META TAG ──────────────────────────────────────────────
-
-(function addCSP() {
-    if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) return;
-    const csp = document.createElement('meta');
-    csp.httpEquiv = 'Content-Security-Policy';
-    csp.content = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev",
-        "style-src 'self' 'unsafe-inline'",
-        "connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev https://graph.facebook.com https://www.paytr.com",
-        "img-src 'self' data: blob: https:",
-        "font-src 'self' data:",
-        "object-src 'none'",
-        "base-uri 'self'"
-    ].join('; ');
-    document.head.insertBefore(csp, document.head.firstChild);
-})();
+// ── 3. CSP META TAG — KALDIRILDI ─────────────────────────────────
+// CSP artık SADECE vercel.json HTTP header'ı üzerinden tanımlanıyor.
+// Meta tag ve HTTP header çakışması önlendi.
 
 // ── 4. ANA GİRİŞ FONKSİYONU ──────────────────────────────────────
 //
@@ -372,7 +357,7 @@ function _securityDoNormalLogin(role) {
                 AppState.currentBranchId = row.branch_id;
 
                 if (window.StorageManager) {
-                    StorageManager.set('sporcu_app_user',   AppState.currentUser);
+                    StorageManager.set('sporcu_app_user',   { ...AppState.currentUser, coach_pass: undefined });
                     StorageManager.set('sporcu_app_org',    AppState.currentOrgId);
                     StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
                 }
@@ -420,7 +405,7 @@ function _securityDoNormalLogin(role) {
 
                 if (window.StorageManager) {
                     StorageManager.set('sporcu_app_sporcu', {
-                        user: AppState.currentSporcu,
+                        user: { ...AppState.currentSporcu, spPass: undefined },
                         orgId: AppState.currentOrgId,
                         branchId: AppState.currentBranchId
                     });
