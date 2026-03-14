@@ -187,7 +187,7 @@ function _clearLoginAttempts(tc) {
     csp.httpEquiv = 'Content-Security-Policy';
     csp.content = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev",
         "style-src 'self' 'unsafe-inline'",
         "connect-src 'self' https://*.supabase.co https://graph.facebook.com https://api.netgsm.com.tr https://www.paytr.com",
         "img-src 'self' data: blob: https:",

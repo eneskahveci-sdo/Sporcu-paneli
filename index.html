@@ -143,24 +143,29 @@ table{min-width:600px}
 @media(min-width:769px) and (max-width:1024px){.g4{grid-template-columns:repeat(2,1fr)!important}.profile-grid{grid-template-columns:1fr!important}}
 @media(max-height:500px) and (orientation:landscape){.lbox{max-height:95vh!important;padding:12px!important}.llogo-i{width:40px!important;height:40px!important;margin-bottom:8px!important}.llogo{margin-bottom:12px!important}#login-school-name{font-size:16px!important}}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" onerror="this.onerror=function(){console.error('Supabase: her iki CDN de yüklenemedi')};this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js'"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" crossorigin="anonymous" onerror="this.onerror=function(){console.error('Supabase: jsdelivr ve unpkg basarisiz, esm.sh deneniyor...');this.src='https://esm.sh/@supabase/supabase-js@2/dist/umd/supabase.min.js'};this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js'"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function(){
-    var maxWait=3000,interval=200,elapsed=0;
+    var maxWait=5000,interval=300,elapsed=0;
     function check(){
-        if(typeof supabase!=='undefined')return;
+        if(typeof supabase!=='undefined'){console.log('✅ Supabase library loaded');return}
         elapsed+=interval;
         if(elapsed<maxWait){setTimeout(check,interval);return}
         console.warn('Supabase CDN yuklenemedi, dinamik retry...');
-        var urls=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js','https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js'];
+        var urls=[
+            'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+            'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+            'https://cdn.skypack.dev/@supabase/supabase-js@2/dist/umd/supabase.min.js'
+        ];
         var i=0;
         function tryNext(){
             if(i>=urls.length){console.error('Supabase: tum kaynaklar basarisiz');return}
             var s=document.createElement('script');
             s.src=urls[i]+'?t='+Date.now();
-            s.onload=function(){console.log('Supabase dinamik yuklendi:',urls[i])};
+            s.crossOrigin='anonymous';
+            s.onload=function(){console.log('✅ Supabase dinamik yuklendi:',urls[i])};
             s.onerror=function(){i++;tryNext()};
             document.head.appendChild(s);
         }
