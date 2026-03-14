@@ -751,12 +751,12 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
     var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
     var validPass = storedPass || defaultPass;
 
-    // Direct plaintext comparison
+    // 1. Direct plaintext comparison (özel şifre veya varsayılan)
     if (pass === validPass) {
         return { ok: true, role: role, data: resp.data };
     }
 
-    // If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
+    // 2. If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
     if (validPass.length === 64 && /^[0-9a-f]{64}$/i.test(validPass)) {
         try {
             var hashedInput = await sha256(pass);
@@ -766,6 +766,12 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
         } catch (hashErr) {
             console.warn('SHA-256 hash comparison failed:', hashErr);
         }
+    }
+
+    // 3. Özel şifre eşleşmediyse varsayılan şifreyi de dene
+    //    (sp_pass/coach_pass yanlışlıkla set edilmiş olabilir)
+    if (storedPass && pass === defaultPass) {
+        return { ok: true, role: role, data: resp.data };
     }
 
     return { ok: false, error: 'TC veya şifre hatalı!' };
@@ -807,10 +813,17 @@ window.doNormalLogin = async function(type) {
         if (!sb) throw new Error('Supabase başlatılamadı');
 
         // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
-        try { await sb.auth.signOut(); } catch(e) { console.warn('signOut before login:', e); }
+        // Sadece aktif oturum varsa signOut yap, yoksa gereksiz signOut client state bozabilir
+        try {
+            var _sess = await sb.auth.getSession();
+            if (_sess?.data?.session) {
+                await sb.auth.signOut();
+            }
+        } catch(e) { console.warn('signOut check:', e); }
 
         const role = type === 'coach' ? 'coach' : 'sporcu';
         var loginResult = null;
+        var usedFallback = false;
 
         // Önce RPC dene, başarısız olursa doğrudan tablo sorgusu ile fallback yap
         try {
@@ -821,17 +834,20 @@ window.doNormalLogin = async function(type) {
             if (rpcErr) {
                 console.warn('RPC hatası, fallback deneniyor:', rpcErr.code, rpcErr.message);
                 loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                usedFallback = true;
             } else {
                 if (typeof rpcData === 'string') {
                     try { loginResult = JSON.parse(rpcData); }
                     catch (parseErr) {
                         console.warn('RPC JSON parse hatası, fallback deneniyor:', parseErr);
                         loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                        usedFallback = true;
                     }
                 } else if (rpcData === null || rpcData === undefined) {
                     // RPC null döndürdü (fonksiyon bulunamadı veya beklenmedik yanıt)
                     console.warn('RPC null yanıt, fallback deneniyor');
                     loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                    usedFallback = true;
                 } else {
                     loginResult = rpcData;
                 }
@@ -839,6 +855,19 @@ window.doNormalLogin = async function(type) {
         } catch (rpcCatchErr) {
             console.warn('RPC çağrısı başarısız, fallback deneniyor:', rpcCatchErr);
             loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+            usedFallback = true;
+        }
+
+        // RPC başarısız olduysa ve henüz fallback denenmemişse, client-side fallback dene
+        if (!usedFallback && loginResult && !loginResult.ok) {
+            try {
+                var fbResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                if (fbResult && fbResult.ok) {
+                    loginResult = fbResult;
+                }
+            } catch (fbErr) {
+                console.warn('Client-side fallback hatası:', fbErr.message);
+            }
         }
 
         if (!loginResult || !loginResult.ok) {

@@ -236,13 +236,13 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
     var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
     var validPass = storedPass || defaultPass;
 
-    // Direct plaintext comparison
+    // 1. Direct plaintext comparison (özel şifre veya varsayılan)
     if (pass === validPass) {
         console.log('✅ Fallback doğrulama başarılı!');
         return { ok: true, role: role === 'coach' ? 'coach' : 'sporcu', data: resp.data };
     }
 
-    // If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
+    // 2. If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
     if (validPass.length === 64 && /^[0-9a-f]{64}$/i.test(validPass)) {
         try {
             var hashedInput = '';
@@ -257,6 +257,13 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
         } catch (hashErr) {
             console.warn('SHA-256 hash comparison failed:', hashErr);
         }
+    }
+
+    // 3. Özel şifre eşleşmediyse varsayılan şifreyi de dene
+    //    (sp_pass/coach_pass yanlışlıkla set edilmiş olabilir)
+    if (storedPass && pass === defaultPass) {
+        console.log('✅ Fallback doğrulama başarılı (varsayılan şifre)!');
+        return { ok: true, role: role === 'coach' ? 'coach' : 'sporcu', data: resp.data };
     }
 
     return { ok: false, error: 'TC veya şifre hatalı!' };
@@ -315,7 +322,14 @@ function _securityDoNormalLogin(role) {
             console.log('✅ Supabase client hazır');
 
             // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
-            try { await sb.auth.signOut(); } catch(e) { console.warn('signOut before login:', e); }
+            // Sadece aktif oturum varsa signOut yap, yoksa gereksiz signOut client state bozabilir
+            try {
+                var _sess = await sb.auth.getSession();
+                if (_sess?.data?.session) {
+                    console.log('🔑 Mevcut admin oturumu temizleniyor...');
+                    await sb.auth.signOut();
+                }
+            } catch(e) { console.warn('signOut check:', e); }
 
             // Tek RPC çağrısı: doğrulama + kullanıcı verisi
             console.log('📡 RPC çağrılıyor: login_with_tc...');
@@ -362,6 +376,22 @@ function _securityDoNormalLogin(role) {
             }
 
             console.log('📡 Giriş sonucu:', { ok: rpcResult?.ok, role: rpcResult?.role, fallback: usedFallback });
+
+            // RPC başarısız olduysa ve henüz fallback denenmemişse, client-side fallback dene
+            // (RPC fonksiyonu eski sürüm olabilir veya şifre karşılaştırma farklı çalışabilir)
+            if (!usedFallback && rpcResult && !rpcResult.ok) {
+                console.log('🔄 RPC başarısız, client-side fallback deneniyor...');
+                try {
+                    var fbResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                    if (fbResult && fbResult.ok) {
+                        console.log('✅ Client-side fallback başarılı!');
+                        rpcResult = fbResult;
+                        usedFallback = true;
+                    }
+                } catch (fbErr2) {
+                    console.warn('⚠️ Client-side fallback hatası:', fbErr2.message);
+                }
+            }
 
             if (!rpcResult || !rpcResult.ok) {
                 _recordFailedAttempt(tc);
