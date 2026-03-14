@@ -8,6 +8,7 @@ const API_CACHE = 'dragos-api-v6';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
+    '/init.js',
     '/script.js',
     '/script-fixes.js',
     '/ui-improvements.js',
