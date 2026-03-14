@@ -2445,6 +2445,7 @@ window.editAth = function(id, prefill) {
             
             const heightVal = UIUtils.getNumber('a-height');
             const weightVal = UIUtils.getNumber('a-weight');
+            const newSpPass = UIUtils.getValue('a-sppass');
             
             const obj = {
                 id: a?.id || generateId(),
@@ -2461,7 +2462,7 @@ window.editAth = function(id, prefill) {
                 pn: UIUtils.getValue('a-pn') || '',
                 pph: UIUtils.getValue('a-pph') || '',
                 pem: UIUtils.getValue('a-pem') || '',
-                spPass: isNew ? (UIUtils.getValue('a-sppass') || '') : (UIUtils.getValue('a-sppass') || undefined),
+                spPass: isNew ? (newSpPass || '') : (newSpPass || undefined),
                 lic: UIUtils.getValue('a-lic') || '',
                 address: UIUtils.getValue('a-address') || '',
                 school: UIUtils.getValue('a-school') || '',
@@ -2482,8 +2483,6 @@ window.editAth = function(id, prefill) {
                 obj.fee = a.fee || 0;
                 obj.vd = a.vd || null;
             }
-            
-            const newSpPass = UIUtils.getValue('a-sppass');
             
             const mapped = DB.mappers.fromAthlete(obj);
             console.log('Saving athlete:', mapped);
