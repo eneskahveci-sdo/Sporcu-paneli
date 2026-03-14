@@ -262,6 +262,7 @@ function getSupabase() {
         try {
             if (typeof supabase === 'undefined') {
                 console.error('Supabase library not loaded');
+                toast(i18n[AppState.lang].connectionError, 'e');
                 return null;
             }
             AppState.sb = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
