@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
-// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.0
+// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.1
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v5';
-const API_CACHE = 'dragos-api-v5';
+const STATIC_CACHE = 'dragos-static-v6';
+const API_CACHE = 'dragos-api-v6';
 
 const STATIC_ASSETS = [
     '/',
@@ -15,24 +15,18 @@ const STATIC_ASSETS = [
     '/style.css'
 ];
 
-const CDN_ASSETS = [
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
-    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+const CDN_HOSTNAMES = [
+    'cdn.jsdelivr.net',
+    'cdnjs.cloudflare.com',
+    'unpkg.com',
+    'esm.sh',
+    'cdn.skypack.dev'
 ];
 
 self.addEventListener('install', function(event) {
     event.waitUntil(
         caches.open(STATIC_CACHE).then(function(cache) {
-            var cdnPromises = CDN_ASSETS.map(function(url) {
-                return fetch(url, { mode: 'cors' })
-                    .then(function(resp) { if (resp.ok) return cache.put(url, resp); })
-                    .catch(function() {});
-            });
-            return Promise.all([
-                cache.addAll(STATIC_ASSETS).catch(function() {}),
-                ...cdnPromises
-            ]);
+            return cache.addAll(STATIC_ASSETS).catch(function() {});
         }).then(function() { return self.skipWaiting(); })
     );
 });
@@ -73,20 +67,10 @@ self.addEventListener('fetch', function(event) {
         return;
     }
 
-    if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'unpkg.com' || url.hostname === 'esm.sh' || url.hostname === 'cdn.skypack.dev') {
-        event.respondWith(
-            fetch(event.request.clone()).then(function(resp) {
-                if (resp.ok) {
-                    var clone = resp.clone();
-                    caches.open(STATIC_CACHE).then(function(c) { c.put(event.request, clone); });
-                }
-                return resp;
-            }).catch(function() {
-                return caches.match(event.request).then(function(cached) {
-                    return cached || new Response('', { status: 503, statusText: 'CDN Unavailable' });
-                });
-            })
-        );
+    // CDN requests — let the browser handle them natively.
+    // Service Worker interception of cross-origin CDN fetches causes CORS
+    // failures and can resolve respondWith() with undefined.
+    if (CDN_HOSTNAMES.indexOf(url.hostname) !== -1) {
         return;
     }
 
@@ -112,7 +96,14 @@ self.addEventListener('fetch', function(event) {
 
     event.respondWith(
         fetch(event.request).catch(function() {
-            if (event.request.mode === 'navigate') return caches.match('/index.html');
+            if (event.request.mode === 'navigate') {
+                return caches.match('/index.html').then(function(page) {
+                    return page || new Response('Çevrimdışı', {
+                        status: 503,
+                        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+                    });
+                });
+            }
             return new Response('', { status: 503, statusText: 'Offline' });
         })
     );
