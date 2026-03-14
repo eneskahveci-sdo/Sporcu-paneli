@@ -791,6 +791,10 @@ window.doNormalLogin = async function(type) {
                         console.warn('RPC JSON parse hatası, fallback deneniyor:', parseErr);
                         loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
                     }
+                } else if (rpcData === null || rpcData === undefined) {
+                    // RPC null döndürdü (fonksiyon bulunamadı veya beklenmedik yanıt)
+                    console.warn('RPC null yanıt, fallback deneniyor');
+                    loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
                 } else {
                     loginResult = rpcData;
                 }

@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
-// DRAGOS FUTBOL AKADEMİSİ — Service Worker v1.0
+// DRAGOS FUTBOL AKADEMİSİ — Service Worker v2.0
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v1';
-const API_CACHE = 'dragos-api-v1';
+const STATIC_CACHE = 'dragos-static-v2';
+const API_CACHE = 'dragos-api-v2';
 
 const STATIC_ASSETS = [
     '/',
@@ -62,7 +62,8 @@ self.addEventListener('fetch', function(event) {
                 })
                 .catch(function() {
                     return caches.match(event.request).then(function(cached) {
-                        return cached || new Response(JSON.stringify({ data: null, error: 'offline' }), {
+                        return cached || new Response(JSON.stringify({ message: 'Bağlantı yok', code: 'OFFLINE' }), {
+                            status: 503,
                             headers: { 'Content-Type': 'application/json' }
                         });
                     });
