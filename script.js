@@ -425,15 +425,15 @@ function toggleLang() {
 window.switchLoginTab = function(tab) {
     const sporcuEl = document.getElementById('login-sporcu');
     const coachEl = document.getElementById('login-coach');
-    const tabs = document.querySelectorAll('#login-tabs .ltab');
-    
+    const adminEl = document.getElementById('login-admin');
+
     if (sporcuEl) sporcuEl.classList.toggle('dn', tab !== 'sporcu');
-    if (coachEl) coachEl.classList.toggle('dn', tab !== 'coach');
-    
-    if (tabs.length > 1) {
-        tabs[0].classList.toggle('on', tab === 'sporcu');
-        tabs[1].classList.toggle('on', tab === 'coach');
-    }
+    if (coachEl)  coachEl.classList.toggle('dn',  tab !== 'coach');
+    if (adminEl)  adminEl.classList.toggle('dn',  tab !== 'admin');
+
+    document.querySelectorAll('#login-tabs .ltab').forEach(function(t) {
+        t.classList.toggle('on', t.getAttribute('data-tab') === tab);
+    });
 };
 
 window.showLegal = function(type) {
@@ -893,16 +893,47 @@ window.doLogin = async function() {
     
     try {
         const sb = getSupabase();
-        if (!sb) throw new Error('Supabase başlatılamadı');
+        if (!sb) {
+            if (errEl) {
+                errEl.textContent = 'Bağlantı hatası. Sayfayı yenileyip tekrar deneyin.';
+                errEl.classList.remove('dn');
+            }
+            return;
+        }
         
         // Önce mevcut oturumu kapat
         await sb.auth.signOut().catch(() => {});
         
-        const { data: authData, error: authError } = await sb.auth.signInWithPassword({ email, password });
+        let authData, authError;
+        try {
+            const result = await sb.auth.signInWithPassword({ email, password });
+            authData = result.data;
+            authError = result.error;
+        } catch (fetchErr) {
+            // Ağ hatası — fetch başarısız, Supabase'e ulaşılamıyor
+            console.error('Supabase auth network error:', fetchErr.message, fetchErr.stack);
+            if (errEl) {
+                errEl.textContent = 'Bağlantı hatası. İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
+                errEl.classList.remove('dn');
+            }
+            return;
+        }
         
         if (authError) {
+            console.error('Supabase auth error:', authError);
+            let msg;
+            const errMsg = authError.message || '';
+            if (/fetch|network|connection/i.test(errMsg)) {
+                msg = 'Bağlantı hatası. İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
+            } else if (/email.not.confirmed|email_not_confirmed/i.test(errMsg)) {
+                msg = 'E-posta adresiniz doğrulanmamış. Lütfen gelen kutunuzu kontrol edin.';
+            } else if (/invalid.api.key|apikey|invalid.key/i.test(errMsg)) {
+                msg = 'Sistem yapılandırma hatası. Lütfen yönetici ile iletişime geçin.';
+            } else {
+                msg = 'Hatalı e-posta veya şifre!';
+            }
             if (errEl) {
-                errEl.textContent = 'Hatalı e-posta veya şifre!';
+                errEl.textContent = msg;
                 errEl.classList.remove('dn');
             }
             return;
@@ -5207,15 +5238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, { passive: true });
     
     if (window.location.href.includes('admin')) {
-        const loginTabs = document.getElementById('login-tabs');
-        const loginSporcu = document.getElementById('login-sporcu');
-        const loginCoach = document.getElementById('login-coach');
-        const loginAdmin = document.getElementById('login-admin');
-        
-        if (loginTabs) loginTabs.classList.add('dn');
-        if (loginSporcu) loginSporcu.classList.add('dn');
-        if (loginCoach) loginCoach.classList.add('dn');
-        if (loginAdmin) loginAdmin.classList.remove('dn');
+        switchLoginTab('admin');
     }
     
     await restoreSession();
