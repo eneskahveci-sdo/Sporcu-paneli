@@ -159,8 +159,9 @@ table{min-width:600px}
             <p style="color:var(--text2);font-size:14px;margin-top:4px">Kayıt ve Yönetim Sistemi</p>
         </div>
         <div class="ltabs" id="login-tabs">
-            <div class="ltab on" onclick="switchLoginTab('sporcu')">Sporcu / Veli</div>
-            <div class="ltab" onclick="switchLoginTab('coach')">Antrenör Girişi</div>
+            <div class="ltab on" data-tab="sporcu" onclick="switchLoginTab('sporcu')">Sporcu / Veli</div>
+            <div class="ltab" data-tab="coach" onclick="switchLoginTab('coach')">Antrenör Girişi</div>
+            <div class="ltab" data-tab="admin" onclick="switchLoginTab('admin')">🔐 Yönetici</div>
         </div>
         <div id="login-admin" class="dn">
             <div class="al al-y mb3" style="font-size:12px">&#x1F512; Yönetici Giriş Modu Aktif</div>
