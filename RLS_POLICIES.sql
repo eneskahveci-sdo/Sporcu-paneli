@@ -1,14 +1,19 @@
 -- ============================================================
 -- SPORCU PANELI - Supabase RLS (Row Level Security) Politikalari
--- v3.0 — TC + TC son 6 hane ile giriş sistemi
+-- v4.0 — Güvenli RLS: anon erişimi kısıtlandı
 --
 -- MİMARİ NOT:
 --   Bu uygulama frontend-only PWA'dır. Antrenör ve sporcular
 --   Supabase Auth kullanmaz; TC kimlik doğrulaması SECURITY DEFINER
---   fonksiyonları aracılığıyla yapılır. Bu nedenle SELECT/INSERT/
---   UPDATE/DELETE politikaları anon role için de açılmıştır.
---   Anon key zaten istemci JS kodunda herkese açıktır.
---   Asıl güvenlik: login_with_tc() fonksiyonu + uygulama katmanı.
+--   fonksiyonları aracılığıyla yapılır.
+--
+-- GÜVENLİK:
+--   • anon role: Sadece branches/orgs SELECT + login_with_tc EXECUTE.
+--     Hassas tablolara (settings, users, athletes, payments, coaches,
+--     attendance, messages) doğrudan erişim engellenir.
+--   • authenticated role: Tüm tablolara tam erişim.
+--   • login_with_tc SECURITY DEFINER olduğu için RLS'i bypass eder —
+--     sporcu/antrenör girişi bundan etkilenmez.
 --
 -- KULLANIM:
 --   Supabase Dashboard → SQL Editor'de bu betiğin TAMAMINI
@@ -38,28 +43,45 @@ END $$;
 -- Supabase'de anon ve authenticated rolleri public şemaya
 -- erişebilmeli. Bu GRANT'ler olmadan RLS politikaları tek
 -- başına yeterli değildir — tablo düzeyinde erişim hakkı da gerekir.
+--
+-- GÜVENLİK: anon role yalnızca branches/orgs için SELECT ve
+-- login_with_tc EXECUTE hakkına sahiptir. Hassas tablolara
+-- doğrudan erişim engellenir.
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
--- Tablo düzeyinde tam erişim hakları
-GRANT SELECT, INSERT, UPDATE, DELETE ON athletes   TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON payments   TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON coaches    TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON attendance TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON messages   TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON settings   TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON sports     TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON classes    TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON branches   TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON orgs       TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON users      TO anon, authenticated, service_role;
+-- ── authenticated + service_role: tüm tablolara tam erişim
+GRANT SELECT, INSERT, UPDATE, DELETE ON athletes   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON payments   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON coaches    TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON attendance TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON messages   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON settings   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON sports     TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON classes    TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON branches   TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON orgs       TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON users      TO authenticated, service_role;
+
+-- ── anon role: sadece branches/orgs SELECT (login ekranı için)
+REVOKE ALL ON athletes   FROM anon;
+REVOKE ALL ON payments   FROM anon;
+REVOKE ALL ON coaches    FROM anon;
+REVOKE ALL ON attendance FROM anon;
+REVOKE ALL ON messages   FROM anon;
+REVOKE ALL ON settings   FROM anon;
+REVOKE ALL ON sports     FROM anon;
+REVOKE ALL ON classes    FROM anon;
+REVOKE ALL ON users      FROM anon;
+GRANT SELECT ON branches TO anon;
+GRANT SELECT ON orgs     TO anon;
 
 -- Sequence erişim hakları (INSERT + auto-increment id'ler için)
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
 -- Gelecekte oluşturulacak tablolar/sequence'ler için varsayılan haklar
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, service_role;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated, service_role;
 
@@ -80,77 +102,77 @@ ALTER TABLE users      ENABLE ROW LEVEL SECURITY;
 -- ── ADIM 3: POLİTİKALAR ──────────────────────────────────────────
 --
 -- Politika Stratejisi:
---   • SELECT: Herkese açık (anon dahil) — uygulama katmanı erişimi
---             kontrol eder (login_with_tc doğrulaması).
---   • INSERT/UPDATE/DELETE: Herkese açık — antrenörler Supabase Auth
---             kullanmadığından SECURITY DEFINER fonksiyonlar üzerinden
---             ya da doğrudan anon key ile yazabilmelidir.
+--   • settings, users: Sadece authenticated role erişebilir.
+--   • athletes, payments, coaches, attendance, messages:
+--     - SELECT/INSERT/UPDATE/DELETE: Sadece authenticated role.
+--     - anon erişimi yok — sporcu/antrenör girişi login_with_tc
+--       SECURITY DEFINER fonksiyonu üzerinden yapılır (RLS bypass).
+--   • sports, classes: Sadece authenticated role.
+--   • branches, orgs: SELECT herkese açık (login ekranında gerekli),
+--     INSERT/UPDATE sadece authenticated.
 --   • Admin (email/şifre Supabase Auth): zaten authenticated role.
---
--- NOT: TO anon, authenticated açıkça belirtilmiştir — Supabase'de
--- "PUBLIC" varsayılanı bazen beklendiği gibi çalışmayabilir.
 
--- Athletes
-CREATE POLICY "athletes_select" ON athletes FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "athletes_insert" ON athletes FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "athletes_update" ON athletes FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "athletes_delete" ON athletes FOR DELETE TO anon, authenticated USING (true);
-
--- Payments
-CREATE POLICY "payments_select" ON payments FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "payments_insert" ON payments FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "payments_update" ON payments FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "payments_delete" ON payments FOR DELETE TO anon, authenticated USING (true);
-
--- Coaches
-CREATE POLICY "coaches_select" ON coaches FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "coaches_insert" ON coaches FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "coaches_update" ON coaches FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "coaches_delete" ON coaches FOR DELETE TO anon, authenticated USING (true);
-
--- Attendance
-CREATE POLICY "attendance_select" ON attendance FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "attendance_insert" ON attendance FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "attendance_update" ON attendance FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "attendance_delete" ON attendance FOR DELETE TO anon, authenticated USING (true);
-
--- Messages
-CREATE POLICY "messages_select" ON messages FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "messages_insert" ON messages FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "messages_update" ON messages FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "messages_delete" ON messages FOR DELETE TO anon, authenticated USING (true);
-
--- Settings
-CREATE POLICY "settings_select" ON settings FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "settings_insert" ON settings FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "settings_update" ON settings FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-
--- Sports
-CREATE POLICY "sports_select" ON sports FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "sports_insert" ON sports FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "sports_update" ON sports FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "sports_delete" ON sports FOR DELETE TO anon, authenticated USING (true);
-
--- Classes
-CREATE POLICY "classes_select" ON classes FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "classes_insert" ON classes FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "classes_update" ON classes FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "classes_delete" ON classes FOR DELETE TO anon, authenticated USING (true);
-
--- Branches
-CREATE POLICY "branches_select" ON branches FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "branches_insert" ON branches FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "branches_update" ON branches FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-
--- Orgs
-CREATE POLICY "orgs_select" ON orgs FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "orgs_insert" ON orgs FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "orgs_update" ON orgs FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+-- Settings (hassas bilgiler: NetGSM, PayTR credentials)
+CREATE POLICY "settings_select" ON settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "settings_insert" ON settings FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "settings_update" ON settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
 -- Users (Supabase Auth kullanıcıları — admin hesapları)
-CREATE POLICY "users_select" ON users FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY "users_insert" ON users FOR INSERT TO anon, authenticated WITH CHECK (true);
-CREATE POLICY "users_update" ON users FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "users_select" ON users FOR SELECT TO authenticated USING (true);
+CREATE POLICY "users_insert" ON users FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "users_update" ON users FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+-- Athletes
+CREATE POLICY "athletes_select" ON athletes FOR SELECT TO authenticated USING (true);
+CREATE POLICY "athletes_insert" ON athletes FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "athletes_update" ON athletes FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "athletes_delete" ON athletes FOR DELETE TO authenticated USING (true);
+
+-- Payments
+CREATE POLICY "payments_select" ON payments FOR SELECT TO authenticated USING (true);
+CREATE POLICY "payments_insert" ON payments FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "payments_update" ON payments FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "payments_delete" ON payments FOR DELETE TO authenticated USING (true);
+
+-- Coaches
+CREATE POLICY "coaches_select" ON coaches FOR SELECT TO authenticated USING (true);
+CREATE POLICY "coaches_insert" ON coaches FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "coaches_update" ON coaches FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "coaches_delete" ON coaches FOR DELETE TO authenticated USING (true);
+
+-- Attendance
+CREATE POLICY "attendance_select" ON attendance FOR SELECT TO authenticated USING (true);
+CREATE POLICY "attendance_insert" ON attendance FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "attendance_update" ON attendance FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "attendance_delete" ON attendance FOR DELETE TO authenticated USING (true);
+
+-- Messages
+CREATE POLICY "messages_select" ON messages FOR SELECT TO authenticated USING (true);
+CREATE POLICY "messages_insert" ON messages FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "messages_update" ON messages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "messages_delete" ON messages FOR DELETE TO authenticated USING (true);
+
+-- Sports
+CREATE POLICY "sports_select" ON sports FOR SELECT TO authenticated USING (true);
+CREATE POLICY "sports_insert" ON sports FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "sports_update" ON sports FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "sports_delete" ON sports FOR DELETE TO authenticated USING (true);
+
+-- Classes
+CREATE POLICY "classes_select" ON classes FOR SELECT TO authenticated USING (true);
+CREATE POLICY "classes_insert" ON classes FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "classes_update" ON classes FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "classes_delete" ON classes FOR DELETE TO authenticated USING (true);
+
+-- Branches (login ekranında gerekli — anon SELECT açık)
+CREATE POLICY "branches_select" ON branches FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "branches_insert" ON branches FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "branches_update" ON branches FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+-- Orgs (login ekranında gerekli — anon SELECT açık)
+CREATE POLICY "orgs_select" ON orgs FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "orgs_insert" ON orgs FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "orgs_update" ON orgs FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
 -- ── ADIM 4: PGCRYPTO UZANTISI (hash karşılaştırma için) ──────────
 -- Eğer coach_pass veya sp_pass alanında SHA-256 hash varsa,
@@ -218,6 +240,10 @@ BEGIN
 
     -- 1. Düz metin karşılaştırma (özel şifre veya varsayılan)
     IF p_pass = v_stored THEN
+      -- Başarılı giriş: plaintext şifreyi otomatik SHA-256 hash'le
+      IF length(v_stored) < 64 OR v_stored !~ '^[0-9a-f]{64}$' THEN
+        UPDATE coaches SET coach_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+      END IF;
       RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
     END IF;
 
@@ -232,6 +258,8 @@ BEGIN
     -- 3. Özel şifre eşleşmediyse varsayılan şifreyi de dene
     --    (coach_pass yanlışlıkla set edilmiş olabilir)
     IF v_raw_pass <> '' AND p_pass = v_default THEN
+      -- Başarılı giriş: varsayılan şifreyi hash'le
+      UPDATE coaches SET coach_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
       RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
     END IF;
 
@@ -251,6 +279,10 @@ BEGIN
 
     -- 1. Düz metin karşılaştırma (özel şifre veya varsayılan)
     IF p_pass = v_stored THEN
+      -- Başarılı giriş: plaintext şifreyi otomatik SHA-256 hash'le
+      IF length(v_stored) < 64 OR v_stored !~ '^[0-9a-f]{64}$' THEN
+        UPDATE athletes SET sp_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+      END IF;
       RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
     END IF;
 
@@ -265,6 +297,8 @@ BEGIN
     -- 3. Özel şifre eşleşmediyse varsayılan şifreyi de dene
     --    (sp_pass yanlışlıkla set edilmiş olabilir)
     IF v_raw_pass <> '' AND p_pass = v_default THEN
+      -- Başarılı giriş: varsayılan şifreyi hash'le
+      UPDATE athletes SET sp_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
       RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
     END IF;
 
@@ -301,11 +335,12 @@ GRANT EXECUTE ON FUNCTION verify_user_credentials(TEXT, TEXT, TEXT) TO service_r
 -- ── TAMAMLANDI ────────────────────────────────────────────────────
 -- Bu betik çalıştırıldıktan sonra:
 --   1. Tüm eski politikalar temizlendi.
---   2. Şema ve tablo düzeyinde GRANT'ler verildi (anon + authenticated).
---   3. RLS aktif — tablolara doğrudan erişim politika gerektirir.
---   4. Yeni permisif politikalar uygulandı (USING true, TO anon, authenticated).
---   5. login_with_tc() ile güvenli TC girişi sağlandı.
---   6. verify_user_credentials() geriye dönük uyumluluk için korundu.
---   7. Sequence erişim hakları verildi (INSERT + auto-increment).
---   8. Gelecekteki tablolar için varsayılan haklar ayarlandı.
+--   2. Şema düzeyinde GRANT'ler verildi.
+--   3. anon role: Sadece branches/orgs SELECT + login_with_tc EXECUTE.
+--   4. authenticated role: Tüm tablolara tam CRUD erişimi.
+--   5. RLS aktif — tablolara doğrudan erişim politika gerektirir.
+--   6. login_with_tc() ile güvenli TC girişi sağlandı (SECURITY DEFINER).
+--   7. verify_user_credentials() geriye dönük uyumluluk için korundu.
+--   8. Sequence erişim hakları verildi (INSERT + auto-increment).
+--   9. Başarılı girişte plaintext şifreler otomatik SHA-256 hash'lenir.
 -- ============================================================

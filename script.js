@@ -5,7 +5,10 @@
 
 window.onerror = function(msg, url, line, col, error) {
     console.error('Global Error:', { msg, url, line, col, error });
-    return true;
+    if (typeof toast === 'function') {
+        toast('Beklenmeyen bir hata oluştu. Sayfa yenilenebilir.', 'e');
+    }
+    return false;
 };
 
 // Mobil uyumlu localStorage wrapper
@@ -625,11 +628,7 @@ const DB = {
                 id: r.id, schoolName: r.school_name, logoUrl: r.logo_url,
                 bankName: r.bank_name, accountName: r.account_name,
                 iban: r.iban, ownerPhone: r.owner_phone,
-                address: r.address, netgsmUser: r.netgsm_user,
-                netgsmPass: r.netgsm_pass, netgsmHeader: r.netgsm_header,
-                paytrMerchantId: r.paytr_merchant_id || '',
-                paytrMerchantKey: r.paytr_merchant_key || '',
-                paytrMerchantSalt: r.paytr_merchant_salt || '',
+                address: r.address, netgsmHeader: r.netgsm_header,
                 paytrActive: r.paytr_active || false
             };
         },
@@ -640,11 +639,7 @@ const DB = {
                 school_name: s.schoolName, logo_url: s.logoUrl,
                 bank_name: s.bankName, account_name: s.accountName,
                 iban: s.iban, owner_phone: s.ownerPhone,
-                address: s.address, netgsm_user: s.netgsmUser,
-                netgsm_pass: s.netgsmPass, netgsm_header: s.netgsmHeader,
-                paytr_merchant_id: s.paytrMerchantId || '',
-                paytr_merchant_key: s.paytrMerchantKey || '',
-                paytr_merchant_salt: s.paytrMerchantSalt || '',
+                address: s.address, netgsm_header: s.netgsmHeader,
                 paytr_active: s.paytrActive || false
             };
         }
@@ -1634,9 +1629,9 @@ function pgAthleteProfile(athleteId) {
                         <span class="profile-meta-item"><span class="badge ${a.st === 'active' ? 'badge-green' : 'badge-red'}">${statusLabel(a.st)}</span></span>
                     </div>
                     <div class="profile-actions">
-                        <button class="btn bp" onclick="editAth('${a.id}')">&#x270F; Düzenle</button>
+                        <button class="btn bp" onclick="editAth('${FormatUtils.escape(a.id)}')">&#x270F; Düzenle</button>
                         <button class="btn bs" onclick="go('athletes')">&#x2190; Listeye Dön</button>
-                        <button class="btn bw" onclick="printProfile('${a.id}')">&#x1F5A8; Yazdır</button>
+                        <button class="btn bw" onclick="printProfile('${FormatUtils.escape(a.id)}')">&#x1F5A8; Yazdır</button>
                     </div>
                 </div>
                 <div class="stats-grid" style="min-width:200px">
@@ -1827,7 +1822,7 @@ function pgAthleteProfile(athleteId) {
         <div id="tab-payments" class="tab-content">
             <div class="flex fjb fca mb3">
                 <h3 class="tw6">Ödeme Geçmişi</h3>
-                <button class="btn bp" onclick="addPaymentForAthlete('${a.id}')">+ Yeni Ödeme Ekle</button>
+                <button class="btn bp" onclick="addPaymentForAthlete('${FormatUtils.escape(a.id)}')">+ Yeni Ödeme Ekle</button>
             </div>
             ${generatePaymentHistory(a.id)}
         </div>
@@ -1847,7 +1842,7 @@ function pgAthleteProfile(athleteId) {
         <div id="tab-documents" class="tab-content">
             <div class="flex fjb fca mb3">
                 <h3 class="tw6">Belgeler</h3>
-                <button class="btn bp" onclick="uploadDocument('${a.id}')">+ Belge Yükle</button>
+                <button class="btn bp" onclick="uploadDocument('${FormatUtils.escape(a.id)}')">+ Belge Yükle</button>
             </div>
             <div class="g2">
                 <div class="document-card" onclick="viewDocument('saglik')">
@@ -2219,8 +2214,8 @@ function pgAthletes() {
                     <td class="ts">${FormatUtils.escape(ok.parentName || '-')}<br><small style="color:var(--text2)">${FormatUtils.escape(ok.parentPhone || '')}</small></td>
                     <td><span class="bg ${ok.status === 'new' ? 'bg-y' : 'bg-g'}">${ok.status === 'new' ? '⏳ Bekliyor' : '✅ İşlendi'}</span></td>
                     ${isAdmin ? `<td>
-                        ${ok.status === 'new' ? `<button class="btn btn-xs bp" onclick="convertOnKayit('${ok.id}')">Kayıt Aç</button> ` : ''}
-                        <button class="btn btn-xs bd" onclick="delOnKayit('${ok.id}')">Sil</button>
+                        ${ok.status === 'new' ? `<button class="btn btn-xs bp" onclick="convertOnKayit('${FormatUtils.escape(ok.id)}')">Kayıt Aç</button> ` : ''}
+                        <button class="btn btn-xs bd" onclick="delOnKayit('${FormatUtils.escape(ok.id)}')">Sil</button>
                     </td>` : ''}
                 </tr>`;
                 }).join('')}
@@ -2295,9 +2290,9 @@ function pgAthletes() {
                         <td>${FormatUtils.escape(className(a.clsId))}</td>
                         <td><span class="bg ${statusClass(a.st)}">${statusLabel(a.st)}</span></td>
                         <td>
-                            <button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${a.id}'})">Profil</button>
-                            <button class="btn btn-xs bs" onclick="editAth('${a.id}')">Düzenle</button>
-                            <button class="btn btn-xs bd" onclick="delAth('${a.id}')">Sil</button>
+                            <button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'})">Profil</button>
+                            <button class="btn btn-xs bs" onclick="editAth('${FormatUtils.escape(a.id)}')">Düzenle</button>
+                            <button class="btn btn-xs bd" onclick="delAth('${FormatUtils.escape(a.id)}')">Sil</button>
                         </td>
                     </tr>
                     `).join('')}
@@ -2611,9 +2606,9 @@ function pgClasses() {
                             <td>${coach ? FormatUtils.escape(`${coach.fn} ${coach.ln}`) : '-'}</td>
                             <td>${count}</td>
                             <td>
-                                <button class="btn btn-xs bsu" style="margin-right:4px" onclick="viewClassAthletes('${c.id}')">Öğrenciler</button>
-                                <button class="btn btn-xs bp" onclick="editClass('${c.id}')">Düzenle</button>
-                                <button class="btn btn-xs bd" onclick="delClass('${c.id}')">Sil</button>
+                                <button class="btn btn-xs bsu" style="margin-right:4px" onclick="viewClassAthletes('${FormatUtils.escape(c.id)}')">Öğrenciler</button>
+                                <button class="btn btn-xs bp" onclick="editClass('${FormatUtils.escape(c.id)}')">Düzenle</button>
+                                <button class="btn btn-xs bd" onclick="delClass('${FormatUtils.escape(c.id)}')">Sil</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -2641,7 +2636,7 @@ window.viewClassAthletes = function(cid) {
                         <td class="tw6">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</td>
                         <td>${FormatUtils.escape(a.tc)}</td>
                         <td>${a.pn ? FormatUtils.escape(`${a.pn} (${a.pph})`) : '-'}</td>
-                        <td><button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${a.id}'}); closeModal()">Profil</button></td>
+                        <td><button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'}); closeModal()">Profil</button></td>
                     </tr>
                     `).join('')}
                 </tbody>
@@ -2747,7 +2742,7 @@ function pgSports() {
                     </div>
                 </div>
                 <div class="mt2" style="text-align:right">
-                    <button class="btn btn-xs bd" onclick="delSport('${s.id}')">Sil</button>
+                    <button class="btn btn-xs bd" onclick="delSport('${FormatUtils.escape(s.id)}')">Sil</button>
                 </div>
             </div>`;
         }).join('')}
@@ -2852,7 +2847,7 @@ function pgAttendance() {
             const st = attDay[a.id] || '';
             return `
             <div class="att-row">
-                <div class="flex fca gap2" style="flex:1;cursor:pointer" onclick="go('athleteProfile', {id:'${a.id}'})">
+                <div class="flex fca gap2" style="flex:1;cursor:pointer" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'})">
                     ${UIUtils.getAvatar(32, null, FormatUtils.initials(a.fn, a.ln))}
                     <div>
                         <div class="tw6 tsm">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
@@ -2860,10 +2855,10 @@ function pgAttendance() {
                     </div>
                 </div>
                 <div class="att-btns">
-                    <button class="att-b${st === 'P' ? ' ap' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'P')">Var</button>
-                    <button class="att-b${st === 'A' ? ' aa' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'A')">Yok</button>
-                    <button class="att-b${st === 'E' ? ' al2' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'E')">İzinli</button>
-                    <button class="att-b" onclick="event.stopPropagation();setAtt('${a.id}')">Sil</button>
+                    <button class="att-b${st === 'P' ? ' ap' : ''}" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}', 'P')">Var</button>
+                    <button class="att-b${st === 'A' ? ' aa' : ''}" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}', 'A')">Yok</button>
+                    <button class="att-b${st === 'E' ? ' al2' : ''}" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}', 'E')">İzinli</button>
+                    <button class="att-b" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}')">Sil</button>
                 </div>
             </div>`;
         }).join('')}
@@ -3006,8 +3001,8 @@ function pgPayments() {
                         <div class="ts tm">${DateUtils.format(p.dt)} • ${FormatUtils.escape(p.ds || 'Aidat')} • ${methodLabel}</div>
                     </div>
                     <div class="flex gap2">
-                        <button class="btn btn-sm bp" onclick="approvePayment('${p.id}')">✅ Onayla</button>
-                        <button class="btn btn-sm bd" onclick="rejectPayment('${p.id}')">❌ Reddet</button>
+                        <button class="btn btn-sm bp" onclick="approvePayment('${FormatUtils.escape(p.id)}')">✅ Onayla</button>
+                        <button class="btn btn-sm bd" onclick="rejectPayment('${FormatUtils.escape(p.id)}')">❌ Reddet</button>
                     </div>
                 </div>
             </div>`;
@@ -3057,13 +3052,13 @@ function pgPayments() {
             <tbody>
             ${planlar.sort((a,b)=>b.dt.localeCompare(a.dt)).map(p => `
             <tr>
-                <td class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${p.aid}'})">${FormatUtils.escape(p.an)}</td>
+                <td class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${FormatUtils.escape(p.aid)}'})">${FormatUtils.escape(p.an)}</td>
                 <td>${FormatUtils.escape(p.ds||DateUtils.format(p.dt))}</td>
                 <td class="tw6 tg">${FormatUtils.currency(p.amt)}</td>
                 <td><span class="bg ${p.st==='completed'?'bg-g':p.st==='overdue'?'bg-r':'bg-y'}">${statusLabel(p.st)}</span></td>
                 <td>
-                    <button class="btn btn-xs bp" onclick="editPay('${p.id}')">Düzenle</button>
-                    <button class="btn btn-xs bd" onclick="delPay('${p.id}')">Sil</button>
+                    <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
+                    <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
                 </td>
             </tr>`).join('')}
             </tbody>
@@ -3108,15 +3103,15 @@ function pgPayments() {
                         const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
                         return `<tr>
                             <td>${DateUtils.format(p.dt)}</td>
-                            <td>${p.aid?`<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${p.aid}'})">${FormatUtils.escape(p.an)}</span>`:FormatUtils.escape(p.an)}</td>
+                            <td>${p.aid?`<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${FormatUtils.escape(p.aid)}'})">${FormatUtils.escape(p.an)}</span>`:FormatUtils.escape(p.an)}</td>
                             <td>${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
                             <td>${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
                             <td class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
                             <td><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
                             <td><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
                             <td>
-                                <button class="btn btn-xs bp" onclick="editPay('${p.id}')">Düzenle</button>
-                                <button class="btn btn-xs bd" onclick="delPay('${p.id}')">Sil</button>
+                                <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
+                                <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -3490,8 +3485,8 @@ function pgCoaches() {
                         <td>${FormatUtils.escape(c.tc)} / ${FormatUtils.escape(c.ph || '-')}</td>
                         <td>${FormatUtils.escape(c.sp || '-')}</td>
                         <td>
-                            <button class="btn btn-xs bp" onclick="editCoach('${c.id}')">Düzenle</button>
-                            <button class="btn btn-xs bd" onclick="delCoach('${c.id}')">Sil</button>
+                            <button class="btn btn-xs bp" onclick="editCoach('${FormatUtils.escape(c.id)}')">Düzenle</button>
+                            <button class="btn btn-xs bd" onclick="delCoach('${FormatUtils.escape(c.id)}')">Sil</button>
                         </td>
                     </tr>
                     `).join('')}
@@ -3758,21 +3753,15 @@ function pgSettings() {
 
     <div class="card mb3" style="border-left: 4px solid var(--green)">
         <div class="tw6 tsm mb2">&#x1F4F1; SMS Entegrasyonu (NetGSM)</div>
-        <div class="g21">
-            <div class="fgr mb2">
-                <label>NetGSM Kullanıcı Adı</label>
-                <input id="s-smsuser" value="${FormatUtils.escape(s?.netgsmUser || '')}"/>
-            </div>
-            <div class="fgr mb2">
-                <label>NetGSM Şifre</label>
-                <input id="s-smspass" type="password" value="${FormatUtils.escape(s?.netgsmPass || '')}"/>
-            </div>
+        <div class="al al-b mb3" style="font-size:12px">
+            &#x2139;&#xFE0F; NetGSM kullanıcı adı ve şifresi güvenlik için Supabase Edge Function ortam değişkenlerinde saklanır.<br>
+            <strong>Ayarlama:</strong> <code style="font-size:11px">supabase secrets set NETGSM_USER=xxx NETGSM_PASS=xxx NETGSM_HEADER=xxx</code>
         </div>
         <div class="fgr mb2">
             <label>SMS Başlığı (Header)</label>
             <input id="s-smsheader" value="${FormatUtils.escape(s?.netgsmHeader || '')}" placeholder="Örn: AKADEMI"/>
         </div>
-        <button class="btn bp mt2" onclick="saveSmsSettings()">SMS Ayarlarını Kaydet</button>
+        <button class="btn bp mt2" onclick="saveSmsSettings()">SMS Başlığını Kaydet</button>
     </div>
 
     <div class="card mb3" style="border-left: 4px solid #0070f3">
@@ -3784,26 +3773,10 @@ function pgSettings() {
             </label>
         </div>
         <div class="al al-b mb3" style="font-size:12px">
-            &#x2139;&#xFE0F; PayTR ile veliler online kredi kartı ödemesi yapabilir. Webhook için Supabase Edge Function gereklidir.<br>
+            &#x2139;&#xFE0F; PayTR ile veliler online kredi kartı ödemesi yapabilir.<br>
+            PayTR Merchant bilgileri güvenlik için Supabase Edge Function ortam değişkenlerinde saklanır.<br>
+            <strong>Ayarlama:</strong> <code style="font-size:11px">supabase secrets set PAYTR_MERCHANT_ID=xxx PAYTR_MERCHANT_KEY=xxx PAYTR_MERCHANT_SALT=xxx</code><br>
             <strong>Webhook URL:</strong> <code style="font-size:11px">${window?.location?.origin || 'https://siteniz.com'}/functions/v1/paytr-webhook</code>
-        </div>
-        <div class="g21 mb2">
-            <div class="fgr">
-                <label>Merchant ID</label>
-                <input id="s-paytr-mid" value="${FormatUtils.escape(s?.paytrMerchantId || '')}" placeholder="PayTR panelinden alın"/>
-            </div>
-            <div class="fgr">
-                <label>Merchant Key</label>
-                <input id="s-paytr-key" type="password" value="${FormatUtils.escape(s?.paytrMerchantKey || '')}"/>
-            </div>
-        </div>
-        <div class="fgr mb2">
-            <label>Merchant Salt</label>
-            <input id="s-paytr-salt" type="password" value="${FormatUtils.escape(s?.paytrMerchantSalt || '')}"/>
-        </div>
-        <div class="al al-y mb2" style="font-size:12px">
-            &#x26A0; Token hesaplama ve güvenlik için <strong>Supabase Edge Function</strong> deploy edilmelidir.
-            Fonksiyon kodu için dökümanı inceleyin.
         </div>
         <button class="btn bp" onclick="savePayTRSettings()">PayTR Ayarlarını Kaydet</button>
     </div>
@@ -3832,10 +3805,10 @@ function pgSettings() {
               <div class="ts tm mb2">TC: ${FormatUtils.escape(ok.tc || '-')}</div>
               <div class="flex gap2">
                   ${ok.status === 'new' ? `
-                  <button class="btn bsu btn-sm" onclick="convertOnKayit('${ok.id}')">Sporcuya Dönüştür</button>
-                  <button class="btn bs btn-sm" onclick="markOnKayitDone('${ok.id}')">İşaretlendi</button>
+                  <button class="btn bsu btn-sm" onclick="convertOnKayit('${FormatUtils.escape(ok.id)}')">Sporcuya Dönüştür</button>
+                  <button class="btn bs btn-sm" onclick="markOnKayitDone('${FormatUtils.escape(ok.id)}')">İşaretlendi</button>
                   ` : ''}
-                  <button class="btn bd btn-sm" onclick="delOnKayit('${ok.id}')">Sil</button>
+                  <button class="btn bd btn-sm" onclick="delOnKayit('${FormatUtils.escape(ok.id)}')">Sil</button>
               </div>
           </div>
           `).join('')}
@@ -3863,23 +3836,18 @@ window.saveGeneralSettings = async function() {
 window.saveSmsSettings = async function() {
     const obj = {
         ...(AppState.data.settings || {}),
-        netgsmUser: UIUtils.getValue('s-smsuser'),
-        netgsmPass: UIUtils.getValue('s-smspass'),
         netgsmHeader: UIUtils.getValue('s-smsheader')
     };
     const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
     if (result) {
         AppState.data.settings = obj;
-        toast('SMS ayarları kaydedildi!', 'g');
+        toast('SMS başlığı kaydedildi!', 'g');
     }
 };
 
 window.savePayTRSettings = async function() {
     const obj = {
         ...(AppState.data.settings || {}),
-        paytrMerchantId: UIUtils.getValue('s-paytr-mid').trim(),
-        paytrMerchantKey: UIUtils.getValue('s-paytr-key').trim(),
-        paytrMerchantSalt: UIUtils.getValue('s-paytr-salt').trim(),
         paytrActive: document.getElementById('s-paytr-active')?.checked || false
     };
     const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
@@ -3899,7 +3867,13 @@ window.handleLogoUpload = function(input) {
         const dataUrl = e.target.result;
         // Önizleme
         const preview = document.getElementById('logo-preview');
-        if (preview) preview.innerHTML = '<img src="' + dataUrl + '" style="width:100%;height:100%;object-fit:cover"/>';
+        if (preview) {
+            preview.textContent = '';
+            var img = document.createElement('img');
+            img.src = dataUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+            preview.appendChild(img);
+        }
         // URL alanına yaz (kaydet butonuyla DB'ye işlenecek)
         const urlInput = document.getElementById('s-logo-url');
         if (urlInput) urlInput.value = dataUrl;
@@ -4453,7 +4427,7 @@ function spOdemeYap() {
                 </div>
                 <div class="plan-card-right">
                     ${badge}
-                    <button class="btn bp btn-sm mt2" onclick="spPayPlan('${p.id}')">💳 Öde</button>
+                    <button class="btn bp btn-sm mt2" onclick="spPayPlan('${FormatUtils.escape(p.id)}')">💳 Öde</button>
                 </div>
             </div>`;
         }).join('')
@@ -4793,7 +4767,7 @@ window.loadAndShowAdmins = async function() {
                 <div class="tw6 tsm">${FormatUtils.escape(u.name || u.email)}</div>
                 <div class="ts tm">${FormatUtils.escape(u.email)} • <span class="bg ${u.role === 'admin' ? 'bg-b' : 'bg-g'}">${u.role === 'admin' ? 'Yönetici' : 'Antrenör'}</span></div>
             </div>
-            ${u.id !== AppState.currentUser?.id ? `<button class="btn btn-xs bd" onclick="removeAdmin('${u.id}','${FormatUtils.escape(u.email)}')">Sil</button>` : '<span class="ts tm">(Siz)</span>'}
+            ${u.id !== AppState.currentUser?.id ? `<button class="btn btn-xs bd" onclick="removeAdmin('${FormatUtils.escape(u.id)}','${FormatUtils.escape(u.email)}')">Sil</button>` : '<span class="ts tm">(Siz)</span>'}
         </div>`).join('');
     } catch(e) {
         area.innerHTML = `<div class="al al-r ts">Yüklenemedi: ${FormatUtils.escape(e.message)}</div>`;
@@ -4963,24 +4937,31 @@ window.submitOnKayit = async function() {
 
 async function sendOnKayitSms(phone, fn, ln, clsName) {
     const settings = AppState.data.settings;
-    const smsUser = settings?.netgsmUser;
-    const smsPass = settings?.netgsmPass;
-    const smsHeader = settings?.netgsmHeader || 'BILGI';
     
     const msg = `Sayin veli, ${fn} ${ln} icin ${clsName} sinifina on kayit talebiniz alinmistir. En kisa surede sizinle iletisime gececegiz. ${settings?.schoolName || 'Akademi'}`;
     
-    if (!smsUser || !smsPass) {
-        console.log('SMS gönderilemedi - NetGSM ayarları eksik. Mesaj:', msg);
-        return;
-    }
-    
     try {
-        const cleanPhone = phone.replace(/[\s\-\(\)]/g, '').replace(/^(\+90|0090|90)/, '');
-        const url = `https://api.netgsm.com.tr/sms/send/get/?usercode=${smsUser}&password=${smsPass}&gsmno=${cleanPhone}&message=${encodeURIComponent(msg)}&msgheader=${smsHeader}`;
-        await fetch(url, { method: 'GET', mode: 'no-cors' });
-        console.log('SMS gönderildi:', cleanPhone);
+        const sb = AppState.sb;
+        if (!sb || !sb.functions) {
+            console.log('SMS gönderilemedi - Supabase client hazır değil. Mesaj:', msg);
+            return;
+        }
+        const { data, error } = await sb.functions.invoke('send-sms', {
+            body: { phone: phone, message: msg }
+        });
+        if (error) {
+            console.warn('SMS Edge Function hatası:', error);
+            if (typeof toast === 'function') {
+                toast('SMS gönderilemedi. Ön kayıt alındı ancak SMS bilgilendirmesi yapılamadı.', 'e');
+            }
+        } else {
+            console.log('SMS gönderildi:', phone);
+        }
     } catch(e) {
         console.warn('SMS gönderim hatası:', e);
+        if (typeof toast === 'function') {
+            toast('SMS gönderilemedi. Ön kayıt alındı ancak SMS bilgilendirmesi yapılamadı.', 'e');
+        }
     }
 }
 
