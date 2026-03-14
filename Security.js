@@ -113,22 +113,47 @@ function getAuthClient() {
 
 // ── 2. BRUTE FORCE KORUMASI ──────────────────────────────────────
 
-const _loginAttempts = {};
-
+// sessionStorage kullanarak rate limit verisi sayfa yenileme sonrası korunur
 function _getRateLimitKey(tc) {
     return 'rl_' + String(tc).slice(0, 6);
+}
+
+function _loadAttempts(key) {
+    try {
+        const raw = sessionStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch(e) {
+        return null;
+    }
+}
+
+function _saveAttempts(key, data) {
+    try {
+        sessionStorage.setItem(key, JSON.stringify(data));
+    } catch(e) {
+        console.warn('Rate limit: sessionStorage yazılamadı:', e);
+    }
+}
+
+function _deleteAttempts(key) {
+    try {
+        sessionStorage.removeItem(key);
+    } catch(e) {
+        console.warn('Rate limit: sessionStorage silinemedi:', e);
+    }
 }
 
 function _checkRateLimit(tc) {
     const key = _getRateLimitKey(tc);
     const now = Date.now();
-    if (!_loginAttempts[key]) return { blocked: false };
-    const { count, firstAt, lockedUntil } = _loginAttempts[key];
+    const attempts = _loadAttempts(key);
+    if (!attempts) return { blocked: false };
+    const { count, firstAt, lockedUntil } = attempts;
     if (lockedUntil && now < lockedUntil) {
         return { blocked: true, remaining: Math.ceil((lockedUntil - now) / 1000) };
     }
     if (now - firstAt > 10 * 60 * 1000) {
-        delete _loginAttempts[key];
+        _deleteAttempts(key);
         return { blocked: false };
     }
     return { blocked: false, count };
@@ -137,18 +162,20 @@ function _checkRateLimit(tc) {
 function _recordFailedAttempt(tc) {
     const key = _getRateLimitKey(tc);
     const now = Date.now();
-    if (!_loginAttempts[key]) {
-        _loginAttempts[key] = { count: 1, firstAt: now };
+    const attempts = _loadAttempts(key);
+    if (!attempts) {
+        _saveAttempts(key, { count: 1, firstAt: now });
         return;
     }
-    _loginAttempts[key].count++;
-    if (_loginAttempts[key].count >= 5) {
-        _loginAttempts[key].lockedUntil = now + 5 * 60 * 1000;
+    attempts.count++;
+    if (attempts.count >= 5) {
+        attempts.lockedUntil = now + 5 * 60 * 1000;
     }
+    _saveAttempts(key, attempts);
 }
 
 function _clearLoginAttempts(tc) {
-    delete _loginAttempts[_getRateLimitKey(tc)];
+    _deleteAttempts(_getRateLimitKey(tc));
 }
 
 // ── 3. CSP META TAG ──────────────────────────────────────────────

@@ -201,7 +201,8 @@ const FormatUtils = {
         return `${this.number(n)} ₺`;
     },
     escape(str) {
-        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' };
+        return String(str || '').replace(/[&<>"']/g, c => map[c]);
     },
     tcValidate(tc) {
         if (!tc || tc.length !== 11 || !/^\d{11}$/.test(tc)) return false;
@@ -223,6 +224,16 @@ const FormatUtils = {
 };
 
 function generateId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    }
+    // Fallback only for non-HTTPS environments where crypto is unavailable
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -241,7 +252,10 @@ async function sha256(str) {
         console.warn('Native crypto failed, using fallback');
     }
     
-    // Basit hash fonksiyonu (fallback)
+    // UYARI: Bu fallback hash kriptografik olarak güvenli değildir.
+    // Sadece crypto.subtle erişilemediğinde (HTTP ortam) çalışır.
+    // Üretimde HTTPS kullanın — bu koda asla düşmeyin.
+    console.warn('sha256: Güvenli olmayan fallback hash kullanılıyor — HTTPS ortamı gereklidir!');
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
@@ -1173,7 +1187,12 @@ function applyLogoEverywhere(logoUrl) {
     const loginLogo = document.getElementById('login-logo');
     if (loginLogo) {
         if (hasLogo) {
-            loginLogo.innerHTML = `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.parentElement.innerHTML='&#x26BD;'"/>`;
+            const img = document.createElement('img');
+            img.src = logoUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;';
+            img.onerror = function() { loginLogo.textContent = '⚽'; };
+            loginLogo.textContent = '';
+            loginLogo.appendChild(img);
             loginLogo.style.background = 'none';
             loginLogo.style.backgroundColor = 'transparent';
             loginLogo.style.padding = '0';
@@ -1235,7 +1254,11 @@ function applyLogoEverywhere(logoUrl) {
     const logoPreview = document.getElementById('logo-preview');
     if (logoPreview) {
         if (hasLogo) {
-            logoPreview.innerHTML = '<img src="' + logoUrl + '" style="width:100%;height:100%;object-fit:cover"/>';
+            const img = document.createElement('img');
+            img.src = logoUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+            logoPreview.textContent = '';
+            logoPreview.appendChild(img);
         } else {
             logoPreview.innerHTML = '&#x26BD;';
         }
@@ -4580,7 +4603,7 @@ window.loadAndShowAdmins = async function() {
             ${u.id !== AppState.currentUser?.id ? `<button class="btn btn-xs bd" onclick="removeAdmin('${u.id}','${FormatUtils.escape(u.email)}')">Sil</button>` : '<span class="ts tm">(Siz)</span>'}
         </div>`).join('');
     } catch(e) {
-        area.innerHTML = `<div class="al al-r ts">Yüklenemedi: ${e.message}</div>`;
+        area.innerHTML = `<div class="al al-r ts">Yüklenemedi: ${FormatUtils.escape(e.message)}</div>`;
     }
 };
 
@@ -4927,7 +4950,7 @@ window.handleExcelImport = async function(input) {
         ${data.length > 10 ? `<div class="ts tm mt2">...ve ${data.length - 10} kayıt daha</div>` : ''}`;
         
     } catch(e) {
-        if (preview) preview.innerHTML = `<div class="al al-r">Dosya okunamadı: ${e.message}</div>`;
+        if (preview) preview.innerHTML = `<div class="al al-r">Dosya okunamadı: ${FormatUtils.escape(e.message)}</div>`;
     }
 };
 

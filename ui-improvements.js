@@ -323,8 +323,10 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
 
 console.log('🎨 UI İyileştirme Paketi v1.1 — Tüm modüller yüklendi!');
 
-// ── 8) LOCALSTORAGE GÜVENLİK PATCH'İ ───────────────────
+// ── 8) LOCALSTORAGE VERİ GİZLEME PATCH'İ ───────────────────
 // StorageManager'ı patch'le — düz metin yerine base64 encoding
+// NOT: Bu şifreleme (encryption) değil, sadece görsel gizlemedir (obfuscation).
+//      Hassas veriler localStorage'da saklanmamalıdır.
 // Mevcut verileri otomatik migrate eder
 
 (function patchStorageManager() {
