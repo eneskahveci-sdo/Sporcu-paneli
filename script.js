@@ -280,6 +280,19 @@ function getSupabase() {
     return AppState.sb;
 }
 
+// Asenkron versiyon: Supabase yüklenmesini bekler
+async function waitForSupabase(maxWait) {
+    maxWait = maxWait || 8000;
+    var interval = 300;
+    var elapsed = 0;
+    while (typeof supabase === 'undefined' && elapsed < maxWait) {
+        await new Promise(function(r) { setTimeout(r, interval); });
+        elapsed += interval;
+    }
+    return getSupabase();
+}
+window.waitForSupabase = waitForSupabase;
+
 const ToastManager = {
     activeToasts: [],
     show(msg, type = 'info') {

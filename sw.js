@@ -2,8 +2,8 @@
 // DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.0
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v3';
-const API_CACHE = 'dragos-api-v3';
+const STATIC_CACHE = 'dragos-static-v4';
+const API_CACHE = 'dragos-api-v4';
 
 const STATIC_ASSETS = [
     '/',
