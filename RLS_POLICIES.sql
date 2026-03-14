@@ -129,6 +129,11 @@ CREATE POLICY "users_update" ON users FOR UPDATE USING (true) WITH CHECK (true);
 -- SECURITY DEFINER → RLS'i atlayarak tabloyu okur,
 -- dolayısıyla anon key kullanan istemciler doğrulama yapabilir.
 
+-- ── ADIM 2.5: PGCRYPTO UZANTISI (hash karşılaştırma için) ────────
+-- Eğer coach_pass veya sp_pass alanında SHA-256 hash varsa,
+-- girilen şifreyi hashleyip karşılaştırma yapabilmek için gerekli.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE OR REPLACE FUNCTION login_with_tc(p_tc TEXT, p_pass TEXT, p_role TEXT)
 RETURNS JSON
 LANGUAGE plpgsql
@@ -140,6 +145,7 @@ DECLARE
   v_coach    coaches%ROWTYPE;
   v_default  TEXT;
   v_stored   TEXT;
+  v_hashed   TEXT;
 BEGIN
   -- Girdi temizleme
   p_tc   := regexp_replace(COALESCE(p_tc, ''),   '[^0-9]', '', 'g');
@@ -165,11 +171,21 @@ BEGIN
 
     v_stored := COALESCE(NULLIF(trim(v_coach.coach_pass), ''), v_default);
 
-    IF p_pass <> v_stored THEN
-      RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
+    -- Önce düz metin karşılaştırma
+    IF p_pass = v_stored THEN
+      RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
     END IF;
 
-    RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
+    -- Eğer saklanan şifre SHA-256 hash gibi görünüyorsa (64 hex karakter),
+    -- girilen şifrenin hash'ini karşılaştır
+    IF length(v_stored) = 64 AND v_stored ~ '^[0-9a-f]{64}$' THEN
+      v_hashed := encode(digest(p_pass, 'sha256'), 'hex');
+      IF v_hashed = lower(v_stored) THEN
+        RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
+      END IF;
+    END IF;
+
+    RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
 
   ELSE
     -- sporcu (veya veli)
@@ -180,11 +196,20 @@ BEGIN
 
     v_stored := COALESCE(NULLIF(trim(v_athlete.sp_pass), ''), v_default);
 
-    IF p_pass <> v_stored THEN
-      RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
+    -- Önce düz metin karşılaştırma
+    IF p_pass = v_stored THEN
+      RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
     END IF;
 
-    RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
+    -- Hash karşılaştırma
+    IF length(v_stored) = 64 AND v_stored ~ '^[0-9a-f]{64}$' THEN
+      v_hashed := encode(digest(p_pass, 'sha256'), 'hex');
+      IF v_hashed = lower(v_stored) THEN
+        RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
+      END IF;
+    END IF;
+
+    RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
   END IF;
 END;
 $$;
