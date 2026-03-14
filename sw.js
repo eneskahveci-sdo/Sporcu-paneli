@@ -2,8 +2,8 @@
 // DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.0
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v4';
-const API_CACHE = 'dragos-api-v4';
+const STATIC_CACHE = 'dragos-static-v5';
+const API_CACHE = 'dragos-api-v5';
 
 const STATIC_ASSETS = [
     '/',
@@ -73,25 +73,7 @@ self.addEventListener('fetch', function(event) {
         return;
     }
 
-    if (event.request.method === 'GET' && (
-        url.pathname.endsWith('.js') || url.pathname.endsWith('.css') ||
-        url.pathname.endsWith('.html') || url.pathname === '/'
-    )) {
-        event.respondWith(
-            caches.open(STATIC_CACHE).then(function(cache) {
-                return cache.match(event.request).then(function(cached) {
-                    var fetchPromise = fetch(event.request.clone()).then(function(resp) {
-                        if (resp.ok) cache.put(event.request, resp.clone());
-                        return resp;
-                    }).catch(function() { return cached; });
-                    return cached || fetchPromise;
-                });
-            })
-        );
-        return;
-    }
-
-    if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'unpkg.com') {
+    if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'unpkg.com' || url.hostname === 'esm.sh' || url.hostname === 'cdn.skypack.dev') {
         event.respondWith(
             fetch(event.request.clone()).then(function(resp) {
                 if (resp.ok) {
@@ -108,9 +90,30 @@ self.addEventListener('fetch', function(event) {
         return;
     }
 
+    if (event.request.method === 'GET' && (
+        url.pathname.endsWith('.js') || url.pathname.endsWith('.css') ||
+        url.pathname.endsWith('.html') || url.pathname === '/'
+    )) {
+        event.respondWith(
+            caches.open(STATIC_CACHE).then(function(cache) {
+                return cache.match(event.request).then(function(cached) {
+                    var fetchPromise = fetch(event.request.clone()).then(function(resp) {
+                        if (resp.ok) cache.put(event.request, resp.clone());
+                        return resp;
+                    }).catch(function() {
+                        return cached || new Response('', { status: 503, statusText: 'Offline' });
+                    });
+                    return cached || fetchPromise;
+                });
+            })
+        );
+        return;
+    }
+
     event.respondWith(
         fetch(event.request).catch(function() {
             if (event.request.mode === 'navigate') return caches.match('/index.html');
+            return new Response('', { status: 503, statusText: 'Offline' });
         })
     );
 });
