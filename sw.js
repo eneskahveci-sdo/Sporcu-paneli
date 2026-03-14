@@ -27,7 +27,9 @@ const CDN_HOSTNAMES = [
 self.addEventListener('install', function(event) {
     event.waitUntil(
         caches.open(STATIC_CACHE).then(function(cache) {
-            return cache.addAll(STATIC_ASSETS).catch(function() {});
+            return cache.addAll(STATIC_ASSETS).catch(function(err) {
+                console.warn('[SW] Cache addAll hatası:', err);
+            });
         }).then(function() { return self.skipWaiting(); })
     );
 });
