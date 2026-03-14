@@ -368,6 +368,6 @@ GRANT EXECUTE ON FUNCTION verify_user_credentials(TEXT, TEXT, TEXT) TO service_r
 --   6. login_with_tc() ile güvenli TC girişi sağlandı (SECURITY DEFINER).
 --   7. verify_user_credentials() geriye dönük uyumluluk için korundu.
 --   8. Sequence erişim hakları verildi (INSERT + auto-increment).
---   9. Başarılı girişte plaintext şifreler otomatik SHA-256 hash'lenir
+--   9. Başarılı girişte plaintext şifreler otomatik SHA-256 hash'lenir.
 --      (pgcrypto yüklüyse). pgcrypto yoksa giriş çalışır, hash atlanır.
 -- ============================================================
