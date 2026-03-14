@@ -423,7 +423,7 @@ function applyLang(lang) {
     const btn = document.getElementById('lang-btn');
     if (btn) btn.textContent = lang === 'TR' ? 'EN' : 'TR';
     const sel = document.getElementById('s-lang-select');
-    if (sel) sel.value = lang;
+    if (sel && sel.value !== lang) sel.value = lang;
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (i18n[lang] && i18n[lang][key]) {
@@ -4505,7 +4505,7 @@ function spOdemeYap() {
             </div>` : ''}
         </div>
         <div id="pay-method-detail" class="mb2"></div>
-        <div class="fgr mb2" id="sp-desc-wrapper" style="display:none">
+        <div class="fgr mb2 dn" id="sp-desc-wrapper">
             <label>Açıklama <span class="tm ts">(opsiyonel)</span></label>
             <input id="sp-desc" placeholder="Ödeme notu ekleyin..."/>
         </div>
@@ -4530,8 +4530,7 @@ window.spPayPlan = function(planId) {
     if (detail) detail.innerHTML = '';
     if (submitBtn) submitBtn.style.display = 'none';
     const descWrapper = document.getElementById('sp-desc-wrapper');
-    if (descWrapper) descWrapper.style.display = 'none';
-    document.querySelectorAll('.pay-method-btn').forEach(btn => btn.classList.remove('active'));
+    if (descWrapper) descWrapper.classList.add('dn');
     document.querySelectorAll('.pay-choice-card').forEach(c => c.classList.remove('active'));
     form?.scrollIntoView({ behavior: 'smooth' });
 };
@@ -4607,7 +4606,7 @@ window.selectPayChoice = function(choice) {
         </div>`;
         submitBtn.textContent = '📩 Havale Bildirimi Gönder';
         submitBtn.style.display = 'block';
-        if (descWrapper) descWrapper.style.display = 'block';
+        if (descWrapper) descWrapper.classList.remove('dn');
     } else if (choice === 'paytr') {
         detail.innerHTML = `
         <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
@@ -4616,7 +4615,7 @@ window.selectPayChoice = function(choice) {
         </div>`;
         submitBtn.textContent = '🔵 PayTR ile Ödemeye Geç';
         submitBtn.style.display = 'block';
-        if (descWrapper) descWrapper.style.display = 'block';
+        if (descWrapper) descWrapper.classList.remove('dn');
     }
 };
 
@@ -5482,9 +5481,8 @@ window.toggleNotifPanel = function(e) {
 function closeNotifOnOutside(e) {
     const panels = document.querySelectorAll('.notif-panel');
     const btns = document.querySelectorAll('#notif-btn, #sp-notif-btn');
-    let inside = false;
-    panels.forEach(p => { if (p.contains(e.target)) inside = true; });
-    btns.forEach(b => { if (b.contains(e.target)) inside = true; });
+    const inside = Array.from(panels).some(p => p.contains(e.target)) ||
+                   Array.from(btns).some(b => b.contains(e.target));
     if (!inside) {
         panels.forEach(p => p.classList.add('dn'));
         document.removeEventListener('click', closeNotifOnOutside);
