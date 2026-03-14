@@ -519,7 +519,7 @@ const DB = {
             };
             
             // Sadece temel tabloda garantili olan kolonlar
-            return {
+            const result = {
                 id: a.id,
                 org_id: a.orgId || AppState.currentOrgId || '',
                 branch_id: a.branchId || AppState.currentBranchId || '',
@@ -541,9 +541,13 @@ const DB = {
                 cls_id: str(a.clsId) || null,
                 pn: str(a.pn),
                 pph: str(a.pph),
-                pem: str(a.pem),
-                sp_pass: str(a.spPass)
+                pem: str(a.pem)
             };
+            // Only include sp_pass if explicitly provided (not undefined)
+            if (a.spPass !== undefined) {
+                result.sp_pass = str(a.spPass);
+            }
+            return result;
         },
         toPayment(r) {
             return {
@@ -581,15 +585,19 @@ const DB = {
         fromCoach(c) {
             const str = (v) => (v === undefined || v === null) ? '' : String(v);
             const num = (v) => (v === undefined || v === null || v === '') ? 0 : Number(v) || 0;
-            return {
+            const result = {
                 id: c.id,
                 org_id: c.orgId || AppState.currentOrgId || '',
                 branch_id: c.branchId || AppState.currentBranchId || '',
                 fn: str(c.fn), ln: str(c.ln), tc: str(c.tc),
                 ph: str(c.ph), em: str(c.em), sp: str(c.sp),
-                sal: num(c.sal), st: str(c.st) || 'active',
-                coach_pass: str(c.coachPass)
+                sal: num(c.sal), st: str(c.st) || 'active'
             };
+            // Only include coach_pass if explicitly provided (not undefined)
+            if (c.coachPass !== undefined) {
+                result.coach_pass = str(c.coachPass);
+            }
+            return result;
         },
         toClass(r) {
             return { id: r.id, name: r.name, spId: r.sp_id, coachId: r.coach_id, cap: r.cap };
@@ -743,11 +751,24 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
     var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
     var validPass = storedPass || defaultPass;
 
-    if (pass !== validPass) {
-        return { ok: false, error: 'TC veya şifre hatalı!' };
+    // Direct plaintext comparison
+    if (pass === validPass) {
+        return { ok: true, role: role, data: resp.data };
     }
 
-    return { ok: true, role: role, data: resp.data };
+    // If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
+    if (validPass.length === 64 && /^[0-9a-f]{64}$/i.test(validPass)) {
+        try {
+            var hashedInput = await sha256(pass);
+            if (hashedInput === validPass.toLowerCase()) {
+                return { ok: true, role: role, data: resp.data };
+            }
+        } catch (hashErr) {
+            console.warn('SHA-256 hash comparison failed:', hashErr);
+        }
+    }
+
+    return { ok: false, error: 'TC veya şifre hatalı!' };
 }
 
 window.doNormalLogin = async function(type) {
@@ -2394,8 +2415,9 @@ window.editAth = function(id, prefill) {
     <div class="dv"></div>
     <div class="tw6 tsm mb2">Güvenlik</div>
     <div class="fgr">
-        <label>Sporcu Şifresi (Boş = TC son 6 hane)</label>
-        <input id="a-sppass" type="text" placeholder="Örn: 123456" value="${FormatUtils.escape(a?.spPass || '')}"/>
+        <label>Sporcu Şifresi ${isNew ? '(Boş = TC son 6 hane)' : '(Boş bırakırsanız mevcut şifre korunur)'}</label>
+        <input id="a-sppass" type="password" placeholder="${isNew ? 'Örn: 123456' : 'Yeni şifre girin veya boş bırakın'}" value=""/>
+        ${!isNew && a?.spPass ? '<div class="ts tm mt1">Mevcut özel şifre tanımlı</div>' : ''}
     </div>`;
     
     modal(isNew ? 'Yeni Sporcu' : 'Sporcu Düzenle', html, [
@@ -2423,6 +2445,7 @@ window.editAth = function(id, prefill) {
             
             const heightVal = UIUtils.getNumber('a-height');
             const weightVal = UIUtils.getNumber('a-weight');
+            const newSpPass = UIUtils.getValue('a-sppass');
             
             const obj = {
                 id: a?.id || generateId(),
@@ -2439,7 +2462,7 @@ window.editAth = function(id, prefill) {
                 pn: UIUtils.getValue('a-pn') || '',
                 pph: UIUtils.getValue('a-pph') || '',
                 pem: UIUtils.getValue('a-pem') || '',
-                spPass: UIUtils.getValue('a-sppass') || '',
+                spPass: isNew ? (newSpPass || '') : (newSpPass || undefined),
                 lic: UIUtils.getValue('a-lic') || '',
                 address: UIUtils.getValue('a-address') || '',
                 school: UIUtils.getValue('a-school') || '',
@@ -2466,6 +2489,25 @@ window.editAth = function(id, prefill) {
             
             const result = await DB.upsert('athletes', mapped);
             if (result) {
+                // If password was changed, also do an explicit update as fallback
+                if (!isNew && newSpPass) {
+                    try {
+                        const sb = getSupabase();
+                        if (sb) {
+                            await sb.from('athletes').update({ sp_pass: newSpPass }).eq('id', obj.id);
+                        }
+                    } catch (passErr) {
+                        console.warn('Athlete password explicit update failed:', passErr);
+                    }
+                }
+                
+                // Update local state with actual password value
+                if (newSpPass) {
+                    obj.spPass = newSpPass;
+                } else if (!isNew) {
+                    obj.spPass = a?.spPass || '';
+                }
+                
                 if (isNew) {
                     AppState.data.athletes.push(obj);
                 } else {
@@ -3462,8 +3504,9 @@ window.editCoach = function(id) {
         <input id="c-sal" type="number" value="${c?.sal || ''}"/>
     </div>
     <div class="fgr mt2">
-        <label>Özel Şifre (Boş = TC son 6 hane)</label>
-        <input id="c-pass" placeholder="Örn: 1234" value="${FormatUtils.escape(c?.coachPass || '')}"/>
+        <label>Özel Şifre ${isNew ? '(Boş = TC son 6 hane)' : '(Boş bırakırsanız mevcut şifre korunur)'}</label>
+        <input id="c-pass" type="password" placeholder="${isNew ? 'Örn: 1234' : 'Yeni şifre girin veya boş bırakın'}" value=""/>
+        ${!isNew && c?.coachPass ? '<div class="ts tm mt1">Mevcut özel şifre tanımlı</div>' : ''}
     </div>
     `, [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
@@ -3488,6 +3531,7 @@ window.editCoach = function(id) {
                 return;
             }
             
+            const newPass = UIUtils.getValue('c-pass');
             const obj = {
                 id: c?.id || generateId(),
                 orgId: c?.orgId || AppState.currentOrgId,
@@ -3497,7 +3541,7 @@ window.editCoach = function(id) {
                 sp: UIUtils.getValue('c-sp') || '',
                 em: UIUtils.getValue('c-em') || '',
                 sal: UIUtils.getNumber('c-sal') || 0,
-                coachPass: UIUtils.getValue('c-pass') || '',
+                coachPass: isNew ? (newPass || '') : (newPass || undefined),
                 st: 'active'
             };
             
@@ -3506,6 +3550,25 @@ window.editCoach = function(id) {
             
             const result = await DB.upsert('coaches', mapped);
             if (result) {
+                // If password was changed, also do an explicit update as fallback
+                if (!isNew && newPass) {
+                    try {
+                        const sb = getSupabase();
+                        if (sb) {
+                            await sb.from('coaches').update({ coach_pass: newPass }).eq('id', obj.id);
+                        }
+                    } catch (passErr) {
+                        console.warn('Coach password explicit update failed:', passErr);
+                    }
+                }
+                
+                // Update local state with actual password value
+                if (newPass) {
+                    obj.coachPass = newPass;
+                } else if (!isNew) {
+                    obj.coachPass = c?.coachPass || '';
+                }
+                
                 if (isNew) {
                     AppState.data.coaches.push(obj);
                 } else {

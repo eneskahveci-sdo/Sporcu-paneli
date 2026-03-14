@@ -236,12 +236,30 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
     var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
     var validPass = storedPass || defaultPass;
 
-    if (pass !== validPass) {
-        return { ok: false, error: 'TC veya şifre hatalı!' };
+    // Direct plaintext comparison
+    if (pass === validPass) {
+        console.log('✅ Fallback doğrulama başarılı!');
+        return { ok: true, role: role === 'coach' ? 'coach' : 'sporcu', data: resp.data };
     }
 
-    console.log('✅ Fallback doğrulama başarılı!');
-    return { ok: true, role: role === 'coach' ? 'coach' : 'sporcu', data: resp.data };
+    // If stored password looks like a SHA-256 hash (64 hex chars), try hash comparison
+    if (validPass.length === 64 && /^[0-9a-f]{64}$/i.test(validPass)) {
+        try {
+            var hashedInput = '';
+            if (typeof crypto !== 'undefined' && crypto.subtle) {
+                var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+                hashedInput = Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+            }
+            if (hashedInput && hashedInput === validPass.toLowerCase()) {
+                console.log('✅ Fallback doğrulama başarılı (hash karşılaştırma)!');
+                return { ok: true, role: role === 'coach' ? 'coach' : 'sporcu', data: resp.data };
+            }
+        } catch (hashErr) {
+            console.warn('SHA-256 hash comparison failed:', hashErr);
+        }
+    }
+
+    return { ok: false, error: 'TC veya şifre hatalı!' };
 }
 
 function _securityDoNormalLogin(role) {
