@@ -220,9 +220,9 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
         return msg;
     };
 
-    if (window.DB && window.DB.query) {
-        var _origQuery = window.DB.query;
-        window.DB.query = async function(table, filters) {
+    if (typeof DB !== 'undefined' && DB.query) {
+        var _origQuery = DB.query;
+        DB.query = async function(table, filters) {
             for (var attempt = 0; attempt <= 2; attempt++) {
                 try {
                     var result = await _origQuery.call(this, table, filters);
@@ -251,7 +251,7 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
         if (id.includes('-tc') || id === 'ok-tc' || id === 'eok-tc') {
             var val = el.value.replace(/\D/g, '');
             if (val.length === 11) {
-                if (window.FormatUtils && typeof FormatUtils.tcValidate === 'function') {
+                if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.tcValidate === 'function') {
                     el.style.borderColor = FormatUtils.tcValidate(val) ? 'var(--green, #22c55e)' : 'var(--red, #ef4444)';
                 }
             } else if (val.length > 0) {

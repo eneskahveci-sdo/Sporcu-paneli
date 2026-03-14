@@ -1052,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ═══════════════════════════════════════════════════════════
  
 function _extendMappers() {
-    if (!window.DB || !DB.mappers || typeof DB.mappers.fromSettings !== 'function') {
+    if (typeof DB === 'undefined' || !DB.mappers || typeof DB.mappers.fromSettings !== 'function') {
         return false; // henüz hazır değil
     }
  
