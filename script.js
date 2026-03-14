@@ -806,6 +806,9 @@ window.doNormalLogin = async function(type) {
         const sb = getSupabase();
         if (!sb) throw new Error('Supabase başlatılamadı');
 
+        // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
+        try { await sb.auth.signOut(); } catch(e) { console.warn('signOut before login:', e); }
+
         const role = type === 'coach' ? 'coach' : 'sporcu';
         var loginResult = null;
 
@@ -1111,6 +1114,7 @@ async function restoreSession() {
                         const { data: { session } } = await sb.auth.getSession();
                         if (!session) {
                             console.warn('Admin session expired');
+                            await sb.auth.signOut().catch(() => {});
                             StorageManager.remove('sporcu_app_user');
                             StorageManager.remove('sporcu_app_org');
                             StorageManager.remove('sporcu_app_branch');
@@ -1119,6 +1123,12 @@ async function restoreSession() {
                         }
                     } catch(e) {
                         console.warn('Session check failed:', e);
+                        await sb.auth.signOut().catch(() => {});
+                        StorageManager.remove('sporcu_app_user');
+                        StorageManager.remove('sporcu_app_org');
+                        StorageManager.remove('sporcu_app_branch');
+                        await loadLogoForLoginScreen();
+                        return;
                     }
                 }
             }
@@ -1143,6 +1153,7 @@ async function restoreSession() {
         
     } catch (e) {
         console.error('Session restore error:', e);
+        try { const sb = getSupabase(); if (sb) await sb.auth.signOut(); } catch(_) {}
         StorageManager.remove('sporcu_app_user');
         StorageManager.remove('sporcu_app_org');
         StorageManager.remove('sporcu_app_branch');
