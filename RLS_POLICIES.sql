@@ -1,6 +1,6 @@
 -- ============================================================
 -- SPORCU PANELI - Supabase RLS (Row Level Security) Politikalari
--- v4.0 — Güvenli RLS: anon erişimi kısıtlandı
+-- v4.1 — Güvenli RLS: anon SELECT izni eklendi (sporcu/veli paneli için)
 --
 -- MİMARİ NOT:
 --   Bu uygulama frontend-only PWA'dır. Antrenör ve sporcular
@@ -8,12 +8,17 @@
 --   fonksiyonları aracılığıyla yapılır.
 --
 -- GÜVENLİK:
---   • anon role: Sadece branches/orgs SELECT + login_with_tc EXECUTE.
---     Hassas tablolara (settings, users, athletes, payments, coaches,
---     attendance, messages) doğrudan erişim engellenir.
+--   • anon role: Tüm tablolara SELECT + login_with_tc EXECUTE.
+--     Yazma işlemleri (INSERT/UPDATE/DELETE) engellenir.
+--     users tablosuna erişim tamamen engellenir.
 --   • authenticated role: Tüm tablolara tam erişim.
 --   • login_with_tc SECURITY DEFINER olduğu için RLS'i bypass eder —
 --     sporcu/antrenör girişi bundan etkilenmez.
+--
+-- NOT: Bu uygulama frontend-only PWA'dır. Sporcu/antrenör girişi
+--   Supabase Auth kullanmaz; TC doğrulaması login_with_tc ile yapılır.
+--   Giriş sonrası veri yükleme (loadBranchData) anon key ile yapılır,
+--   bu nedenle anon role'ün SELECT erişimi gereklidir.
 --
 -- KULLANIM:
 --   Supabase Dashboard → SQL Editor'de bu betiğin TAMAMINI
@@ -44,9 +49,9 @@ END $$;
 -- erişebilmeli. Bu GRANT'ler olmadan RLS politikaları tek
 -- başına yeterli değildir — tablo düzeyinde erişim hakkı da gerekir.
 --
--- GÜVENLİK: anon role yalnızca branches/orgs için SELECT ve
--- login_with_tc EXECUTE hakkına sahiptir. Hassas tablolara
--- doğrudan erişim engellenir.
+-- GÜVENLİK: anon role tüm tablolara SELECT erişimi olan (sporcu/veli
+-- paneli loadBranchData için gerekli), ancak yazma işlemleri engellenir.
+-- users tablosuna erişim tamamen engellenir (admin hesapları).
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
@@ -63,18 +68,19 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON branches   TO authenticated, service_rol
 GRANT SELECT, INSERT, UPDATE, DELETE ON orgs       TO authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON users      TO authenticated, service_role;
 
--- ── anon role: sadece branches/orgs SELECT (login ekranı için)
-REVOKE ALL ON athletes   FROM anon;
-REVOKE ALL ON payments   FROM anon;
-REVOKE ALL ON coaches    FROM anon;
-REVOKE ALL ON attendance FROM anon;
-REVOKE ALL ON messages   FROM anon;
-REVOKE ALL ON settings   FROM anon;
-REVOKE ALL ON sports     FROM anon;
-REVOKE ALL ON classes    FROM anon;
-REVOKE ALL ON users      FROM anon;
-GRANT SELECT ON branches TO anon;
-GRANT SELECT ON orgs     TO anon;
+-- ── anon role: SELECT tüm tablolara (sporcu/veli paneli için gerekli),
+-- users tablosu hariç. Yazma işlemleri (INSERT/UPDATE/DELETE) engellenir.
+REVOKE ALL ON users FROM anon;
+GRANT SELECT ON athletes   TO anon;
+GRANT SELECT ON payments   TO anon;
+GRANT SELECT ON coaches    TO anon;
+GRANT SELECT ON attendance TO anon;
+GRANT SELECT ON messages   TO anon;
+GRANT SELECT ON settings   TO anon;
+GRANT SELECT ON sports     TO anon;
+GRANT SELECT ON classes    TO anon;
+GRANT SELECT ON branches   TO anon;
+GRANT SELECT ON orgs       TO anon;
 
 -- Sequence erişim hakları (INSERT + auto-increment id'ler için)
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
@@ -102,18 +108,19 @@ ALTER TABLE users      ENABLE ROW LEVEL SECURITY;
 -- ── ADIM 3: POLİTİKALAR ──────────────────────────────────────────
 --
 -- Politika Stratejisi:
---   • settings, users: Sadece authenticated role erişebilir.
+--   • settings: SELECT herkese açık (sporcu paneli ayar gerektirir),
+--     INSERT/UPDATE sadece authenticated.
+--   • users: Sadece authenticated role erişebilir.
 --   • athletes, payments, coaches, attendance, messages:
---     - SELECT/INSERT/UPDATE/DELETE: Sadece authenticated role.
---     - anon erişimi yok — sporcu/antrenör girişi login_with_tc
---       SECURITY DEFINER fonksiyonu üzerinden yapılır (RLS bypass).
---   • sports, classes: Sadece authenticated role.
+--     - SELECT: anon + authenticated (sporcu/veli paneli için gerekli).
+--     - INSERT/UPDATE/DELETE: Sadece authenticated role.
+--   • sports, classes: SELECT herkese açık, yazma sadece authenticated.
 --   • branches, orgs: SELECT herkese açık (login ekranında gerekli),
 --     INSERT/UPDATE sadece authenticated.
 --   • Admin (email/şifre Supabase Auth): zaten authenticated role.
 
--- Settings (hassas bilgiler: NetGSM, PayTR credentials)
-CREATE POLICY "settings_select" ON settings FOR SELECT TO authenticated USING (true);
+-- Settings (anon SELECT: sporcu paneli school name, logo vb. gerektirir)
+CREATE POLICY "settings_select" ON settings FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "settings_insert" ON settings FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "settings_update" ON settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
@@ -122,44 +129,44 @@ CREATE POLICY "users_select" ON users FOR SELECT TO authenticated USING (true);
 CREATE POLICY "users_insert" ON users FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "users_update" ON users FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
--- Athletes
-CREATE POLICY "athletes_select" ON athletes FOR SELECT TO authenticated USING (true);
+-- Athletes (anon SELECT: sporcu/veli paneli için gerekli)
+CREATE POLICY "athletes_select" ON athletes FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "athletes_insert" ON athletes FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "athletes_update" ON athletes FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "athletes_delete" ON athletes FOR DELETE TO authenticated USING (true);
 
--- Payments
-CREATE POLICY "payments_select" ON payments FOR SELECT TO authenticated USING (true);
+-- Payments (anon SELECT: sporcu/veli ödeme geçmişi için gerekli)
+CREATE POLICY "payments_select" ON payments FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "payments_insert" ON payments FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "payments_update" ON payments FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "payments_delete" ON payments FOR DELETE TO authenticated USING (true);
 
--- Coaches
-CREATE POLICY "coaches_select" ON coaches FOR SELECT TO authenticated USING (true);
+-- Coaches (anon SELECT: sporcu paneli antrenör bilgisi için gerekli)
+CREATE POLICY "coaches_select" ON coaches FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "coaches_insert" ON coaches FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "coaches_update" ON coaches FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "coaches_delete" ON coaches FOR DELETE TO authenticated USING (true);
 
--- Attendance
-CREATE POLICY "attendance_select" ON attendance FOR SELECT TO authenticated USING (true);
+-- Attendance (anon SELECT: sporcu/veli yoklama geçmişi için gerekli)
+CREATE POLICY "attendance_select" ON attendance FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "attendance_insert" ON attendance FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "attendance_update" ON attendance FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "attendance_delete" ON attendance FOR DELETE TO authenticated USING (true);
 
--- Messages
-CREATE POLICY "messages_select" ON messages FOR SELECT TO authenticated USING (true);
+-- Messages (anon SELECT: sporcu/veli mesaj görüntüleme için gerekli)
+CREATE POLICY "messages_select" ON messages FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "messages_insert" ON messages FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "messages_update" ON messages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "messages_delete" ON messages FOR DELETE TO authenticated USING (true);
 
--- Sports
-CREATE POLICY "sports_select" ON sports FOR SELECT TO authenticated USING (true);
+-- Sports (anon SELECT: sporcu paneli spor bilgisi için gerekli)
+CREATE POLICY "sports_select" ON sports FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "sports_insert" ON sports FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "sports_update" ON sports FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "sports_delete" ON sports FOR DELETE TO authenticated USING (true);
 
--- Classes
-CREATE POLICY "classes_select" ON classes FOR SELECT TO authenticated USING (true);
+-- Classes (anon SELECT: sporcu paneli sınıf bilgisi için gerekli)
+CREATE POLICY "classes_select" ON classes FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "classes_insert" ON classes FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "classes_update" ON classes FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "classes_delete" ON classes FOR DELETE TO authenticated USING (true);
@@ -362,7 +369,8 @@ GRANT EXECUTE ON FUNCTION verify_user_credentials(TEXT, TEXT, TEXT) TO service_r
 -- Bu betik çalıştırıldıktan sonra:
 --   1. Tüm eski politikalar temizlendi.
 --   2. Şema düzeyinde GRANT'ler verildi.
---   3. anon role: Sadece branches/orgs SELECT + login_with_tc EXECUTE.
+--   3. anon role: Tüm tablolara SELECT (users hariç) + login_with_tc EXECUTE.
+--      Yazma işlemleri (INSERT/UPDATE/DELETE) engellenir.
 --   4. authenticated role: Tüm tablolara tam CRUD erişimi.
 --   5. RLS aktif — tablolara doğrudan erişim politika gerektirir.
 --   6. login_with_tc() ile güvenli TC girişi sağlandı (SECURITY DEFINER).
