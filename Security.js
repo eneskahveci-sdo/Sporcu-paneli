@@ -290,8 +290,8 @@ function _securityDoNormalLogin(role) {
 
                 if (rpcErr) {
                     console.error('🔴 RPC hatası:', rpcErr.code, rpcErr.message);
-                    // RPC fonksiyonu tanımlı değilse kalıcı uyarı göster
-                    if (rpcErr.code === '42883' || (rpcErr.message && rpcErr.message.includes('function') && rpcErr.message.includes('does not exist'))) {
+                    // PostgreSQL error code 42883 = function does not exist
+                    if (rpcErr.code === '42883' || rpcErr.code === 'PGRST202') {
                         showErr('Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.');
                     } else {
                         showErr('Giriş servisi geçici olarak kullanılamıyor. Lütfen birkaç dakika sonra tekrar deneyin veya yöneticiyle iletişime geçin.');

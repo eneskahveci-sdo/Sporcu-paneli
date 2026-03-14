@@ -4951,11 +4951,17 @@ async function sendOnKayitSms(phone, fn, ln, clsName) {
         });
         if (error) {
             console.warn('SMS Edge Function hatası:', error);
+            if (typeof toast === 'function') {
+                toast('SMS gönderilemedi. Ön kayıt alındı ancak SMS bilgilendirmesi yapılamadı.', 'e');
+            }
         } else {
             console.log('SMS gönderildi:', phone);
         }
     } catch(e) {
         console.warn('SMS gönderim hatası:', e);
+        if (typeof toast === 'function') {
+            toast('SMS gönderilemedi. Ön kayıt alındı ancak SMS bilgilendirmesi yapılamadı.', 'e');
+        }
     }
 }
 

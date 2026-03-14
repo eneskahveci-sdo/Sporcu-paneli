@@ -9,6 +9,8 @@ const CORS_HEADERS = {
 };
 
 // Basit in-memory rate limiting (IP başına dakikada max 5 SMS)
+// NOT: Serverless ortamda birden fazla instance çalışabilir.
+// Üretim ortamında dağıtık rate limiting için Redis veya DB kullanılmalıdır.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 dakika
