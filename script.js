@@ -422,6 +422,8 @@ function applyLang(lang) {
     StorageManager.set('sporcu_lang', lang);
     const btn = document.getElementById('lang-btn');
     if (btn) btn.textContent = lang === 'TR' ? 'EN' : 'TR';
+    const sel = document.getElementById('s-lang-select');
+    if (sel && sel.value !== lang) sel.value = lang;
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (i18n[lang] && i18n[lang][key]) {
@@ -437,6 +439,13 @@ function toggleLang() {
         go(AppState.ui.curPage);
     }
 }
+
+window.changeLang = function(val) {
+    applyLang(val);
+    if (!document.getElementById('main-wrap').classList.contains('dn')) {
+        go(AppState.ui.curPage);
+    }
+};
 
 window.switchLoginTab = function(tab) {
     const sporcuEl = document.getElementById('login-sporcu');
@@ -1307,6 +1316,7 @@ async function loadBranchData() {
         }
         
         checkOverdue();
+        refreshNotifBadges();
     } catch (e) {
         console.error('Load branch data error:', e);
         toast(i18n[AppState.lang].connectionError, 'e');
@@ -3722,6 +3732,18 @@ function pgSettings() {
         ${s?.logoUrl && s.logoUrl.startsWith('data:') ? `<div class="ts tm mt2" style="text-align:center">&#x26A0; Base64 logo DB\'ye kaydedildi (büyük olabilir, harici URL tercih edilir)</div>` : ''}
     </div>
 
+    <div class="card mb3" style="border-left: 4px solid var(--blue2)">
+        <div class="tw6 tsm mb2">&#x1F310; Dil / Language</div>
+        <p class="ts tm mb2">Arayüz dilini seçin. / Select interface language.</p>
+        <div class="fgr mb2">
+            <label>Dil Seçimi / Language</label>
+            <select id="s-lang-select" class="fs" onchange="changeLang(this.value)" style="padding:10px 14px;border-radius:10px;font-size:14px;min-height:44px">
+                <option value="TR"${AppState.lang === 'TR' ? ' selected' : ''}>🇹🇷 Türkçe</option>
+                <option value="EN"${AppState.lang === 'EN' ? ' selected' : ''}>🇬🇧 English</option>
+            </select>
+        </div>
+    </div>
+
     <div class="card mb3" style="border-left: 4px solid var(--text2)">
         <div class="tw6 tsm mb2">&#x2699; Genel Kurum Ayarları</div>
         <div class="g21">
@@ -4466,22 +4488,24 @@ function spOdemeYap() {
             <button class="btn bs btn-sm" onclick="document.getElementById('sp-pay-form').style.display='none'">✕ Kapat</button>
         </div>
         <div id="sp-plan-info" class="sp-plan-info-box mb3"></div>
-        <div class="pay-methods-grid mb3">
-            <button class="pay-method-btn" id="pm-nakit" onclick="selectPayMethod('nakit')">
-                <div class="pay-method-icon">💵</div><div class="tw6 ts">Nakit</div>
-            </button>
-            <button class="pay-method-btn" id="pm-kredi_karti" onclick="selectPayMethod('kredi_karti')">
-                <div class="pay-method-icon">💳</div><div class="tw6 ts">Kredi Kartı</div>
-            </button>
-            ${hasBank ? `<button class="pay-method-btn" id="pm-havale" onclick="selectPayMethod('havale')">
-                <div class="pay-method-icon">🏦</div><div class="tw6 ts">Havale/EFT</div>
-            </button>` : ''}
-            ${hasPayTR ? `<button class="pay-method-btn" id="pm-paytr" onclick="selectPayMethod('paytr')">
-                <div class="pay-method-icon">🔵</div><div class="tw6 ts">PayTR Online</div>
-            </button>` : ''}
+        <div class="pay-choice-grid mb3">
+            ${hasBank ? `<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice('havale')">
+                <div class="pay-choice-icon">🏦</div>
+                <div class="pay-choice-title">Havale / EFT</div>
+                <div class="pay-choice-desc">Banka havalesi veya EFT ile ödeme yapın</div>
+            </div>` : ''}
+            ${hasPayTR ? `<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice('paytr')">
+                <div class="pay-choice-icon">🔵</div>
+                <div class="pay-choice-title">Online Ödeme</div>
+                <div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div>
+            </div>` : ''}
+            ${!hasBank && !hasPayTR ? `<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px">
+                <div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div>
+                <p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p>
+            </div>` : ''}
         </div>
         <div id="pay-method-detail" class="mb2"></div>
-        <div class="fgr mb2">
+        <div class="fgr mb2 dn" id="sp-desc-wrapper">
             <label>Açıklama <span class="tm ts">(opsiyonel)</span></label>
             <input id="sp-desc" placeholder="Ödeme notu ekleyin..."/>
         </div>
@@ -4505,7 +4529,9 @@ window.spPayPlan = function(planId) {
     // Önceki seçimi temizle
     if (detail) detail.innerHTML = '';
     if (submitBtn) submitBtn.style.display = 'none';
-    document.querySelectorAll('.pay-method-btn').forEach(btn => btn.classList.remove('active'));
+    const descWrapper = document.getElementById('sp-desc-wrapper');
+    if (descWrapper) descWrapper.classList.add('dn');
+    document.querySelectorAll('.pay-choice-card').forEach(c => c.classList.remove('active'));
     form?.scrollIntoView({ behavior: 'smooth' });
 };
 
@@ -4554,6 +4580,42 @@ window.selectPayMethod = function(method) {
         </div>`;
         submitBtn.textContent = '🔵 PayTR ile Ödemeye Geç';
         submitBtn.style.display = 'block';
+    }
+};
+
+window.selectPayChoice = function(choice) {
+    document.querySelectorAll('.pay-choice-card').forEach(c => c.classList.remove('active'));
+    const activeCard = document.getElementById('pc-' + choice);
+    if (activeCard) activeCard.classList.add('active');
+
+    const detail    = document.getElementById('pay-method-detail');
+    const submitBtn = document.getElementById('pay-submit-btn');
+    const descWrapper = document.getElementById('sp-desc-wrapper');
+    const s = AppState.data.settings;
+
+    AppState.ui.selectedPayMethod = choice;
+
+    if (choice === 'havale') {
+        detail.innerHTML = `
+        <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
+            <div class="tw6 mb2">🏦 Havale / EFT Bilgileri</div>
+            <div class="ts mb1"><strong>Banka:</strong> ${FormatUtils.escape(s?.bankName || '-')}</div>
+            <div class="ts mb1"><strong>Hesap Adı:</strong> ${FormatUtils.escape(s?.accountName || '-')}</div>
+            <div class="ts" style="word-break:break-all"><strong>IBAN:</strong> <span style="font-family:monospace">${FormatUtils.escape(s?.iban || '-')}</span></div>
+            <p class="ts tm mt2">Havaleyi yaptıktan sonra aşağıdan bildirim gönderin.</p>
+        </div>`;
+        submitBtn.textContent = '📩 Havale Bildirimi Gönder';
+        submitBtn.style.display = 'block';
+        if (descWrapper) descWrapper.classList.remove('dn');
+    } else if (choice === 'paytr') {
+        detail.innerHTML = `
+        <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
+            <div class="tw6 mb1">🔵 PayTR ile Online Ödeme</div>
+            <p class="ts tm">Güvenli ödeme sayfasına yönlendirileceksiniz. 256-bit SSL ile korunan ödeme altyapısı.</p>
+        </div>`;
+        submitBtn.textContent = '🔵 PayTR ile Ödemeye Geç';
+        submitBtn.style.display = 'block';
+        if (descWrapper) descWrapper.classList.remove('dn');
     }
 };
 
@@ -5304,6 +5366,157 @@ function downloadFile(content, filename, type) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// GNOME-STYLE BİLDİRİM SİSTEMİ
+// ============================================================
+
+function getNotifications() {
+    const notifications = [];
+    const today = new Date();
+    const payments = AppState.data.payments || [];
+
+    // Yaklaşan ödeme planlarını bildirime çevir
+    payments.filter(p => p.source === 'plan' && p.st !== 'completed').forEach(p => {
+        const dueDate = new Date(p.dt);
+        const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        const athName = p.an || 'Sporcu';
+
+        if (diffDays < 0) {
+            notifications.push({
+                id: 'notif-' + p.id,
+                icon: '⚠️',
+                text: `${athName} — ${FormatUtils.currency(p.amt)} ödeme ${Math.abs(diffDays)} gün gecikti!`,
+                time: DateUtils.format(p.dt),
+                type: 'danger'
+            });
+        } else if (diffDays <= 7) {
+            notifications.push({
+                id: 'notif-' + p.id,
+                icon: '🔔',
+                text: `${athName} — ödemesine ${diffDays} gün kaldı (${FormatUtils.currency(p.amt)})`,
+                time: DateUtils.format(p.dt),
+                type: 'warning'
+            });
+        }
+    });
+
+    // Onay bekleyen veli bildirimleri
+    payments.filter(p => p.notifStatus === 'pending_approval').forEach(p => {
+        notifications.push({
+            id: 'notif-approval-' + p.id,
+            icon: '📩',
+            text: `${p.an || 'Veli'} ödeme bildirimi gönderdi (${FormatUtils.currency(p.amt)}) — Onay bekliyor`,
+            time: DateUtils.format(p.dt),
+            type: 'info'
+        });
+    });
+
+    // Dismissed olanları filtrele
+    const dismissed = JSON.parse(StorageManager.get('dismissed_notifs') || '[]');
+    return notifications.filter(n => !dismissed.includes(n.id));
+}
+
+function renderNotifPanel(panelId, badgeId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const notifs = getNotifications();
+
+    if (notifs.length === 0) {
+        panel.innerHTML = '<div class="notif-panel-header"><span class="tw6 tsm">🔔 Bildirimler</span></div><div class="notif-empty"><div style="font-size:36px;margin-bottom:8px">✅</div><div class="ts tm">Yeni bildirim yok</div></div>';
+    } else {
+        panel.innerHTML = '<div class="notif-panel-header"><span class="tw6 tsm">🔔 Bildirimler</span><span class="notif-count">' + notifs.length + '</span></div>' +
+            notifs.map(n => {
+                const typeClass = n.type === 'danger' ? 'notif-item-danger' : n.type === 'warning' ? 'notif-item-warning' : 'notif-item-info';
+                return '<div class="notif-item ' + typeClass + '" id="' + n.id + '">' +
+                    '<div class="notif-item-icon">' + n.icon + '</div>' +
+                    '<div class="notif-item-body">' +
+                    '<div class="notif-item-text">' + FormatUtils.escape(n.text) + '</div>' +
+                    '<div class="notif-item-time">' + FormatUtils.escape(n.time) + '</div>' +
+                    '</div>' +
+                    '<button class="notif-dismiss" onclick="dismissNotif(\'' + n.id + '\')" title="Kaldır">✕</button>' +
+                    '</div>';
+            }).join('');
+    }
+
+    // Badge güncelle
+    updateNotifBadge(badgeId, notifs.length);
+}
+
+function updateNotifBadge(badgeId, count) {
+    const badge = document.getElementById(badgeId);
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('dn');
+    } else {
+        badge.classList.add('dn');
+    }
+}
+
+window.toggleNotifPanel = function(e) {
+    if (e) e.stopPropagation();
+    // Determine which panel to use based on which portal is visible
+    const wrapEl = document.getElementById('wrap');
+    const isAdmin = wrapEl && !wrapEl.classList.contains('dn');
+    const panel = isAdmin ? document.getElementById('notif-panel') : document.getElementById('sp-notif-panel');
+    const badgeId = isAdmin ? 'notif-badge' : 'sp-notif-badge';
+
+    if (!panel) return;
+
+    if (panel.classList.contains('dn')) {
+        renderNotifPanel(panel.id, badgeId);
+        panel.classList.remove('dn');
+        // Dışarı tıklama ile kapat
+        setTimeout(() => {
+            document.addEventListener('click', closeNotifOnOutside);
+        }, 0);
+    } else {
+        panel.classList.add('dn');
+        document.removeEventListener('click', closeNotifOnOutside);
+    }
+};
+
+function closeNotifOnOutside(e) {
+    const panels = document.querySelectorAll('.notif-panel');
+    const btns = document.querySelectorAll('#notif-btn, #sp-notif-btn');
+    const inside = Array.from(panels).some(p => p.contains(e.target)) ||
+                   Array.from(btns).some(b => b.contains(e.target));
+    if (!inside) {
+        panels.forEach(p => p.classList.add('dn'));
+        document.removeEventListener('click', closeNotifOnOutside);
+    }
+}
+
+window.dismissNotif = function(notifId) {
+    const el = document.getElementById(notifId);
+    if (el) {
+        el.style.animation = 'notif-fade-out 0.3s ease forwards';
+        setTimeout(() => {
+            el.remove();
+            // Dismissed listesine ekle
+            const dismissed = JSON.parse(StorageManager.get('dismissed_notifs') || '[]');
+            dismissed.push(notifId);
+            StorageManager.set('dismissed_notifs', JSON.stringify(dismissed));
+            // Badge güncelle
+            updateNotifBadge('notif-badge', document.querySelectorAll('#notif-panel .notif-item').length);
+            updateNotifBadge('sp-notif-badge', document.querySelectorAll('#sp-notif-panel .notif-item').length);
+            // Eğer hiç bildirim kalmadıysa boş durumu göster
+            const panel = document.querySelector('.notif-panel:not(.dn)');
+            if (panel && panel.querySelectorAll('.notif-item').length === 0) {
+                const header = panel.querySelector('.notif-panel-header');
+                if (header) header.querySelector('.notif-count')?.remove();
+                panel.innerHTML = '<div class="notif-panel-header"><span class="tw6 tsm">🔔 Bildirimler</span></div><div class="notif-empty"><div style="font-size:36px;margin-bottom:8px">✅</div><div class="ts tm">Yeni bildirim yok</div></div>';
+            }
+        }, 300);
+    }
+};
+
+function refreshNotifBadges() {
+    const count = getNotifications().length;
+    updateNotifBadge('notif-badge', count);
+    updateNotifBadge('sp-notif-badge', count);
 }
 
 // DOM Ready - Initialize
