@@ -242,15 +242,24 @@ BEGIN
     IF p_pass = v_stored THEN
       -- Başarılı giriş: plaintext şifreyi otomatik SHA-256 hash'le
       IF length(v_stored) < 64 OR v_stored !~ '^[0-9a-f]{64}$' THEN
-        UPDATE coaches SET coach_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+        BEGIN
+          UPDATE coaches SET coach_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+        EXCEPTION WHEN undefined_function THEN
+          -- pgcrypto yüklü değil, auto-hash atlanıyor
+          NULL;
+        END;
       END IF;
       RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
     END IF;
 
     -- 2. SHA-256 hash karşılaştırma (şifre hash olarak saklanmışsa)
     IF length(v_stored) = 64 AND v_stored ~ '^[0-9a-f]{64}$' THEN
-      v_hashed := encode(digest(p_pass, 'sha256'), 'hex');
-      IF v_hashed = lower(v_stored) THEN
+      BEGIN
+        v_hashed := encode(digest(p_pass, 'sha256'), 'hex');
+      EXCEPTION WHEN undefined_function THEN
+        v_hashed := '';
+      END;
+      IF v_hashed <> '' AND v_hashed = lower(v_stored) THEN
         RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
       END IF;
     END IF;
@@ -259,7 +268,11 @@ BEGIN
     --    (coach_pass yanlışlıkla set edilmiş olabilir)
     IF v_raw_pass <> '' AND p_pass = v_default THEN
       -- Başarılı giriş: varsayılan şifreyi hash'le
-      UPDATE coaches SET coach_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+      BEGIN
+        UPDATE coaches SET coach_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+      EXCEPTION WHEN undefined_function THEN
+        NULL;
+      END;
       RETURN json_build_object('ok', true, 'role', 'coach', 'data', row_to_json(v_coach));
     END IF;
 
@@ -281,15 +294,24 @@ BEGIN
     IF p_pass = v_stored THEN
       -- Başarılı giriş: plaintext şifreyi otomatik SHA-256 hash'le
       IF length(v_stored) < 64 OR v_stored !~ '^[0-9a-f]{64}$' THEN
-        UPDATE athletes SET sp_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+        BEGIN
+          UPDATE athletes SET sp_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+        EXCEPTION WHEN undefined_function THEN
+          -- pgcrypto yüklü değil, auto-hash atlanıyor
+          NULL;
+        END;
       END IF;
       RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
     END IF;
 
     -- 2. SHA-256 hash karşılaştırma
     IF length(v_stored) = 64 AND v_stored ~ '^[0-9a-f]{64}$' THEN
-      v_hashed := encode(digest(p_pass, 'sha256'), 'hex');
-      IF v_hashed = lower(v_stored) THEN
+      BEGIN
+        v_hashed := encode(digest(p_pass, 'sha256'), 'hex');
+      EXCEPTION WHEN undefined_function THEN
+        v_hashed := '';
+      END;
+      IF v_hashed <> '' AND v_hashed = lower(v_stored) THEN
         RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
       END IF;
     END IF;
@@ -298,7 +320,11 @@ BEGIN
     --    (sp_pass yanlışlıkla set edilmiş olabilir)
     IF v_raw_pass <> '' AND p_pass = v_default THEN
       -- Başarılı giriş: varsayılan şifreyi hash'le
-      UPDATE athletes SET sp_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+      BEGIN
+        UPDATE athletes SET sp_pass = encode(digest(p_pass, 'sha256'), 'hex') WHERE tc = p_tc;
+      EXCEPTION WHEN undefined_function THEN
+        NULL;
+      END;
       RETURN json_build_object('ok', true, 'role', 'sporcu', 'data', row_to_json(v_athlete));
     END IF;
 
@@ -343,4 +369,5 @@ GRANT EXECUTE ON FUNCTION verify_user_credentials(TEXT, TEXT, TEXT) TO service_r
 --   7. verify_user_credentials() geriye dönük uyumluluk için korundu.
 --   8. Sequence erişim hakları verildi (INSERT + auto-increment).
 --   9. Başarılı girişte plaintext şifreler otomatik SHA-256 hash'lenir.
+--      (pgcrypto yüklüyse). pgcrypto yoksa giriş çalışır, hash atlanır.
 -- ============================================================

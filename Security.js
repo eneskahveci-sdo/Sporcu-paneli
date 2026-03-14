@@ -192,7 +192,6 @@ function _clearLoginAttempts(tc) {
         "connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev https://graph.facebook.com https://www.paytr.com",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data:",
-        "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'"
     ].join('; ');
@@ -290,9 +289,12 @@ function _securityDoNormalLogin(role) {
 
                 if (rpcErr) {
                     console.error('🔴 RPC hatası:', rpcErr.code, rpcErr.message);
-                    // PostgreSQL error code 42883 = function does not exist
-                    if (rpcErr.code === '42883' || rpcErr.code === 'PGRST202') {
+                    if (rpcErr.code === 'PGRST202') {
+                        // PostgREST: login_with_tc fonksiyonu bulunamadı
                         showErr('Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.');
+                    } else if (rpcErr.code === '42883') {
+                        // PostgreSQL: Bir fonksiyon bulunamadı (genellikle pgcrypto/digest eksik)
+                        showErr('Veritabanı fonksiyonu güncellenmeli. Yönetici RLS_POLICIES.sql betiğini Supabase SQL Editor\'de tekrar çalıştırmalıdır.');
                     } else {
                         showErr('Giriş servisi geçici olarak kullanılamıyor. Lütfen birkaç dakika sonra tekrar deneyin veya yöneticiyle iletişime geçin.');
                     }
