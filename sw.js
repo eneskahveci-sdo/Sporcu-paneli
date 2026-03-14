@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
-// DRAGOS FUTBOL AKADEMİSİ — Service Worker v2.0
+// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.0
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v2';
-const API_CACHE = 'dragos-api-v2';
+const STATIC_CACHE = 'dragos-static-v3';
+const API_CACHE = 'dragos-api-v3';
 
 const STATIC_ASSETS = [
     '/',
@@ -17,6 +17,7 @@ const STATIC_ASSETS = [
 
 const CDN_ASSETS = [
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];
 
@@ -90,16 +91,17 @@ self.addEventListener('fetch', function(event) {
         return;
     }
 
-    if (url.hostname.includes('cdn.jsdelivr.net') || url.hostname.includes('cdnjs.cloudflare.com')) {
+    if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'unpkg.com') {
         event.respondWith(
-            caches.match(event.request).then(function(cached) {
-                if (cached) return cached;
-                return fetch(event.request.clone()).then(function(resp) {
-                    if (resp.ok) {
-                        var clone = resp.clone();
-                        caches.open(STATIC_CACHE).then(function(c) { c.put(event.request, clone); });
-                    }
-                    return resp;
+            fetch(event.request.clone()).then(function(resp) {
+                if (resp.ok) {
+                    var clone = resp.clone();
+                    caches.open(STATIC_CACHE).then(function(c) { c.put(event.request, clone); });
+                }
+                return resp;
+            }).catch(function() {
+                return caches.match(event.request).then(function(cached) {
+                    return cached || new Response('', { status: 503, statusText: 'CDN Unavailable' });
                 });
             })
         );
