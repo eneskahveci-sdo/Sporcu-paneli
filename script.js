@@ -807,7 +807,7 @@ window.doNormalLogin = async function(type) {
         if (!sb) throw new Error('Supabase başlatılamadı');
 
         // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
-        try { await sb.auth.signOut(); } catch(_) {}
+        try { await sb.auth.signOut(); } catch(e) { console.warn('signOut before login:', e); }
 
         const role = type === 'coach' ? 'coach' : 'sporcu';
         var loginResult = null;
