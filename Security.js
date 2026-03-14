@@ -189,7 +189,7 @@ function _clearLoginAttempts(tc) {
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev",
         "style-src 'self' 'unsafe-inline'",
-        "connect-src 'self' https://*.supabase.co https://graph.facebook.com https://api.netgsm.com.tr https://www.paytr.com",
+        "connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev https://graph.facebook.com https://api.netgsm.com.tr https://www.paytr.com",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data:",
         "frame-ancestors 'none'",
