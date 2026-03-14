@@ -46,6 +46,17 @@ self.addEventListener('fetch', function(event) {
     var url = new URL(event.request.url);
 
     if (url.hostname.includes('supabase.co')) {
+        // Hassas endpoint'leri ASLA cache'leme — doğrudan network'ten dön
+        var sensitiveEndpoints = ['athletes', 'payments', 'coaches', 'settings', 'users', 'attendance', 'messages'];
+        var isSensitive = sensitiveEndpoints.some(function(ep) {
+            return url.pathname.includes(ep) || url.search.includes(ep);
+        });
+        if (isSensitive) {
+            event.respondWith(fetch(event.request));
+            return;
+        }
+
+        // Sadece public endpoint'leri (branches, orgs, sports, classes) cache'le
         event.respondWith(
             fetch(event.request.clone())
                 .then(function(resp) {

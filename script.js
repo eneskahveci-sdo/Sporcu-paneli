@@ -5,7 +5,10 @@
 
 window.onerror = function(msg, url, line, col, error) {
     console.error('Global Error:', { msg, url, line, col, error });
-    return true;
+    if (typeof toast === 'function') {
+        toast('Beklenmeyen bir hata oluştu. Sayfa yenilenebilir.', 'e');
+    }
+    return false;
 };
 
 // Mobil uyumlu localStorage wrapper
@@ -1626,9 +1629,9 @@ function pgAthleteProfile(athleteId) {
                         <span class="profile-meta-item"><span class="badge ${a.st === 'active' ? 'badge-green' : 'badge-red'}">${statusLabel(a.st)}</span></span>
                     </div>
                     <div class="profile-actions">
-                        <button class="btn bp" onclick="editAth('${a.id}')">&#x270F; Düzenle</button>
+                        <button class="btn bp" onclick="editAth('${FormatUtils.escape(a.id)}')">&#x270F; Düzenle</button>
                         <button class="btn bs" onclick="go('athletes')">&#x2190; Listeye Dön</button>
-                        <button class="btn bw" onclick="printProfile('${a.id}')">&#x1F5A8; Yazdır</button>
+                        <button class="btn bw" onclick="printProfile('${FormatUtils.escape(a.id)}')">&#x1F5A8; Yazdır</button>
                     </div>
                 </div>
                 <div class="stats-grid" style="min-width:200px">
@@ -1819,7 +1822,7 @@ function pgAthleteProfile(athleteId) {
         <div id="tab-payments" class="tab-content">
             <div class="flex fjb fca mb3">
                 <h3 class="tw6">Ödeme Geçmişi</h3>
-                <button class="btn bp" onclick="addPaymentForAthlete('${a.id}')">+ Yeni Ödeme Ekle</button>
+                <button class="btn bp" onclick="addPaymentForAthlete('${FormatUtils.escape(a.id)}')">+ Yeni Ödeme Ekle</button>
             </div>
             ${generatePaymentHistory(a.id)}
         </div>
@@ -1839,7 +1842,7 @@ function pgAthleteProfile(athleteId) {
         <div id="tab-documents" class="tab-content">
             <div class="flex fjb fca mb3">
                 <h3 class="tw6">Belgeler</h3>
-                <button class="btn bp" onclick="uploadDocument('${a.id}')">+ Belge Yükle</button>
+                <button class="btn bp" onclick="uploadDocument('${FormatUtils.escape(a.id)}')">+ Belge Yükle</button>
             </div>
             <div class="g2">
                 <div class="document-card" onclick="viewDocument('saglik')">
@@ -2211,8 +2214,8 @@ function pgAthletes() {
                     <td class="ts">${FormatUtils.escape(ok.parentName || '-')}<br><small style="color:var(--text2)">${FormatUtils.escape(ok.parentPhone || '')}</small></td>
                     <td><span class="bg ${ok.status === 'new' ? 'bg-y' : 'bg-g'}">${ok.status === 'new' ? '⏳ Bekliyor' : '✅ İşlendi'}</span></td>
                     ${isAdmin ? `<td>
-                        ${ok.status === 'new' ? `<button class="btn btn-xs bp" onclick="convertOnKayit('${ok.id}')">Kayıt Aç</button> ` : ''}
-                        <button class="btn btn-xs bd" onclick="delOnKayit('${ok.id}')">Sil</button>
+                        ${ok.status === 'new' ? `<button class="btn btn-xs bp" onclick="convertOnKayit('${FormatUtils.escape(ok.id)}')">Kayıt Aç</button> ` : ''}
+                        <button class="btn btn-xs bd" onclick="delOnKayit('${FormatUtils.escape(ok.id)}')">Sil</button>
                     </td>` : ''}
                 </tr>`;
                 }).join('')}
@@ -2287,9 +2290,9 @@ function pgAthletes() {
                         <td>${FormatUtils.escape(className(a.clsId))}</td>
                         <td><span class="bg ${statusClass(a.st)}">${statusLabel(a.st)}</span></td>
                         <td>
-                            <button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${a.id}'})">Profil</button>
-                            <button class="btn btn-xs bs" onclick="editAth('${a.id}')">Düzenle</button>
-                            <button class="btn btn-xs bd" onclick="delAth('${a.id}')">Sil</button>
+                            <button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'})">Profil</button>
+                            <button class="btn btn-xs bs" onclick="editAth('${FormatUtils.escape(a.id)}')">Düzenle</button>
+                            <button class="btn btn-xs bd" onclick="delAth('${FormatUtils.escape(a.id)}')">Sil</button>
                         </td>
                     </tr>
                     `).join('')}
@@ -2603,9 +2606,9 @@ function pgClasses() {
                             <td>${coach ? FormatUtils.escape(`${coach.fn} ${coach.ln}`) : '-'}</td>
                             <td>${count}</td>
                             <td>
-                                <button class="btn btn-xs bsu" style="margin-right:4px" onclick="viewClassAthletes('${c.id}')">Öğrenciler</button>
-                                <button class="btn btn-xs bp" onclick="editClass('${c.id}')">Düzenle</button>
-                                <button class="btn btn-xs bd" onclick="delClass('${c.id}')">Sil</button>
+                                <button class="btn btn-xs bsu" style="margin-right:4px" onclick="viewClassAthletes('${FormatUtils.escape(c.id)}')">Öğrenciler</button>
+                                <button class="btn btn-xs bp" onclick="editClass('${FormatUtils.escape(c.id)}')">Düzenle</button>
+                                <button class="btn btn-xs bd" onclick="delClass('${FormatUtils.escape(c.id)}')">Sil</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -2633,7 +2636,7 @@ window.viewClassAthletes = function(cid) {
                         <td class="tw6">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</td>
                         <td>${FormatUtils.escape(a.tc)}</td>
                         <td>${a.pn ? FormatUtils.escape(`${a.pn} (${a.pph})`) : '-'}</td>
-                        <td><button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${a.id}'}); closeModal()">Profil</button></td>
+                        <td><button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'}); closeModal()">Profil</button></td>
                     </tr>
                     `).join('')}
                 </tbody>
@@ -2739,7 +2742,7 @@ function pgSports() {
                     </div>
                 </div>
                 <div class="mt2" style="text-align:right">
-                    <button class="btn btn-xs bd" onclick="delSport('${s.id}')">Sil</button>
+                    <button class="btn btn-xs bd" onclick="delSport('${FormatUtils.escape(s.id)}')">Sil</button>
                 </div>
             </div>`;
         }).join('')}
@@ -2844,7 +2847,7 @@ function pgAttendance() {
             const st = attDay[a.id] || '';
             return `
             <div class="att-row">
-                <div class="flex fca gap2" style="flex:1;cursor:pointer" onclick="go('athleteProfile', {id:'${a.id}'})">
+                <div class="flex fca gap2" style="flex:1;cursor:pointer" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'})">
                     ${UIUtils.getAvatar(32, null, FormatUtils.initials(a.fn, a.ln))}
                     <div>
                         <div class="tw6 tsm">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
@@ -2852,10 +2855,10 @@ function pgAttendance() {
                     </div>
                 </div>
                 <div class="att-btns">
-                    <button class="att-b${st === 'P' ? ' ap' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'P')">Var</button>
-                    <button class="att-b${st === 'A' ? ' aa' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'A')">Yok</button>
-                    <button class="att-b${st === 'E' ? ' al2' : ''}" onclick="event.stopPropagation();setAtt('${a.id}', 'E')">İzinli</button>
-                    <button class="att-b" onclick="event.stopPropagation();setAtt('${a.id}')">Sil</button>
+                    <button class="att-b${st === 'P' ? ' ap' : ''}" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}', 'P')">Var</button>
+                    <button class="att-b${st === 'A' ? ' aa' : ''}" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}', 'A')">Yok</button>
+                    <button class="att-b${st === 'E' ? ' al2' : ''}" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}', 'E')">İzinli</button>
+                    <button class="att-b" onclick="event.stopPropagation();setAtt('${FormatUtils.escape(a.id)}')">Sil</button>
                 </div>
             </div>`;
         }).join('')}
@@ -2998,8 +3001,8 @@ function pgPayments() {
                         <div class="ts tm">${DateUtils.format(p.dt)} • ${FormatUtils.escape(p.ds || 'Aidat')} • ${methodLabel}</div>
                     </div>
                     <div class="flex gap2">
-                        <button class="btn btn-sm bp" onclick="approvePayment('${p.id}')">✅ Onayla</button>
-                        <button class="btn btn-sm bd" onclick="rejectPayment('${p.id}')">❌ Reddet</button>
+                        <button class="btn btn-sm bp" onclick="approvePayment('${FormatUtils.escape(p.id)}')">✅ Onayla</button>
+                        <button class="btn btn-sm bd" onclick="rejectPayment('${FormatUtils.escape(p.id)}')">❌ Reddet</button>
                     </div>
                 </div>
             </div>`;
@@ -3049,13 +3052,13 @@ function pgPayments() {
             <tbody>
             ${planlar.sort((a,b)=>b.dt.localeCompare(a.dt)).map(p => `
             <tr>
-                <td class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${p.aid}'})">${FormatUtils.escape(p.an)}</td>
+                <td class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${FormatUtils.escape(p.aid)}'})">${FormatUtils.escape(p.an)}</td>
                 <td>${FormatUtils.escape(p.ds||DateUtils.format(p.dt))}</td>
                 <td class="tw6 tg">${FormatUtils.currency(p.amt)}</td>
                 <td><span class="bg ${p.st==='completed'?'bg-g':p.st==='overdue'?'bg-r':'bg-y'}">${statusLabel(p.st)}</span></td>
                 <td>
-                    <button class="btn btn-xs bp" onclick="editPay('${p.id}')">Düzenle</button>
-                    <button class="btn btn-xs bd" onclick="delPay('${p.id}')">Sil</button>
+                    <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
+                    <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
                 </td>
             </tr>`).join('')}
             </tbody>
@@ -3100,15 +3103,15 @@ function pgPayments() {
                         const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
                         return `<tr>
                             <td>${DateUtils.format(p.dt)}</td>
-                            <td>${p.aid?`<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${p.aid}'})">${FormatUtils.escape(p.an)}</span>`:FormatUtils.escape(p.an)}</td>
+                            <td>${p.aid?`<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${FormatUtils.escape(p.aid)}'})">${FormatUtils.escape(p.an)}</span>`:FormatUtils.escape(p.an)}</td>
                             <td>${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
                             <td>${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
                             <td class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
                             <td><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
                             <td><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
                             <td>
-                                <button class="btn btn-xs bp" onclick="editPay('${p.id}')">Düzenle</button>
-                                <button class="btn btn-xs bd" onclick="delPay('${p.id}')">Sil</button>
+                                <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
+                                <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
                             </td>
                         </tr>`;
                     }).join('')}
@@ -3482,8 +3485,8 @@ function pgCoaches() {
                         <td>${FormatUtils.escape(c.tc)} / ${FormatUtils.escape(c.ph || '-')}</td>
                         <td>${FormatUtils.escape(c.sp || '-')}</td>
                         <td>
-                            <button class="btn btn-xs bp" onclick="editCoach('${c.id}')">Düzenle</button>
-                            <button class="btn btn-xs bd" onclick="delCoach('${c.id}')">Sil</button>
+                            <button class="btn btn-xs bp" onclick="editCoach('${FormatUtils.escape(c.id)}')">Düzenle</button>
+                            <button class="btn btn-xs bd" onclick="delCoach('${FormatUtils.escape(c.id)}')">Sil</button>
                         </td>
                     </tr>
                     `).join('')}
@@ -3802,10 +3805,10 @@ function pgSettings() {
               <div class="ts tm mb2">TC: ${FormatUtils.escape(ok.tc || '-')}</div>
               <div class="flex gap2">
                   ${ok.status === 'new' ? `
-                  <button class="btn bsu btn-sm" onclick="convertOnKayit('${ok.id}')">Sporcuya Dönüştür</button>
-                  <button class="btn bs btn-sm" onclick="markOnKayitDone('${ok.id}')">İşaretlendi</button>
+                  <button class="btn bsu btn-sm" onclick="convertOnKayit('${FormatUtils.escape(ok.id)}')">Sporcuya Dönüştür</button>
+                  <button class="btn bs btn-sm" onclick="markOnKayitDone('${FormatUtils.escape(ok.id)}')">İşaretlendi</button>
                   ` : ''}
-                  <button class="btn bd btn-sm" onclick="delOnKayit('${ok.id}')">Sil</button>
+                  <button class="btn bd btn-sm" onclick="delOnKayit('${FormatUtils.escape(ok.id)}')">Sil</button>
               </div>
           </div>
           `).join('')}
@@ -3864,7 +3867,13 @@ window.handleLogoUpload = function(input) {
         const dataUrl = e.target.result;
         // Önizleme
         const preview = document.getElementById('logo-preview');
-        if (preview) preview.innerHTML = '<img src="' + dataUrl + '" style="width:100%;height:100%;object-fit:cover"/>';
+        if (preview) {
+            preview.textContent = '';
+            var img = document.createElement('img');
+            img.src = dataUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+            preview.appendChild(img);
+        }
         // URL alanına yaz (kaydet butonuyla DB'ye işlenecek)
         const urlInput = document.getElementById('s-logo-url');
         if (urlInput) urlInput.value = dataUrl;
@@ -4418,7 +4427,7 @@ function spOdemeYap() {
                 </div>
                 <div class="plan-card-right">
                     ${badge}
-                    <button class="btn bp btn-sm mt2" onclick="spPayPlan('${p.id}')">💳 Öde</button>
+                    <button class="btn bp btn-sm mt2" onclick="spPayPlan('${FormatUtils.escape(p.id)}')">💳 Öde</button>
                 </div>
             </div>`;
         }).join('')
@@ -4758,7 +4767,7 @@ window.loadAndShowAdmins = async function() {
                 <div class="tw6 tsm">${FormatUtils.escape(u.name || u.email)}</div>
                 <div class="ts tm">${FormatUtils.escape(u.email)} • <span class="bg ${u.role === 'admin' ? 'bg-b' : 'bg-g'}">${u.role === 'admin' ? 'Yönetici' : 'Antrenör'}</span></div>
             </div>
-            ${u.id !== AppState.currentUser?.id ? `<button class="btn btn-xs bd" onclick="removeAdmin('${u.id}','${FormatUtils.escape(u.email)}')">Sil</button>` : '<span class="ts tm">(Siz)</span>'}
+            ${u.id !== AppState.currentUser?.id ? `<button class="btn btn-xs bd" onclick="removeAdmin('${FormatUtils.escape(u.id)}','${FormatUtils.escape(u.email)}')">Sil</button>` : '<span class="ts tm">(Siz)</span>'}
         </div>`).join('');
     } catch(e) {
         area.innerHTML = `<div class="al al-r ts">Yüklenemedi: ${FormatUtils.escape(e.message)}</div>`;
