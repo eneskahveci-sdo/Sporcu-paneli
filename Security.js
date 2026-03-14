@@ -233,7 +233,7 @@ async function _clientSideLoginFallback(sb, tc, pass, role) {
     }
 
     var storedPass = (resp.data[passCol] || '').trim();
-    var defaultPass = tc.slice(-6);
+    var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
     var validPass = storedPass || defaultPass;
 
     if (pass !== validPass) {
@@ -312,7 +312,16 @@ function _securityDoNormalLogin(role) {
                     usedFallback = true;
                 } else {
                     // RPC sonucu string olabilir, parse et
-                    rpcResult = (typeof rpcData === 'string') ? JSON.parse(rpcData) : rpcData;
+                    if (typeof rpcData === 'string') {
+                        try { rpcResult = JSON.parse(rpcData); }
+                        catch (parseErr) {
+                            console.warn('⚠️ RPC JSON parse hatası, fallback deneniyor:', parseErr);
+                            rpcResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                            usedFallback = true;
+                        }
+                    } else {
+                        rpcResult = rpcData;
+                    }
                 }
             } catch (rpcCatchErr) {
                 console.warn('⚠️ RPC çağrısı başarısız, fallback deneniyor:', rpcCatchErr);

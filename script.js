@@ -714,7 +714,7 @@ function setupTCInput(inputId) {
 }
 
 // Client-side login fallback: RPC yoksa doğrudan tablo sorgusu ile şifre doğrula
-async function _doClientSideLogin(sb, tc, pass, role) {
+async function _clientSideLoginFallback(sb, tc, pass, role) {
     var table = role === 'coach' ? 'coaches' : 'athletes';
     var passCol = role === 'coach' ? 'coach_pass' : 'sp_pass';
 
@@ -726,7 +726,7 @@ async function _doClientSideLogin(sb, tc, pass, role) {
     }
 
     var storedPass = (resp.data[passCol] || '').trim();
-    var defaultPass = tc.slice(-6);
+    var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
     var validPass = storedPass || defaultPass;
 
     if (pass !== validPass) {
@@ -782,13 +782,21 @@ window.doNormalLogin = async function(type) {
 
             if (rpcErr) {
                 console.warn('RPC hatası, fallback deneniyor:', rpcErr.code, rpcErr.message);
-                loginResult = await _doClientSideLogin(sb, tc, pass, role);
+                loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
             } else {
-                loginResult = (typeof rpcData === 'string') ? JSON.parse(rpcData) : rpcData;
+                if (typeof rpcData === 'string') {
+                    try { loginResult = JSON.parse(rpcData); }
+                    catch (parseErr) {
+                        console.warn('RPC JSON parse hatası, fallback deneniyor:', parseErr);
+                        loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                    }
+                } else {
+                    loginResult = rpcData;
+                }
             }
         } catch (rpcCatchErr) {
             console.warn('RPC çağrısı başarısız, fallback deneniyor:', rpcCatchErr);
-            loginResult = await _doClientSideLogin(sb, tc, pass, role);
+            loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
         }
 
         if (!loginResult || !loginResult.ok) {
