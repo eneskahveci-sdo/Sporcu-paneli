@@ -713,6 +713,29 @@ function setupTCInput(inputId) {
     });
 }
 
+// Client-side login fallback: RPC yoksa doğrudan tablo sorgusu ile şifre doğrula
+async function _clientSideLoginFallback(sb, tc, pass, role) {
+    var table = role === 'coach' ? 'coaches' : 'athletes';
+    var passCol = role === 'coach' ? 'coach_pass' : 'sp_pass';
+
+    var resp = await sb.from(table).select('*').eq('tc', tc).limit(1).maybeSingle();
+
+    if (resp.error) throw new Error('Veritabanı sorgu hatası: ' + resp.error.message);
+    if (!resp.data) {
+        return { ok: false, error: role === 'coach' ? 'Antrenör bulunamadı' : 'Sporcu bulunamadı' };
+    }
+
+    var storedPass = (resp.data[passCol] || '').trim();
+    var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
+    var validPass = storedPass || defaultPass;
+
+    if (pass !== validPass) {
+        return { ok: false, error: 'TC veya şifre hatalı!' };
+    }
+
+    return { ok: true, role: role, data: resp.data };
+}
+
 window.doNormalLogin = async function(type) {
     // Bu fonksiyon Security.js tarafından override edilir.
     // Security.js yüklenmemişse bu fallback çalışır.
@@ -748,17 +771,39 @@ window.doNormalLogin = async function(type) {
         const sb = getSupabase();
         if (!sb) throw new Error('Supabase başlatılamadı');
 
-        // Tek RPC çağrısıyla doğrulama + kullanıcı verisi
-        const { data: rpcResult, error: rpcErr } = await sb.rpc('login_with_tc', {
-            p_tc: tc, p_pass: pass, p_role: type === 'coach' ? 'coach' : 'sporcu'
-        });
+        const role = type === 'coach' ? 'coach' : 'sporcu';
+        var loginResult = null;
 
-        if (rpcErr) throw new Error(rpcErr.message || 'Sunucu hatası');
-        if (!rpcResult || !rpcResult.ok) {
-            throw new Error((rpcResult && rpcResult.error) || 'TC veya şifre hatalı!');
+        // Önce RPC dene, başarısız olursa doğrudan tablo sorgusu ile fallback yap
+        try {
+            const { data: rpcData, error: rpcErr } = await sb.rpc('login_with_tc', {
+                p_tc: tc, p_pass: pass, p_role: role
+            });
+
+            if (rpcErr) {
+                console.warn('RPC hatası, fallback deneniyor:', rpcErr.code, rpcErr.message);
+                loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+            } else {
+                if (typeof rpcData === 'string') {
+                    try { loginResult = JSON.parse(rpcData); }
+                    catch (parseErr) {
+                        console.warn('RPC JSON parse hatası, fallback deneniyor:', parseErr);
+                        loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                    }
+                } else {
+                    loginResult = rpcData;
+                }
+            }
+        } catch (rpcCatchErr) {
+            console.warn('RPC çağrısı başarısız, fallback deneniyor:', rpcCatchErr);
+            loginResult = await _clientSideLoginFallback(sb, tc, pass, role);
         }
 
-        const found = rpcResult.data;
+        if (!loginResult || !loginResult.ok) {
+            throw new Error((loginResult && loginResult.error) || 'TC veya şifre hatalı!');
+        }
+
+        const found = loginResult.data;
         
         if (isCoach) {
             AppState.currentUser = {

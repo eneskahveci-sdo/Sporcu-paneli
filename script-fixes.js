@@ -809,7 +809,7 @@ window.convertOnKayit = async function(id) {
     var cls = AppState.data.classes.find(function(c) { return c.id === ok.clsId || c.name === ok.className; });
     var sp = '';
     if (cls) { var sport = AppState.data.sports.find(function(s) { return s.id === cls.spId; }); if (sport) sp = sport.name; }
-    var athleteObj = { id: generateId(), fn: ok.fn || '', ln: ok.ln || '', tc: ok.tc || '', bd: ok.bd || null, gn: 'E', ph: '', em: '', sp: sp, cat: '', lic: '', rd: DateUtils.today(), st: 'active', fee: 0, vd: null, nt: '', clsId: cls ? cls.id : (ok.clsId || ''), pn: ok.parentName || '', pph: ok.parentPhone || '', pem: '', spPass: ok.tc ? ok.tc.slice(-4) : '', orgId: ok.orgId || AppState.currentOrgId || '', branchId: ok.branchId || AppState.currentBranchId || '', address: '', city: '', emergency: '', blood: '', height: '', weight: '', health: '', school: '' };
+    var athleteObj = { id: generateId(), fn: ok.fn || '', ln: ok.ln || '', tc: ok.tc || '', bd: ok.bd || null, gn: 'E', ph: '', em: '', sp: sp, cat: '', lic: '', rd: DateUtils.today(), st: 'active', fee: 0, vd: null, nt: '', clsId: cls ? cls.id : (ok.clsId || ''), pn: ok.parentName || '', pph: ok.parentPhone || '', pem: '', spPass: '', orgId: ok.orgId || AppState.currentOrgId || '', branchId: ok.branchId || AppState.currentBranchId || '', address: '', city: '', emergency: '', blood: '', height: '', weight: '', health: '', school: '' };
     try {
         var result = await DB.upsert('athletes', DB.mappers.fromAthlete(athleteObj));
         if (result) {

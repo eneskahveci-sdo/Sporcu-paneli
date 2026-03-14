@@ -212,6 +212,38 @@ function _clearLoginAttempts(tc) {
 
 console.log('🛡️ Dragos Güvenlik Kalkanı v5.0 Aktif!');
 
+// ── 4a. CLIENT-SIDE FALLBACK GİRİŞ ───────────────────────────────
+// login_with_tc RPC fonksiyonu Supabase'de yoksa veya hata verirse,
+// doğrudan tablo sorgusu + istemci tarafında şifre karşılaştırması yapılır.
+
+async function _clientSideLoginFallback(sb, tc, pass, role) {
+    console.log('🔄 Client-side fallback login başlatılıyor — role:', role);
+    var table = role === 'coach' ? 'coaches' : 'athletes';
+    var passCol = role === 'coach' ? 'coach_pass' : 'sp_pass';
+
+    var resp = await sb.from(table).select('*').eq('tc', tc).limit(1).maybeSingle();
+
+    if (resp.error) {
+        console.error('🔴 Fallback sorgu hatası:', resp.error);
+        throw new Error('Veritabanı sorgu hatası: ' + resp.error.message);
+    }
+
+    if (!resp.data) {
+        return { ok: false, error: role === 'coach' ? 'Antrenör bulunamadı' : 'Sporcu bulunamadı' };
+    }
+
+    var storedPass = (resp.data[passCol] || '').trim();
+    var defaultPass = tc.length >= 6 ? tc.slice(-6) : tc;
+    var validPass = storedPass || defaultPass;
+
+    if (pass !== validPass) {
+        return { ok: false, error: 'TC veya şifre hatalı!' };
+    }
+
+    console.log('✅ Fallback doğrulama başarılı!');
+    return { ok: true, role: role === 'coach' ? 'coach' : 'sporcu', data: resp.data };
+}
+
 function _securityDoNormalLogin(role) {
     return async function() {
         console.log('🔐 Security v5.0 doNormalLogin başladı — role:', role);
@@ -266,23 +298,44 @@ function _securityDoNormalLogin(role) {
 
             // Tek RPC çağrısı: doğrulama + kullanıcı verisi
             console.log('📡 RPC çağrılıyor: login_with_tc...');
-            const { data: rpcResult, error: rpcErr } = await sb.rpc('login_with_tc', {
-                p_tc: tc, p_pass: pass, p_role: role
-            });
+            var rpcResult = null;
+            var usedFallback = false;
 
-            console.log('📡 RPC sonucu:', { ok: rpcResult?.ok, role: rpcResult?.role, rpcErr });
+            try {
+                const { data: rpcData, error: rpcErr } = await sb.rpc('login_with_tc', {
+                    p_tc: tc, p_pass: pass, p_role: role
+                });
 
-            if (rpcErr) {
-                console.error('🔴 RPC hatası:', rpcErr);
-                // login_with_tc fonksiyonu Supabase'de tanımlı değil (PGRST202 = function not found)
-                if (rpcErr.code === 'PGRST202') {
-                    showErr('Sunucu yapılandırması eksik: login_with_tc fonksiyonu bulunamadı. ' +
-                            'Lütfen RLS_POLICIES.sql dosyasını Supabase SQL Editor\'de çalıştırın.');
+                if (rpcErr) {
+                    console.warn('⚠️ RPC hatası, fallback deneniyor:', rpcErr.code, rpcErr.message);
+                    rpcResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                    usedFallback = true;
+                } else {
+                    // RPC sonucu string olabilir, parse et
+                    if (typeof rpcData === 'string') {
+                        try { rpcResult = JSON.parse(rpcData); }
+                        catch (parseErr) {
+                            console.warn('⚠️ RPC JSON parse hatası, fallback deneniyor:', parseErr);
+                            rpcResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                            usedFallback = true;
+                        }
+                    } else {
+                        rpcResult = rpcData;
+                    }
+                }
+            } catch (rpcCatchErr) {
+                console.warn('⚠️ RPC çağrısı başarısız, fallback deneniyor:', rpcCatchErr);
+                try {
+                    rpcResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                    usedFallback = true;
+                } catch (fbErr) {
+                    console.error('🔴 Fallback de başarısız:', fbErr);
+                    showErr('Sunucu hatası: ' + (fbErr.message || 'Bilinmeyen'));
                     return;
                 }
-                showErr('Sunucu hatası: ' + (rpcErr.message || 'Bilinmeyen'));
-                return;
             }
+
+            console.log('📡 Giriş sonucu:', { ok: rpcResult?.ok, role: rpcResult?.role, fallback: usedFallback });
 
             if (!rpcResult || !rpcResult.ok) {
                 _recordFailedAttempt(tc);
@@ -297,7 +350,7 @@ function _securityDoNormalLogin(role) {
                 return;
             }
 
-            console.log('✅ Giriş doğrulandı!');
+            console.log('✅ Giriş doğrulandı!' + (usedFallback ? ' (fallback)' : ''));
             _clearLoginAttempts(tc);
 
             // AppState yoksa oluştur
