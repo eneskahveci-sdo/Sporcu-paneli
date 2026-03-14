@@ -1,7 +1,8 @@
 // =================================================================
-// DRAGOS AKADEMİ - GÜVENLİK KALKANI v4.1
-// Supabase Auth bypass — TC + şifre ile direkt giriş.
-// v4.1: Debug sadece ?debug=1 ile + güvenlik güncellemeleri
+// DRAGOS AKADEMİ - GÜVENLİK KALKANI v5.0
+// TC + TC Son 6 Hane şifre ile giriş.
+// Tek RPC çağrısı (login_with_tc) — RLS ile tam uyumlu.
+// v5.0: login_with_tc entegrasyonu + oturum yönetimi düzeltmeleri
 // =================================================================
 
 // ── 0. GÖRSEL DEBUG PANELİ (iPhone için) ─────────────────────────
@@ -113,22 +114,47 @@ function getAuthClient() {
 
 // ── 2. BRUTE FORCE KORUMASI ──────────────────────────────────────
 
-const _loginAttempts = {};
-
+// sessionStorage kullanarak rate limit verisi sayfa yenileme sonrası korunur
 function _getRateLimitKey(tc) {
     return 'rl_' + String(tc).slice(0, 6);
+}
+
+function _loadAttempts(key) {
+    try {
+        const raw = sessionStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch(e) {
+        return null;
+    }
+}
+
+function _saveAttempts(key, data) {
+    try {
+        sessionStorage.setItem(key, JSON.stringify(data));
+    } catch(e) {
+        console.warn('Rate limit: sessionStorage yazılamadı:', e);
+    }
+}
+
+function _deleteAttempts(key) {
+    try {
+        sessionStorage.removeItem(key);
+    } catch(e) {
+        console.warn('Rate limit: sessionStorage silinemedi:', e);
+    }
 }
 
 function _checkRateLimit(tc) {
     const key = _getRateLimitKey(tc);
     const now = Date.now();
-    if (!_loginAttempts[key]) return { blocked: false };
-    const { count, firstAt, lockedUntil } = _loginAttempts[key];
+    const attempts = _loadAttempts(key);
+    if (!attempts) return { blocked: false };
+    const { count, firstAt, lockedUntil } = attempts;
     if (lockedUntil && now < lockedUntil) {
         return { blocked: true, remaining: Math.ceil((lockedUntil - now) / 1000) };
     }
     if (now - firstAt > 10 * 60 * 1000) {
-        delete _loginAttempts[key];
+        _deleteAttempts(key);
         return { blocked: false };
     }
     return { blocked: false, count };
@@ -137,18 +163,20 @@ function _checkRateLimit(tc) {
 function _recordFailedAttempt(tc) {
     const key = _getRateLimitKey(tc);
     const now = Date.now();
-    if (!_loginAttempts[key]) {
-        _loginAttempts[key] = { count: 1, firstAt: now };
+    const attempts = _loadAttempts(key);
+    if (!attempts) {
+        _saveAttempts(key, { count: 1, firstAt: now });
         return;
     }
-    _loginAttempts[key].count++;
-    if (_loginAttempts[key].count >= 5) {
-        _loginAttempts[key].lockedUntil = now + 5 * 60 * 1000;
+    attempts.count++;
+    if (attempts.count >= 5) {
+        attempts.lockedUntil = now + 5 * 60 * 1000;
     }
+    _saveAttempts(key, attempts);
 }
 
 function _clearLoginAttempts(tc) {
-    delete _loginAttempts[_getRateLimitKey(tc)];
+    _deleteAttempts(_getRateLimitKey(tc));
 }
 
 // ── 3. CSP META TAG ──────────────────────────────────────────────
@@ -164,48 +192,29 @@ function _clearLoginAttempts(tc) {
         "connect-src 'self' https://*.supabase.co https://graph.facebook.com https://api.netgsm.com.tr https://www.paytr.com",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data:",
-        "frame-ancestors 'none'"
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'"
     ].join('; ');
     document.head.insertBefore(csp, document.head.firstChild);
 })();
 
-// ── 4. SPORCU OTURUMU GÜVENLİĞİ ──────────────────────────────────
+// ── 4. ANA GİRİŞ FONKSİYONU ──────────────────────────────────────
+//
+// Giriş akışı (v5.0):
+//   1. Rate limit kontrolü
+//   2. login_with_tc RPC → doğrulama + kullanıcı verisi tek seferde
+//   3. AppState güncelleme + UI geçişi
+//
+// Şifre mantığı:
+//   • sp_pass / coach_pass alanında özel şifre varsa onu kullan
+//   • Alan boşsa varsayılan: TC'nin son 6 hanesi
 
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        if (typeof window.restoreSession !== 'function') return;
-        const _orig = window.restoreSession;
-        window.restoreSession = async function() {
-            const storedSporcu = window.StorageManager
-                ? StorageManager.get('sporcu_app_sporcu')
-                : null;
-            if (storedSporcu) {
-                const sb = getAuthClient();
-                if (sb) {
-                    try {
-                        const { data: { session } } = await sb.auth.getSession();
-                        if (!session) {
-                            console.warn('Güvenlik: Sporcu Supabase oturumu yok, temizleniyor.');
-                            if (window.StorageManager) StorageManager.remove('sporcu_app_sporcu');
-                            else localStorage.removeItem('sporcu_app_sporcu');
-                        }
-                    } catch(e) {
-                        console.warn('Güvenlik: Sporcu oturum kontrolü başarısız:', e);
-                    }
-                }
-            }
-            return _orig.apply(this, arguments);
-        };
-    }, 100);
-}, { once: true });
-
-// ── 5. ANA GİRİŞ FONKSİYONU ──────────────────────────────────────
-
-console.log('🛡️ Dragos Güvenlik Kalkanı v4.1 Aktif!');
+console.log('🛡️ Dragos Güvenlik Kalkanı v5.0 Aktif!');
 
 function _securityDoNormalLogin(role) {
     return async function() {
-        console.log('🔐 Security v4.0 doNormalLogin başladı — role:', role);
+        console.log('🔐 Security v5.0 doNormalLogin başladı — role:', role);
 
         const tcInputId   = role === 'coach' ? 'lc-tc'   : 'ls-tc';
         const passInputId = role === 'coach' ? 'lc-pass'  : 'ls-pass';
@@ -232,6 +241,7 @@ function _securityDoNormalLogin(role) {
         }
 
         if (!tc || !pass) { showErr('TC Kimlik No ve şifre giriniz!'); return; }
+        if (tc.length !== 11) { showErr('TC Kimlik No 11 hane olmalıdır!'); return; }
 
         const rl = _checkRateLimit(tc);
         if (rl.blocked) {
@@ -254,38 +264,43 @@ function _securityDoNormalLogin(role) {
             }
             console.log('✅ Supabase client hazır');
 
-            // ADIM 1: TC + şifre doğrula (RPC)
-            console.log('📡 RPC çağrılıyor: verify_user_credentials...');
-            const { data: isValid, error: rpcErr } = await sb.rpc('verify_user_credentials', {
+            // Tek RPC çağrısı: doğrulama + kullanıcı verisi
+            console.log('📡 RPC çağrılıyor: login_with_tc...');
+            const { data: rpcResult, error: rpcErr } = await sb.rpc('login_with_tc', {
                 p_tc: tc, p_pass: pass, p_role: role
             });
 
-            console.log('📡 RPC sonucu:', { isValid, rpcErr });
+            console.log('📡 RPC sonucu:', { ok: rpcResult?.ok, role: rpcResult?.role, rpcErr });
 
             if (rpcErr) {
                 console.error('🔴 RPC hatası:', rpcErr);
+                // login_with_tc fonksiyonu Supabase'de tanımlı değil (PGRST202 = function not found)
+                if (rpcErr.code === 'PGRST202') {
+                    showErr('Sunucu yapılandırması eksik: login_with_tc fonksiyonu bulunamadı. ' +
+                            'Lütfen RLS_POLICIES.sql dosyasını Supabase SQL Editor\'de çalıştırın.');
+                    return;
+                }
                 showErr('Sunucu hatası: ' + (rpcErr.message || 'Bilinmeyen'));
                 return;
             }
 
-            if (!isValid) {
+            if (!rpcResult || !rpcResult.ok) {
                 _recordFailedAttempt(tc);
                 const rl2 = _checkRateLimit(tc);
                 if (rl2.blocked) {
                     showErr('5 başarısız deneme. 5 dakika bekleyin.');
                 } else {
                     const kalan = 5 - (rl2.count || 1);
-                    showErr('TC veya şifre hatalı!' + (kalan > 0 ? ' (' + kalan + ' deneme hakkı kaldı)' : ''));
+                    const errMsg = (rpcResult && rpcResult.error) || 'TC veya şifre hatalı!';
+                    showErr(errMsg + (kalan > 0 ? ' (' + kalan + ' deneme hakkı kaldı)' : ''));
                 }
                 return;
             }
 
-            console.log('✅ Şifre doğrulandı!');
-
-            // ADIM 2: Kullanıcı bilgilerini çek
+            console.log('✅ Giriş doğrulandı!');
             _clearLoginAttempts(tc);
 
-            // AppState yoksa oluştur (KRİTİK FIX)
+            // AppState yoksa oluştur
             if (!window.AppState) {
                 console.warn('⚠️ AppState yoktu, oluşturuluyor...');
                 window.AppState = {
@@ -302,151 +317,99 @@ function _securityDoNormalLogin(role) {
                 };
             }
 
-            if (role === 'coach') {
-                console.log('📡 coaches tablosu sorgulanıyor...');
-                const { data: coachRow, error: coachErr } = await sb.from('coaches').select('*').eq('tc', tc).maybeSingle();
-                console.log('📡 Coach sorgu sonucu:', { coachRow: coachRow ? 'VAR' : 'YOK', coachErr });
+            const row = rpcResult.data;
 
-                if (coachErr) {
-                    console.error('🔴 Coach sorgu hatası:', coachErr);
-                    showErr('Veritabanı hatası: ' + coachErr.message);
-                    return;
+            if (role === 'coach') {
+                console.log('✅ Coach bulundu:', row.fn, row.ln);
+
+                AppState.currentUser = {
+                    id: row.id,
+                    name: row.fn + ' ' + row.ln,
+                    role: 'coach',
+                    tc: tc
+                };
+                AppState.currentOrgId    = row.org_id;
+                AppState.currentBranchId = row.branch_id;
+
+                if (window.StorageManager) {
+                    StorageManager.set('sporcu_app_user',   AppState.currentUser);
+                    StorageManager.set('sporcu_app_org',    AppState.currentOrgId);
+                    StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
                 }
 
-                if (coachRow) {
-                    console.log('✅ Coach bulundu:', coachRow.fn, coachRow.ln);
+                const lboxWrap = document.getElementById('lbox-wrap');
+                const wrap     = document.getElementById('wrap');
+                const suname   = document.getElementById('suname');
 
-                    AppState.currentUser = {
-                        id: coachRow.id,
-                        name: coachRow.fn + ' ' + coachRow.ln,
-                        role: 'coach',
-                        tc: tc
+                if (lboxWrap) lboxWrap.style.display = 'none';
+                if (wrap)     wrap.classList.remove('dn');
+                if (suname)   suname.textContent = AppState.currentUser.name;
+
+                if (typeof window.loadBranchData === 'function') {
+                    try { await window.loadBranchData(); }
+                    catch(lbErr) { console.error('🔴 loadBranchData hatası:', lbErr); }
+                }
+                if (typeof window.updateBranchUI === 'function') {
+                    try { window.updateBranchUI(); } catch(e) {}
+                }
+                if (typeof window.go === 'function') {
+                    window.go('attendance');
+                }
+                console.log('✅ Antrenör paneline giriş BAŞARILI!');
+
+            } else {
+                console.log('✅ Sporcu bulundu:', row.fn, row.ln);
+
+                if (window.DB && window.DB.mappers && typeof window.DB.mappers.toAthlete === 'function') {
+                    AppState.currentSporcu = DB.mappers.toAthlete(row);
+                } else {
+                    AppState.currentSporcu = {
+                        id: row.id, fn: row.fn, ln: row.ln, tc: row.tc,
+                        bd: row.bd, gn: row.gn, ph: row.ph, em: row.em || '',
+                        sp: row.sp, st: row.st || 'active', fee: row.fee || 0,
+                        orgId: row.org_id, branchId: row.branch_id,
+                        clsId: row.cls_id, pn: row.pn, pph: row.pph,
+                        rd: row.rd, lic: row.lic, vd: row.vd,
+                        cat: row.cat || '', nt: row.nt || '',
+                        pem: row.pem || '', spPass: row.sp_pass || ''
                     };
-                    AppState.currentOrgId    = coachRow.org_id;
-                    AppState.currentBranchId = coachRow.branch_id;
+                }
 
-                    console.log('📝 AppState güncellendi:', {
-                        user: AppState.currentUser.name,
+                AppState.currentOrgId    = row.org_id;
+                AppState.currentBranchId = row.branch_id;
+
+                if (window.StorageManager) {
+                    StorageManager.set('sporcu_app_sporcu', {
+                        user: AppState.currentSporcu,
                         orgId: AppState.currentOrgId,
                         branchId: AppState.currentBranchId
                     });
-
-                    if (window.StorageManager) {
-                        StorageManager.set('sporcu_app_user',   AppState.currentUser);
-                        StorageManager.set('sporcu_app_org',    AppState.currentOrgId);
-                        StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
-                        console.log('💾 StorageManager\'a kaydedildi');
-                    }
-
-                    const lboxWrap = document.getElementById('lbox-wrap');
-                    const wrap     = document.getElementById('wrap');
-                    const suname   = document.getElementById('suname');
-
-                    console.log('🖥️ UI elementleri:', { lboxWrap: !!lboxWrap, wrap: !!wrap, suname: !!suname });
-
-                    if (lboxWrap) lboxWrap.style.display = 'none';
-                    if (wrap)     wrap.classList.remove('dn');
-                    if (suname)   suname.textContent = AppState.currentUser.name;
-
-                    if (typeof window.loadBranchData === 'function') {
-                        console.log('📡 loadBranchData çağrılıyor...');
-                        try {
-                            await window.loadBranchData();
-                            console.log('✅ loadBranchData tamamlandı');
-                        } catch(lbErr) {
-                            console.error('🔴 loadBranchData hatası:', lbErr);
-                        }
-                    } else {
-                        console.warn('⚠️ loadBranchData fonksiyonu bulunamadı!');
-                    }
-
-                    if (typeof window.updateBranchUI === 'function') {
-                        try { window.updateBranchUI(); console.log('✅ updateBranchUI tamamlandı'); }
-                        catch(ubErr) { console.error('🔴 updateBranchUI hatası:', ubErr); }
-                    }
-
-                    if (typeof window.go === 'function') {
-                        console.log('🚀 go("attendance") çağrılıyor...');
-                        window.go('attendance');
-                        console.log('✅ Antrenör paneline giriş BAŞARILI!');
-                    }
-                } else {
-                    console.error('🔴 Coach verisi bulunamadı (coachRow null)');
-                    showErr('Antrenör bilgileri bulunamadı.');
                 }
 
-            } else {
-                // SPORCU GİRİŞİ
-                console.log('📡 athletes tablosu sorgulanıyor...');
-                const { data: athRow, error: athErr } = await sb.from('athletes').select('*').eq('tc', tc).maybeSingle();
-                console.log('📡 Athlete sorgu sonucu:', { athRow: athRow ? 'VAR' : 'YOK', athErr });
-
-                if (athErr) {
-                    console.error('🔴 Athlete sorgu hatası:', athErr);
-                    showErr('Veritabanı hatası: ' + athErr.message);
-                    return;
+                if (typeof window.loadBranchData === 'function') {
+                    try { await window.loadBranchData(); }
+                    catch(lbErr) { console.error('🔴 loadBranchData hatası:', lbErr); }
                 }
 
-                if (athRow) {
-                    console.log('✅ Sporcu bulundu:', athRow.fn, athRow.ln);
+                const lboxWrap     = document.getElementById('lbox-wrap');
+                const sporcuPortal = document.getElementById('sporcu-portal');
+                const spName       = document.getElementById('sp-name');
+                const spOrgname    = document.getElementById('sp-orgname');
 
-                    if (window.DB && window.DB.mappers && typeof window.DB.mappers.toAthlete === 'function') {
-                        AppState.currentSporcu = DB.mappers.toAthlete(athRow);
-                        console.log('✅ DB.mappers.toAthlete kullanıldı');
-                    } else {
-                        console.warn('⚠️ DB.mappers.toAthlete yok, manuel mapping...');
-                        AppState.currentSporcu = {
-                            id: athRow.id, fn: athRow.fn, ln: athRow.ln, tc: athRow.tc,
-                            bd: athRow.bd, gn: athRow.gn, ph: athRow.ph, em: athRow.em || '',
-                            sp: athRow.sp, st: athRow.st || 'active', fee: athRow.fee || 0,
-                            orgId: athRow.org_id, branchId: athRow.branch_id,
-                            clsId: athRow.cls_id, pn: athRow.pn, pph: athRow.pph,
-                            rd: athRow.rd, lic: athRow.lic, vd: athRow.vd,
-                            cat: athRow.cat || '', nt: athRow.nt || '',
-                            pem: athRow.pem || '', spPass: athRow.sp_pass || ''
-                        };
-                    }
+                if (lboxWrap)     lboxWrap.style.display = 'none';
+                if (sporcuPortal) sporcuPortal.style.display = 'flex';
+                if (spName)       spName.textContent = row.fn + ' ' + row.ln;
+                if (spOrgname)    spOrgname.textContent = AppState.data?.settings?.schoolName || 'Dragos Futbol Akademisi';
 
-                    AppState.currentOrgId    = athRow.org_id;
-                    AppState.currentBranchId = athRow.branch_id;
-
-                    if (window.StorageManager) {
-                        StorageManager.set('sporcu_app_sporcu', {
-                            user: AppState.currentSporcu,
-                            orgId: AppState.currentOrgId,
-                            branchId: AppState.currentBranchId
-                        });
-                    }
-
-                    if (typeof window.loadBranchData === 'function') {
-                        console.log('📡 loadBranchData çağrılıyor...');
-                        try { await window.loadBranchData(); console.log('✅ loadBranchData tamamlandı'); }
-                        catch(lbErr) { console.error('🔴 loadBranchData hatası:', lbErr); }
-                    }
-
-                    const lboxWrap     = document.getElementById('lbox-wrap');
-                    const sporcuPortal = document.getElementById('sporcu-portal');
-                    const spName       = document.getElementById('sp-name');
-                    const spOrgname    = document.getElementById('sp-orgname');
-
-                    if (lboxWrap)     lboxWrap.style.display = 'none';
-                    if (sporcuPortal) sporcuPortal.style.display = 'flex';
-                    if (spName)       spName.textContent = athRow.fn + ' ' + athRow.ln;
-                    if (spOrgname)    spOrgname.textContent = AppState.data?.settings?.schoolName || 'Dragos Futbol Akademisi';
-
-                    if (window.FormatUtils && window.UIUtils) {
-                        UIUtils.setElementAvatar('sp-avatar', null, FormatUtils.initials(athRow.fn, athRow.ln));
-                    }
-                    if (typeof window.applyLogoEverywhere === 'function') {
-                        applyLogoEverywhere(AppState.data?.settings?.logoUrl || '');
-                    }
-                    if (typeof window.spTab === 'function') spTab('profil');
-
-                    console.log('✅ Sporcu portaline giriş BAŞARILI!');
-                } else {
-                    console.error('🔴 Sporcu verisi bulunamadı (athRow null)');
-                    showErr('Sporcu bilgileri bulunamadı.');
+                if (window.FormatUtils && window.UIUtils) {
+                    UIUtils.setElementAvatar('sp-avatar', null, FormatUtils.initials(row.fn, row.ln));
                 }
+                if (typeof window.applyLogoEverywhere === 'function') {
+                    applyLogoEverywhere(AppState.data?.settings?.logoUrl || '');
+                }
+                if (typeof window.spTab === 'function') spTab('profil');
+
+                console.log('✅ Sporcu portaline giriş BAŞARILI!');
             }
 
         } catch (err) {
@@ -463,12 +426,12 @@ window.doNormalLogin = function(role) {
     return _securityDoNormalLogin(role)();
 };
 
-// DOMContentLoaded'da tekrar override et
+// DOMContentLoaded'da tekrar override et (diğer script'lerin üzerine yaz)
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         window.doNormalLogin = function(role) {
             return _securityDoNormalLogin(role)();
         };
-        console.log('🛡️ doNormalLogin override tamamlandı (v4.1)');
+        console.log('🛡️ doNormalLogin override tamamlandı (v5.0)');
     }, 200);
 }, { once: true });

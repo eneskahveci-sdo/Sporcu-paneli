@@ -201,7 +201,8 @@ const FormatUtils = {
         return `${this.number(n)} ₺`;
     },
     escape(str) {
-        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' };
+        return String(str || '').replace(/[&<>"']/g, c => map[c]);
     },
     tcValidate(tc) {
         if (!tc || tc.length !== 11 || !/^\d{11}$/.test(tc)) return false;
@@ -223,6 +224,16 @@ const FormatUtils = {
 };
 
 function generateId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+    }
+    // Fallback only for non-HTTPS environments where crypto is unavailable
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -241,14 +252,9 @@ async function sha256(str) {
         console.warn('Native crypto failed, using fallback');
     }
     
-    // Basit hash fonksiyonu (fallback)
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return Math.abs(hash).toString(16).padStart(64, '0');
+    // HATA: crypto.subtle erişilemiyor — HTTPS ortamı gereklidir.
+    // Kriptografik açıdan güvenli olmayan bir ortamda çalışıyorsunuz.
+    throw new Error('sha256: crypto.subtle kullanılamıyor. HTTPS üzerinden erişin.');
 }
 
 function getSupabase() {
@@ -708,6 +714,8 @@ function setupTCInput(inputId) {
 }
 
 window.doNormalLogin = async function(type) {
+    // Bu fonksiyon Security.js tarafından override edilir.
+    // Security.js yüklenmemişse bu fallback çalışır.
     const isCoach = type === 'coach';
     const tcId = isCoach ? 'lc-tc' : 'ls-tc';
     const passId = isCoach ? 'lc-pass' : 'ls-pass';
@@ -725,9 +733,9 @@ window.doNormalLogin = async function(type) {
         return;
     }
     
-    if (!FormatUtils.tcValidate(tc)) {
+    if (tc.length !== 11) {
         if (errEl) {
-            errEl.textContent = i18n[AppState.lang].invalidTC;
+            errEl.textContent = AppState.lang === 'TR' ? 'TC Kimlik No 11 hane olmalıdır!' : 'ID must be 11 digits!';
             errEl.classList.remove('dn');
         }
         return;
@@ -737,29 +745,20 @@ window.doNormalLogin = async function(type) {
     if (errEl) errEl.classList.add('dn');
     
     try {
-        const inputHash = await sha256(pass);
-        const table = isCoach ? 'coaches' : 'athletes';
-        const results = await DB.query(table, { tc });
-        
-        if (!results || results.length === 0) {
-            throw new Error('Not found');
+        const sb = getSupabase();
+        if (!sb) throw new Error('Supabase başlatılamadı');
+
+        // Tek RPC çağrısıyla doğrulama + kullanıcı verisi
+        const { data: rpcResult, error: rpcErr } = await sb.rpc('login_with_tc', {
+            p_tc: tc, p_pass: pass, p_role: type === 'coach' ? 'coach' : 'sporcu'
+        });
+
+        if (rpcErr) throw new Error(rpcErr.message || 'Sunucu hatası');
+        if (!rpcResult || !rpcResult.ok) {
+            throw new Error((rpcResult && rpcResult.error) || 'TC veya şifre hatalı!');
         }
-        
-        let found = null;
-        for (const r of results) {
-            const expectedPass = isCoach ? r.coach_pass : r.sp_pass;
-            const expected = expectedPass || tc.slice(-4);
-            const expectedHash = await sha256(expected);
-            
-            if ((pass === expected) || (inputHash === expectedHash)) {
-                found = r;
-                break;
-            }
-        }
-        
-        if (!found) {
-            throw new Error('Invalid password');
-        }
+
+        const found = rpcResult.data;
         
         if (isCoach) {
             AppState.currentUser = {
@@ -1166,14 +1165,30 @@ async function loadBranchData() {
 
 // Tek merkezden tüm ekranların logosunu günceller
 // URL (http/https) veya base64 data: her ikisini de destekler
+function _isSafeLogoUrl(url) {
+    if (!url) return false;
+    if (url.startsWith('data:image/')) return true;
+    try {
+        const u = new URL(url);
+        return u.protocol === 'https:' || u.protocol === 'http:';
+    } catch(e) {
+        return false;
+    }
+}
+
 function applyLogoEverywhere(logoUrl) {
-    const hasLogo = !!(logoUrl && logoUrl.trim() !== '' && logoUrl !== DEFAULT_LOGO);
+    const hasLogo = !!(logoUrl && logoUrl.trim() !== '' && logoUrl !== DEFAULT_LOGO && _isSafeLogoUrl(logoUrl));
 
     // 1) GİRİŞ EKRANI LOGO (#login-logo) — <img> ile override et, CSS sorununu tamamen önle
     const loginLogo = document.getElementById('login-logo');
     if (loginLogo) {
         if (hasLogo) {
-            loginLogo.innerHTML = `<img src="${logoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.parentElement.innerHTML='&#x26BD;'"/>`;
+            const img = document.createElement('img');
+            img.src = logoUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;';
+            img.onerror = function() { loginLogo.textContent = '⚽'; };
+            loginLogo.textContent = '';
+            loginLogo.appendChild(img);
             loginLogo.style.background = 'none';
             loginLogo.style.backgroundColor = 'transparent';
             loginLogo.style.padding = '0';
@@ -1235,7 +1250,11 @@ function applyLogoEverywhere(logoUrl) {
     const logoPreview = document.getElementById('logo-preview');
     if (logoPreview) {
         if (hasLogo) {
-            logoPreview.innerHTML = '<img src="' + logoUrl + '" style="width:100%;height:100%;object-fit:cover"/>';
+            const img = document.createElement('img');
+            img.src = logoUrl;
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+            logoPreview.textContent = '';
+            logoPreview.appendChild(img);
         } else {
             logoPreview.innerHTML = '&#x26BD;';
         }
@@ -2281,7 +2300,7 @@ window.editAth = function(id, prefill) {
     <div class="dv"></div>
     <div class="tw6 tsm mb2">Güvenlik</div>
     <div class="fgr">
-        <label>Sporcu Şifresi (Boş = TC son 4)</label>
+        <label>Sporcu Şifresi (Boş = TC son 6 hane)</label>
         <input id="a-sppass" type="text" placeholder="Örn: 123456" value="${FormatUtils.escape(a?.spPass || '')}"/>
     </div>`;
     
@@ -3349,7 +3368,7 @@ window.editCoach = function(id) {
         <input id="c-sal" type="number" value="${c?.sal || ''}"/>
     </div>
     <div class="fgr mt2">
-        <label>Özel Şifre (Boş = TC son 4)</label>
+        <label>Özel Şifre (Boş = TC son 6 hane)</label>
         <input id="c-pass" placeholder="Örn: 1234" value="${FormatUtils.escape(c?.coachPass || '')}"/>
     </div>
     `, [
@@ -4580,7 +4599,7 @@ window.loadAndShowAdmins = async function() {
             ${u.id !== AppState.currentUser?.id ? `<button class="btn btn-xs bd" onclick="removeAdmin('${u.id}','${FormatUtils.escape(u.email)}')">Sil</button>` : '<span class="ts tm">(Siz)</span>'}
         </div>`).join('');
     } catch(e) {
-        area.innerHTML = `<div class="al al-r ts">Yüklenemedi: ${e.message}</div>`;
+        area.innerHTML = `<div class="al al-r ts">Yüklenemedi: ${FormatUtils.escape(e.message)}</div>`;
     }
 };
 
@@ -4927,7 +4946,7 @@ window.handleExcelImport = async function(input) {
         ${data.length > 10 ? `<div class="ts tm mt2">...ve ${data.length - 10} kayıt daha</div>` : ''}`;
         
     } catch(e) {
-        if (preview) preview.innerHTML = `<div class="al al-r">Dosya okunamadı: ${e.message}</div>`;
+        if (preview) preview.innerHTML = `<div class="al al-r">Dosya okunamadı: ${FormatUtils.escape(e.message)}</div>`;
     }
 };
 
