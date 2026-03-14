@@ -319,6 +319,11 @@ function _securityDoNormalLogin(role) {
                             rpcResult = await _clientSideLoginFallback(sb, tc, pass, role);
                             usedFallback = true;
                         }
+                    } else if (rpcData === null || rpcData === undefined) {
+                        // RPC null döndürdü (fonksiyon bulunamadı veya beklenmedik yanıt)
+                        console.warn('⚠️ RPC null yanıt, fallback deneniyor');
+                        rpcResult = await _clientSideLoginFallback(sb, tc, pass, role);
+                        usedFallback = true;
                     } else {
                         rpcResult = rpcData;
                     }
@@ -330,7 +335,7 @@ function _securityDoNormalLogin(role) {
                     usedFallback = true;
                 } catch (fbErr) {
                     console.error('🔴 Fallback de başarısız:', fbErr);
-                    showErr('Sunucu hatası: ' + (fbErr.message || 'Bilinmeyen'));
+                    showErr('Bağlantı hatası. İnternet bağlantınızı kontrol edin ve sayfayı yenileyip tekrar deneyin.');
                     return;
                 }
             }
