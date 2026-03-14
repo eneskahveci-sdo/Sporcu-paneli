@@ -252,17 +252,9 @@ async function sha256(str) {
         console.warn('Native crypto failed, using fallback');
     }
     
-    // UYARI: Bu fallback hash kriptografik olarak güvenli değildir.
-    // Sadece crypto.subtle erişilemediğinde (HTTP ortam) çalışır.
-    // Üretimde HTTPS kullanın — bu koda asla düşmeyin.
-    console.warn('sha256: Güvenli olmayan fallback hash kullanılıyor — HTTPS ortamı gereklidir!');
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return Math.abs(hash).toString(16).padStart(64, '0');
+    // HATA: crypto.subtle erişilemiyor — HTTPS ortamı gereklidir.
+    // Kriptografik açıdan güvenli olmayan bir ortamda çalışıyorsunuz.
+    throw new Error('sha256: crypto.subtle kullanılamıyor. HTTPS üzerinden erişin.');
 }
 
 function getSupabase() {
@@ -722,6 +714,8 @@ function setupTCInput(inputId) {
 }
 
 window.doNormalLogin = async function(type) {
+    // Bu fonksiyon Security.js tarafından override edilir.
+    // Security.js yüklenmemişse bu fallback çalışır.
     const isCoach = type === 'coach';
     const tcId = isCoach ? 'lc-tc' : 'ls-tc';
     const passId = isCoach ? 'lc-pass' : 'ls-pass';
@@ -739,9 +733,9 @@ window.doNormalLogin = async function(type) {
         return;
     }
     
-    if (!FormatUtils.tcValidate(tc)) {
+    if (tc.length !== 11) {
         if (errEl) {
-            errEl.textContent = i18n[AppState.lang].invalidTC;
+            errEl.textContent = AppState.lang === 'TR' ? 'TC Kimlik No 11 hane olmalıdır!' : 'ID must be 11 digits!';
             errEl.classList.remove('dn');
         }
         return;
@@ -751,29 +745,20 @@ window.doNormalLogin = async function(type) {
     if (errEl) errEl.classList.add('dn');
     
     try {
-        const inputHash = await sha256(pass);
-        const table = isCoach ? 'coaches' : 'athletes';
-        const results = await DB.query(table, { tc });
-        
-        if (!results || results.length === 0) {
-            throw new Error('Not found');
+        const sb = getSupabase();
+        if (!sb) throw new Error('Supabase başlatılamadı');
+
+        // Tek RPC çağrısıyla doğrulama + kullanıcı verisi
+        const { data: rpcResult, error: rpcErr } = await sb.rpc('login_with_tc', {
+            p_tc: tc, p_pass: pass, p_role: type === 'coach' ? 'coach' : 'sporcu'
+        });
+
+        if (rpcErr) throw new Error(rpcErr.message || 'Sunucu hatası');
+        if (!rpcResult || !rpcResult.ok) {
+            throw new Error((rpcResult && rpcResult.error) || 'TC veya şifre hatalı!');
         }
-        
-        let found = null;
-        for (const r of results) {
-            const expectedPass = isCoach ? r.coach_pass : r.sp_pass;
-            const expected = expectedPass || tc.slice(-4);
-            const expectedHash = await sha256(expected);
-            
-            if ((pass === expected) || (inputHash === expectedHash)) {
-                found = r;
-                break;
-            }
-        }
-        
-        if (!found) {
-            throw new Error('Invalid password');
-        }
+
+        const found = rpcResult.data;
         
         if (isCoach) {
             AppState.currentUser = {
@@ -1180,8 +1165,19 @@ async function loadBranchData() {
 
 // Tek merkezden tüm ekranların logosunu günceller
 // URL (http/https) veya base64 data: her ikisini de destekler
+function _isSafeLogoUrl(url) {
+    if (!url) return false;
+    if (url.startsWith('data:image/')) return true;
+    try {
+        const u = new URL(url);
+        return u.protocol === 'https:' || u.protocol === 'http:';
+    } catch(e) {
+        return false;
+    }
+}
+
 function applyLogoEverywhere(logoUrl) {
-    const hasLogo = !!(logoUrl && logoUrl.trim() !== '' && logoUrl !== DEFAULT_LOGO);
+    const hasLogo = !!(logoUrl && logoUrl.trim() !== '' && logoUrl !== DEFAULT_LOGO && _isSafeLogoUrl(logoUrl));
 
     // 1) GİRİŞ EKRANI LOGO (#login-logo) — <img> ile override et, CSS sorununu tamamen önle
     const loginLogo = document.getElementById('login-logo');
@@ -2304,7 +2300,7 @@ window.editAth = function(id, prefill) {
     <div class="dv"></div>
     <div class="tw6 tsm mb2">Güvenlik</div>
     <div class="fgr">
-        <label>Sporcu Şifresi (Boş = TC son 4)</label>
+        <label>Sporcu Şifresi (Boş = TC son 6 hane)</label>
         <input id="a-sppass" type="text" placeholder="Örn: 123456" value="${FormatUtils.escape(a?.spPass || '')}"/>
     </div>`;
     
@@ -3372,7 +3368,7 @@ window.editCoach = function(id) {
         <input id="c-sal" type="number" value="${c?.sal || ''}"/>
     </div>
     <div class="fgr mt2">
-        <label>Özel Şifre (Boş = TC son 4)</label>
+        <label>Özel Şifre (Boş = TC son 6 hane)</label>
         <input id="c-pass" placeholder="Örn: 1234" value="${FormatUtils.escape(c?.coachPass || '')}"/>
     </div>
     `, [
