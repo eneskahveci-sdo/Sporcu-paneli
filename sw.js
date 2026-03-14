@@ -49,6 +49,13 @@ self.addEventListener('fetch', function(event) {
     var url = new URL(event.request.url);
 
     if (url.hostname.includes('supabase.co')) {
+        // Edge Function requests — let the browser handle them natively.
+        // Service Worker interception of cross-origin Edge Function fetches
+        // causes CORS preflight failures (OPTIONS requests lack JWT).
+        if (url.pathname.indexOf('/functions/v1/') !== -1) {
+            return;
+        }
+
         // Hassas endpoint'leri ASLA cache'leme — doğrudan network'ten dön
         var sensitiveEndpoints = ['athletes', 'payments', 'coaches', 'settings', 'users', 'attendance', 'messages'];
         var isSensitive = sensitiveEndpoints.some(function(ep) {
