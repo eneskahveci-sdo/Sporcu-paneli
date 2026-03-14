@@ -625,11 +625,7 @@ const DB = {
                 id: r.id, schoolName: r.school_name, logoUrl: r.logo_url,
                 bankName: r.bank_name, accountName: r.account_name,
                 iban: r.iban, ownerPhone: r.owner_phone,
-                address: r.address, netgsmUser: r.netgsm_user,
-                netgsmPass: r.netgsm_pass, netgsmHeader: r.netgsm_header,
-                paytrMerchantId: r.paytr_merchant_id || '',
-                paytrMerchantKey: r.paytr_merchant_key || '',
-                paytrMerchantSalt: r.paytr_merchant_salt || '',
+                address: r.address, netgsmHeader: r.netgsm_header,
                 paytrActive: r.paytr_active || false
             };
         },
@@ -640,11 +636,7 @@ const DB = {
                 school_name: s.schoolName, logo_url: s.logoUrl,
                 bank_name: s.bankName, account_name: s.accountName,
                 iban: s.iban, owner_phone: s.ownerPhone,
-                address: s.address, netgsm_user: s.netgsmUser,
-                netgsm_pass: s.netgsmPass, netgsm_header: s.netgsmHeader,
-                paytr_merchant_id: s.paytrMerchantId || '',
-                paytr_merchant_key: s.paytrMerchantKey || '',
-                paytr_merchant_salt: s.paytrMerchantSalt || '',
+                address: s.address, netgsm_header: s.netgsmHeader,
                 paytr_active: s.paytrActive || false
             };
         }
@@ -3758,21 +3750,15 @@ function pgSettings() {
 
     <div class="card mb3" style="border-left: 4px solid var(--green)">
         <div class="tw6 tsm mb2">&#x1F4F1; SMS Entegrasyonu (NetGSM)</div>
-        <div class="g21">
-            <div class="fgr mb2">
-                <label>NetGSM Kullanıcı Adı</label>
-                <input id="s-smsuser" value="${FormatUtils.escape(s?.netgsmUser || '')}"/>
-            </div>
-            <div class="fgr mb2">
-                <label>NetGSM Şifre</label>
-                <input id="s-smspass" type="password" value="${FormatUtils.escape(s?.netgsmPass || '')}"/>
-            </div>
+        <div class="al al-b mb3" style="font-size:12px">
+            &#x2139;&#xFE0F; NetGSM kullanıcı adı ve şifresi güvenlik için Supabase Edge Function ortam değişkenlerinde saklanır.<br>
+            <strong>Ayarlama:</strong> <code style="font-size:11px">supabase secrets set NETGSM_USER=xxx NETGSM_PASS=xxx NETGSM_HEADER=xxx</code>
         </div>
         <div class="fgr mb2">
             <label>SMS Başlığı (Header)</label>
             <input id="s-smsheader" value="${FormatUtils.escape(s?.netgsmHeader || '')}" placeholder="Örn: AKADEMI"/>
         </div>
-        <button class="btn bp mt2" onclick="saveSmsSettings()">SMS Ayarlarını Kaydet</button>
+        <button class="btn bp mt2" onclick="saveSmsSettings()">SMS Başlığını Kaydet</button>
     </div>
 
     <div class="card mb3" style="border-left: 4px solid #0070f3">
@@ -3784,26 +3770,10 @@ function pgSettings() {
             </label>
         </div>
         <div class="al al-b mb3" style="font-size:12px">
-            &#x2139;&#xFE0F; PayTR ile veliler online kredi kartı ödemesi yapabilir. Webhook için Supabase Edge Function gereklidir.<br>
+            &#x2139;&#xFE0F; PayTR ile veliler online kredi kartı ödemesi yapabilir.<br>
+            PayTR Merchant bilgileri güvenlik için Supabase Edge Function ortam değişkenlerinde saklanır.<br>
+            <strong>Ayarlama:</strong> <code style="font-size:11px">supabase secrets set PAYTR_MERCHANT_ID=xxx PAYTR_MERCHANT_KEY=xxx PAYTR_MERCHANT_SALT=xxx</code><br>
             <strong>Webhook URL:</strong> <code style="font-size:11px">${window?.location?.origin || 'https://siteniz.com'}/functions/v1/paytr-webhook</code>
-        </div>
-        <div class="g21 mb2">
-            <div class="fgr">
-                <label>Merchant ID</label>
-                <input id="s-paytr-mid" value="${FormatUtils.escape(s?.paytrMerchantId || '')}" placeholder="PayTR panelinden alın"/>
-            </div>
-            <div class="fgr">
-                <label>Merchant Key</label>
-                <input id="s-paytr-key" type="password" value="${FormatUtils.escape(s?.paytrMerchantKey || '')}"/>
-            </div>
-        </div>
-        <div class="fgr mb2">
-            <label>Merchant Salt</label>
-            <input id="s-paytr-salt" type="password" value="${FormatUtils.escape(s?.paytrMerchantSalt || '')}"/>
-        </div>
-        <div class="al al-y mb2" style="font-size:12px">
-            &#x26A0; Token hesaplama ve güvenlik için <strong>Supabase Edge Function</strong> deploy edilmelidir.
-            Fonksiyon kodu için dökümanı inceleyin.
         </div>
         <button class="btn bp" onclick="savePayTRSettings()">PayTR Ayarlarını Kaydet</button>
     </div>
@@ -3863,23 +3833,18 @@ window.saveGeneralSettings = async function() {
 window.saveSmsSettings = async function() {
     const obj = {
         ...(AppState.data.settings || {}),
-        netgsmUser: UIUtils.getValue('s-smsuser'),
-        netgsmPass: UIUtils.getValue('s-smspass'),
         netgsmHeader: UIUtils.getValue('s-smsheader')
     };
     const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
     if (result) {
         AppState.data.settings = obj;
-        toast('SMS ayarları kaydedildi!', 'g');
+        toast('SMS başlığı kaydedildi!', 'g');
     }
 };
 
 window.savePayTRSettings = async function() {
     const obj = {
         ...(AppState.data.settings || {}),
-        paytrMerchantId: UIUtils.getValue('s-paytr-mid').trim(),
-        paytrMerchantKey: UIUtils.getValue('s-paytr-key').trim(),
-        paytrMerchantSalt: UIUtils.getValue('s-paytr-salt').trim(),
         paytrActive: document.getElementById('s-paytr-active')?.checked || false
     };
     const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
@@ -4963,22 +4928,23 @@ window.submitOnKayit = async function() {
 
 async function sendOnKayitSms(phone, fn, ln, clsName) {
     const settings = AppState.data.settings;
-    const smsUser = settings?.netgsmUser;
-    const smsPass = settings?.netgsmPass;
-    const smsHeader = settings?.netgsmHeader || 'BILGI';
     
     const msg = `Sayin veli, ${fn} ${ln} icin ${clsName} sinifina on kayit talebiniz alinmistir. En kisa surede sizinle iletisime gececegiz. ${settings?.schoolName || 'Akademi'}`;
     
-    if (!smsUser || !smsPass) {
-        console.log('SMS gönderilemedi - NetGSM ayarları eksik. Mesaj:', msg);
-        return;
-    }
-    
     try {
-        const cleanPhone = phone.replace(/[\s\-\(\)]/g, '').replace(/^(\+90|0090|90)/, '');
-        const url = `https://api.netgsm.com.tr/sms/send/get/?usercode=${smsUser}&password=${smsPass}&gsmno=${cleanPhone}&message=${encodeURIComponent(msg)}&msgheader=${smsHeader}`;
-        await fetch(url, { method: 'GET', mode: 'no-cors' });
-        console.log('SMS gönderildi:', cleanPhone);
+        const sb = AppState.sb;
+        if (!sb || !sb.functions) {
+            console.log('SMS gönderilemedi - Supabase client hazır değil. Mesaj:', msg);
+            return;
+        }
+        const { data, error } = await sb.functions.invoke('send-sms', {
+            body: { phone: phone, message: msg }
+        });
+        if (error) {
+            console.warn('SMS Edge Function hatası:', error);
+        } else {
+            console.log('SMS gönderildi:', phone);
+        }
     } catch(e) {
         console.warn('SMS gönderim hatası:', e);
     }
