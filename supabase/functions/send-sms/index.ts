@@ -30,7 +30,8 @@ function checkRateLimit(ip: string): boolean {
 }
 
 Deno.serve(async (req: Request) => {
-  // CORS preflight
+  // CORS preflight — must respond before any auth check so browsers
+  // receive proper CORS headers even when JWT verification is disabled.
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -39,6 +40,17 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ error: 'Method not allowed' }),
       { status: 405, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Manual API-key check — verify_jwt is disabled so the gateway lets
+  // OPTIONS preflight through, but we still validate real requests.
+  const apikey = req.headers.get('apikey') || req.headers.get('authorization')?.replace('Bearer ', '');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!apikey || !supabaseAnonKey || apikey !== supabaseAnonKey) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
   }
 
