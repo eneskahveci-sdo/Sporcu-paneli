@@ -314,6 +314,9 @@ function _securityDoNormalLogin(role) {
             }
             console.log('✅ Supabase client hazır');
 
+            // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
+            try { await sb.auth.signOut(); } catch(_) {}
+
             // Tek RPC çağrısı: doğrulama + kullanıcı verisi
             console.log('📡 RPC çağrılıyor: login_with_tc...');
             var rpcResult = null;
