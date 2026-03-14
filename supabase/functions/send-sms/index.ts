@@ -46,7 +46,8 @@ Deno.serve(async (req: Request) => {
   // Manual API-key check — verify_jwt is disabled so the gateway lets
   // OPTIONS preflight through, but we still validate real requests.
   const apikey = req.headers.get('apikey') || req.headers.get('authorization')?.replace('Bearer ', '');
-  if (!apikey) {
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!apikey || !supabaseAnonKey || apikey !== supabaseAnonKey) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
