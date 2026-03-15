@@ -116,7 +116,7 @@ const AppState = {
 
 const i18n = {
     TR: {
-        loading: 'Yükleniyor...', menuMain: 'Ana Menü', menuDash: 'Gösterge', menuAth: 'Sporcular',
+        loading: 'Yükleniyor...', menuMain: 'Ana Menü', menuDash: 'Ana Sayfa', menuAth: 'Sporcular',
         menuSpo: 'Branşlar', menuCls: 'Sınıflar', menuAtt: 'Devam (Yoklama)', menuCoa: 'Antrenörler',
         menuFinSec: 'Yönetim (Muhasebe)', menuPay: 'Ödemeler', menuAcc: 'Finans / Rapor',
         menuSms: 'SMS Duyuru', menuSysSec: 'Sistem', menuSet: 'Ayarlar',
@@ -140,7 +140,7 @@ const i18n = {
         paymentCompleted: 'Tamamlandı', paymentOverdue: 'Gecikti'
     },
     EN: {
-        loading: 'Loading...', menuMain: 'Main Menu', menuDash: 'Dashboard', menuAth: 'Athletes',
+        loading: 'Loading...', menuMain: 'Main Menu', menuDash: 'Home', menuAth: 'Athletes',
         menuSpo: 'Sports', menuCls: 'Classes', menuAtt: 'Attendance', menuCoa: 'Coaches',
         menuFinSec: 'Finance', menuPay: 'Payments', menuAcc: 'Financial Report',
         menuSms: 'SMS Alerts', menuSysSec: 'System', menuSet: 'Settings',
@@ -1886,7 +1886,7 @@ function pgDashboard() {
     
     return `
     <div class="ph">
-        <div class="stit" data-i18n="menuDash">Gösterge</div>
+        <div class="stit" data-i18n="menuDash">Ana Sayfa</div>
     </div>
     <div class="g4 mb3">
         <div class="card stat-card stat-b" onclick="go('athletes')">
