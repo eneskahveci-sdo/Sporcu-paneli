@@ -1265,7 +1265,7 @@ window.go = function(page, params = {}) {
     const main = document.getElementById('main');
     const pages = {
         dashboard: pgDashboard,
-        athletes: typeof __renderAthletes === 'function' ? __renderAthletes : pgAthletes,
+        athletes: typeof __renderAthletes === 'function' ? __renderAthletes : (typeof pgAthletes === 'function' ? pgAthletes : null),
         athleteProfile: () => pgAthleteProfile(params.id),
         payments: pgPayments,
         accounting: typeof pgAccountingV8 === 'function' ? pgAccountingV8 : pgAccounting,
