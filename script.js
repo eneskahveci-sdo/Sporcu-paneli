@@ -2632,6 +2632,11 @@ function pgPayments() {
         );
     }
     const total = list.reduce((s, p) => s + (p.ty === 'income' ? (p.amt || 0) : -(p.amt || 0)), 0);
+    // Status counts for mini charts (from filtered list)
+    const completedCount = list.filter(p => p.st === 'completed').length;
+    const pendingCount = list.filter(p => p.st === 'pending').length;
+    const overdueCount = list.filter(p => p.st === 'overdue').length;
+    const totalStatusCount = completedCount + pendingCount + overdueCount || 1;
     const pendingNotifs = AppState.data.payments.filter(p => p.notifStatus === 'pending_approval');
 
     const notifSection = pendingNotifs.length > 0 ? `
@@ -2726,34 +2731,39 @@ function pgPayments() {
             <span class="tw6 tb">Net: ${FormatUtils.currency(total)}</span>
         </div>
     </div>
-    <div class="card">
-        <div class="tw">
-            <table>
-                <thead><tr>
-                    <th>Tarih</th><th>Kişi/Kurum</th><th>Açıklama</th><th>Yöntem</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th>
-                </tr></thead>
-                <tbody>
-                    ${list.map(p => {
-                        const mIcon = p.payMethod==='nakit'?'💵':p.payMethod==='kredi_karti'?'💳':p.payMethod==='havale'?'🏦':p.payMethod==='paytr'?'🔵':'';
-                        const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
-                        return `<tr>
-                            <td>${DateUtils.format(p.dt)}</td>
-                            <td>${p.aid?`<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${FormatUtils.escape(p.aid)}'})">${FormatUtils.escape(p.an)}</span>`:FormatUtils.escape(p.an)}</td>
-                            <td>${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
-                            <td>${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
-                            <td class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
-                            <td><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
-                            <td><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
-                            <td>
-                                <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
-                                <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
-                            </td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
-            </table>
+    <div class="flex gap2 fwrap mb3">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:120px">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--green)" stroke-width="4" stroke-dasharray="${(completedCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            </svg>
+            <div>
+                <div style="font-size:18px;font-weight:700;color:var(--green)">${completedCount}</div>
+                <div style="font-size:11px;color:var(--text2)">Ödendi</div>
+            </div>
         </div>
-    </div>`}`;
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:120px">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--yellow)" stroke-width="4" stroke-dasharray="${(pendingCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            </svg>
+            <div>
+                <div style="font-size:18px;font-weight:700;color:var(--yellow)">${pendingCount}</div>
+                <div style="font-size:11px;color:var(--text2)">Bekliyor</div>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:120px">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--red)" stroke-width="4" stroke-dasharray="${(overdueCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            </svg>
+            <div>
+                <div style="font-size:18px;font-weight:700;color:var(--red)">${overdueCount}</div>
+                <div style="font-size:11px;color:var(--text2)">Gecikti</div>
+            </div>
+        </div>
+    </div>
+    ${_buildGroupedTransactionList(list)}`}`;
 }
 
 window.editPay = function(id) {
@@ -3005,6 +3015,81 @@ function _buildGroupedPlanList(planlar) {
 window.filterPlanAccordion = function() {
     const q = (document.getElementById('plan-list-search')?.value || '').toLowerCase();
     document.querySelectorAll('#plan-acc-container .plan-acc-item').forEach(el => {
+        const name = el.querySelector('.plan-acc-head .tw6')?.textContent?.toLowerCase() || '';
+        el.style.display = name.includes(q) ? '' : 'none';
+    });
+};
+
+// --- Grouped transaction list (same pattern as _buildGroupedPlanList) ---
+function _buildGroupedTransactionList(list) {
+    if (list.length === 0) {
+        return `<div class="card"><p class="tm ts">Kayıt bulunamadı.</p></div>`;
+    }
+    // Group by athlete
+    const groups = {};
+    list.forEach(p => {
+        const key = p.aid || '_independent';
+        if (!groups[key]) groups[key] = { name: p.aid ? (p.an || 'Bilinmeyen') : 'Diğer İşlemler', txns: [] };
+        groups[key].txns.push(p);
+    });
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+        if (a === '_independent') return 1;
+        if (b === '_independent') return -1;
+        return groups[a].name.localeCompare(groups[b].name, 'tr');
+    });
+    const accordionItems = groupKeys.map(key => {
+        const g = groups[key];
+        const groupTotal = g.txns.reduce((s, p) => s + (p.ty === 'income' ? (p.amt || 0) : -(p.amt || 0)), 0);
+        const rows = g.txns.sort((a, b) => (b.dt || '').localeCompare(a.dt || '')).map(p => {
+            const mIcon = p.payMethod==='nakit'?'💵':p.payMethod==='kredi_karti'?'💳':p.payMethod==='havale'?'🏦':p.payMethod==='paytr'?'🔵':'';
+            const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
+            return `<tr>
+                <td>${DateUtils.format(p.dt)}</td>
+                <td>${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
+                <td>${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
+                <td class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
+                <td><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
+                <td><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
+                <td>
+                    <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
+                    <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
+                </td>
+            </tr>`;
+        }).join('');
+        const nameHtml = key !== '_independent'
+            ? `<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="event.stopPropagation();go('athleteProfile',{id:'${FormatUtils.escape(key)}'})">${FormatUtils.escape(g.name)}</span>`
+            : `<span class="tw6">${FormatUtils.escape(g.name)}</span>`;
+        return `
+        <div class="plan-acc-item" style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
+            <div class="plan-acc-head" style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--bg3)" onclick="this.parentElement.classList.toggle('open')">
+                <div>
+                    ${nameHtml}
+                    <span class="tm ts" style="margin-left:8px">${g.txns.length} işlem</span>
+                </div>
+                <div class="flex fca gap2">
+                    <span class="tw6 ${groupTotal >= 0 ? 'tg' : 'tr2'} ts">${FormatUtils.currency(Math.abs(groupTotal))}</span>
+                    <span class="plan-acc-arrow" style="transition:transform .2s">▼</span>
+                </div>
+            </div>
+            <div class="plan-acc-body" style="display:none;padding:0 14px 14px">
+                <div class="tw" style="margin-top:10px"><table>
+                    <thead><tr><th>Tarih</th><th>Açıklama</th><th>Yöntem</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `<div class="card">
+        <div class="tw6 tsm mb2">💳 Tüm İşlemler</div>
+        <input id="txn-list-search" type="text" placeholder="Sporcu ara..." oninput="filterTransactionAccordion()" style="margin-bottom:10px;width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);color:var(--text1)"/>
+        <div id="txn-acc-container">${accordionItems}</div>
+    </div>`;
+}
+
+window.filterTransactionAccordion = function() {
+    const q = (document.getElementById('txn-list-search')?.value || '').toLowerCase();
+    document.querySelectorAll('#txn-acc-container .plan-acc-item').forEach(el => {
         const name = el.querySelector('.plan-acc-head .tw6')?.textContent?.toLowerCase() || '';
         el.style.display = name.includes(q) ? '' : 'none';
     });
