@@ -626,72 +626,8 @@ window.editPay = function(id) {
 };
 
 // ────────────────────────────────────────────────────────
-// 9) go() MONKEY-PATCH — athletes, onkayit, accounting, sms override
+// 9) go() override artık script.js içinde birleştirildi.
 // ────────────────────────────────────────────────────────
-var __origGo = window.go;
-
-window.go = function(page, params) {
-    // Override pages
-    if (page === 'accounting') {
-        AppState.ui.curPage = page;
-        var main = document.getElementById('main');
-        if (!main) return;
-        main.style.opacity = '0';
-        setTimeout(function() {
-            main.innerHTML = pgAccountingV8();
-            main.style.opacity = '1';
-        }, 100);
-        document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-accounting'); });
-        document.querySelectorAll('.bni-btn').forEach(function(el) { el.classList.toggle('on', el.id === 'bn-accounting'); });
-        closeSide();
-        return;
-    }
-
-    if (page === 'sms') {
-        AppState.ui.curPage = page;
-        var main = document.getElementById('main');
-        if (!main) return;
-        main.style.opacity = '0';
-        setTimeout(function() {
-            main.innerHTML = pgSmsV8();
-            main.style.opacity = '1';
-        }, 100);
-        document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-sms'); });
-        closeSide();
-        return;
-    }
-
-    if (page === 'athletes') {
-        AppState.ui.curPage = page;
-        var main = document.getElementById('main');
-        if (!main) return;
-        main.style.opacity = '0';
-        setTimeout(function() {
-            main.innerHTML = __renderAthletes();
-            main.style.opacity = '1';
-        }, 100);
-        document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-athletes'); });
-        document.querySelectorAll('.bni-btn').forEach(function(el) { el.classList.toggle('on', el.id === 'bn-athletes'); });
-        closeSide();
-        return;
-    }
-
-    if (page === 'onkayit') {
-        AppState.ui.curPage = page;
-        var main = document.getElementById('main');
-        if (!main) return;
-        main.style.opacity = '0';
-        setTimeout(function() {
-            main.innerHTML = __renderOnKayit();
-            main.style.opacity = '1';
-        }, 100);
-        document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-onkayit'); });
-        closeSide();
-        return;
-    }
-
-    return __origGo.call(window, page, params);
-};
 
 // ────────────────────────────────────────────────────────
 // 10) ATHLETES + ONKAYIT RENDER (from V7, preserved)
@@ -965,12 +901,10 @@ window.saveWhatsAppSettings = async function() {
     if (result) { AppState.data.settings = obj; toast('WhatsApp ayarları kaydedildi!', 'g'); }
 };
 
-// Patch settings page to add WhatsApp section after render
+// Patch settings page to add WhatsApp section after render — go() hook kullanarak
 var _settingsPatchTimer = null;
-var _prevGoForSettings = window.go;
-window.go = (function(prevGo) {
-    return function(page, params) {
-        var result = prevGo.call(window, page, params);
+if (typeof registerGoHook === 'function') {
+    registerGoHook('after', function(page) {
         if (page === 'settings') {
             clearTimeout(_settingsPatchTimer);
             _settingsPatchTimer = setTimeout(function() {
@@ -1007,20 +941,13 @@ window.go = (function(prevGo) {
                 });
             }, 300);
         }
-        return result;
-    };
-})(window.go);
+    });
+}
 
 // ────────────────────────────────────────────────────────
-// 17) DOMContentLoaded: Load cash transfers after session restore
+// 17) DOMContentLoaded: iOS Safari fix + misc
 // ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
-    // After 2 seconds (enough for restoreSession to complete), load transfers
-    setTimeout(async function() {
-        if (AppState.currentOrgId || AppState.currentBranchId) {
-            await loadCashTransfers();
-        }
-    }, 2000);
 
     // iOS Safari legal link fix
     var links = document.querySelectorAll('.login-legal button, .login-legal a');

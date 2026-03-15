@@ -182,24 +182,7 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
 })();
 
 // ── 3) SAYFA GEÇİŞ ANİMASYONU ──────────────────────────
-
-(function patchGoForAnimation() {
-    var _prevGo = window.go;
-    if (!_prevGo) return;
-    window.go = function(page, params) {
-        var main = document.getElementById('main');
-        if (main) { main.classList.add('page-exit'); main.classList.remove('page-enter'); }
-        setTimeout(function() {
-            _prevGo.call(window, page, params);
-            if (main) {
-                main.classList.remove('page-exit');
-                main.classList.add('page-enter');
-                setTimeout(function() { main.classList.remove('page-enter'); }, 200);
-            }
-        }, 80);
-    };
-    console.log('✅ Sayfa geçiş animasyonları aktif');
-})();
+// Animasyon artık script.js içindeki go() fonksiyonunda birleştirildi.
 
 // ── 4) GELİŞMİŞ HATA YÖNETİMİ ─────────────────────────
 
