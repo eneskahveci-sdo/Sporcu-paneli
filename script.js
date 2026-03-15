@@ -1289,6 +1289,9 @@ window.go = function(page, params = {}) {
             if (page === 'athleteProfile') {
                 initProfileTabs();
             }
+            if (page === 'payments' && typeof _initPlanAthCheckboxes === 'function') {
+                _initPlanAthCheckboxes();
+            }
             main.style.opacity = '1';
         }, 100);
     }
@@ -2656,59 +2659,52 @@ function pgPayments() {
 
     // Ödeme Planları sekmesi içeriği
     const planlar = (AppState.data.payments || []).filter(p => p.source === 'plan');
+
+    // --- Feature 1: Multi-select athlete component ---
+    const athleteCheckboxes = AppState.data.athletes.map(a =>
+        `<label class="ms-item" data-name="${FormatUtils.escape((a.fn+' '+a.ln).toLowerCase())}" data-id="${a.id}" data-fee="${a.fee||0}">
+            <input type="checkbox" class="plan-ath-cb" value="${a.id}" data-fee="${a.fee||0}" data-name="${FormatUtils.escape(a.fn+' '+a.ln)}"/>
+            <span>${FormatUtils.escape(a.fn+' '+a.ln)}</span>
+            <span class="tm ts" style="margin-left:auto">${FormatUtils.currency(a.fee||0)}</span>
+        </label>`
+    ).join('');
+
     const planSection = `
     <div class="card mb3" style="border-left:4px solid var(--blue2)">
         <div class="flex fjb fca mb3">
             <div class="tw6 tsm">📅 Sporcu Ödeme Planı Oluştur</div>
         </div>
-        <div class="g21 mb2">
-            <div class="fgr">
-                <label>Sporcu *</label>
-                <select id="plan-aid" onchange="updatePlanFee()">
-                    <option value="">Sporcu Seçin</option>
-                    ${AppState.data.athletes.map(a => `<option value="${a.id}" data-fee="${a.fee||0}">${FormatUtils.escape(a.fn+' '+a.ln)}</option>`).join('')}
-                </select>
+        <div class="fgr mb2">
+            <label>Sporcu(lar) *</label>
+            <input id="plan-ath-search" type="text" placeholder="Sporcu ara..." oninput="filterPlanAthletes()" style="margin-bottom:6px"/>
+            <div class="flex gap2 mb2">
+                <button type="button" class="btn btn-xs bs" onclick="toggleAllPlanAthletes(true)">✅ Tümünü Seç</button>
+                <button type="button" class="btn btn-xs bd" onclick="toggleAllPlanAthletes(false)">✕ Seçimi Temizle</button>
             </div>
+            <div id="plan-ath-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">${athleteCheckboxes}</div>
+            <div id="plan-ath-tags" class="flex fwrap gap1 mt1" style="min-height:0"></div>
+        </div>
+        <div class="g21 mb2">
             <div class="fgr">
                 <label>Ödeme Tutarı (₺) *</label>
                 <input id="plan-amt" type="number" placeholder="Aylık tutar"/>
             </div>
-        </div>
-        <div class="g21 mb2">
             <div class="fgr">
                 <label>Ay *</label>
                 <input id="plan-month" type="month" value="${DateUtils.today().slice(0,7)}"/>
             </div>
-            <div class="fgr">
-                <label>Açıklama</label>
-                <input id="plan-desc" placeholder="Örn: Ocak Aidatı"/>
-            </div>
+        </div>
+        <div class="fgr mb2">
+            <label>Açıklama</label>
+            <input id="plan-desc" placeholder="Örn: Ocak Aidatı"/>
         </div>
         <div class="flex gap2 mb3">
             <button class="btn bp" onclick="createPaymentPlan()">+ Tek Ay Ekle</button>
             <button class="btn bs" onclick="showBulkPlanModal()">📆 Toplu Plan Oluştur</button>
         </div>
     </div>
-    <div class="card">
-        <div class="tw6 tsm mb2">📋 Mevcut Ödeme Planları</div>
-        ${planlar.length === 0 ? '<p class="tm ts">Henüz ödeme planı oluşturulmadı.</p>' : `
-        <div class="tw"><table>
-            <thead><tr><th>Sporcu</th><th>Ay</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr></thead>
-            <tbody>
-            ${planlar.sort((a,b)=>b.dt.localeCompare(a.dt)).map(p => `
-            <tr>
-                <td class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="go('athleteProfile',{id:'${FormatUtils.escape(p.aid)}'})">${FormatUtils.escape(p.an)}</td>
-                <td>${FormatUtils.escape(p.ds||DateUtils.format(p.dt))}</td>
-                <td class="tw6 tg">${FormatUtils.currency(p.amt)}</td>
-                <td><span class="bg ${p.st==='completed'?'bg-g':p.st==='overdue'?'bg-r':'bg-y'}">${statusLabel(p.st)}</span></td>
-                <td>
-                    <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
-                    <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
-                </td>
-            </tr>`).join('')}
-            </tbody>
-        </table></div>`}
-    </div>`;
+
+    ${_buildGroupedPlanList(planlar)}`;
 
     return `
     <div class="ph"><div class="stit">Ödemeler</div></div>
@@ -2891,58 +2887,177 @@ window.updatePlanFee = function() {
     }
 };
 
-// Tek ay ödeme planı oluştur
+// --- Feature 1: Multi-select helpers ---
+window.filterPlanAthletes = function() {
+    const q = (document.getElementById('plan-ath-search')?.value || '').toLowerCase();
+    document.querySelectorAll('#plan-ath-list .ms-item').forEach(el => {
+        el.style.display = (el.dataset.name || '').includes(q) ? '' : 'none';
+    });
+};
+
+window.toggleAllPlanAthletes = function(check) {
+    document.querySelectorAll('#plan-ath-list .plan-ath-cb').forEach(cb => {
+        if (cb.closest('.ms-item').style.display !== 'none') cb.checked = check;
+    });
+    _updatePlanAthTags();
+    _autoFillFeeFromSelection();
+};
+
+function _updatePlanAthTags() {
+    const container = document.getElementById('plan-ath-tags');
+    if (!container) return;
+    const checked = document.querySelectorAll('#plan-ath-list .plan-ath-cb:checked');
+    if (checked.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = Array.from(checked).map(cb =>
+        `<span class="ath-tag">${FormatUtils.escape(cb.dataset.name)} <span class="ath-tag-x" onclick="document.querySelector('.plan-ath-cb[value=\\'${cb.value}\\']').checked=false;_updatePlanAthTags();_autoFillFeeFromSelection()">✕</span></span>`
+    ).join('');
+}
+
+function _autoFillFeeFromSelection() {
+    const checked = document.querySelectorAll('#plan-ath-list .plan-ath-cb:checked');
+    const amtInput = document.getElementById('plan-amt');
+    if (!amtInput) return;
+    if (checked.length === 1) {
+        const fee = checked[0].dataset.fee;
+        if (fee && fee !== '0') amtInput.value = fee;
+    }
+}
+
+function _getSelectedAthleteIds() {
+    return Array.from(document.querySelectorAll('#plan-ath-list .plan-ath-cb:checked')).map(cb => cb.value);
+}
+
+// Attach change event to checkboxes after render
+window._initPlanAthCheckboxes = function() {
+    document.querySelectorAll('#plan-ath-list .plan-ath-cb').forEach(cb => {
+        cb.addEventListener('change', () => { _updatePlanAthTags(); _autoFillFeeFromSelection(); });
+    });
+};
+
+// --- Feature 2: Grouped plan list helper ---
+function _buildGroupedPlanList(planlar) {
+    if (planlar.length === 0) {
+        return `<div class="card"><div class="tw6 tsm mb2">📋 Mevcut Ödeme Planları</div><p class="tm ts">Henüz ödeme planı oluşturulmadı.</p></div>`;
+    }
+    // Group by athlete
+    const groups = {};
+    planlar.forEach(p => {
+        const key = p.aid || 'unknown';
+        if (!groups[key]) groups[key] = { name: p.an || 'Bilinmeyen', plans: [] };
+        groups[key].plans.push(p);
+    });
+    const groupKeys = Object.keys(groups).sort((a, b) => groups[a].name.localeCompare(groups[b].name, 'tr'));
+    const accordionItems = groupKeys.map((key, idx) => {
+        const g = groups[key];
+        const totalDebt = g.plans.reduce((s, p) => s + (p.amt || 0), 0);
+        const rows = g.plans.sort((a, b) => b.dt.localeCompare(a.dt)).map(p => `
+            <tr>
+                <td>${FormatUtils.escape(p.ds || DateUtils.format(p.dt))}</td>
+                <td class="tw6 tg">${FormatUtils.currency(p.amt)}</td>
+                <td><span class="bg ${p.st === 'completed' ? 'bg-g' : p.st === 'overdue' ? 'bg-r' : 'bg-y'}">${statusLabel(p.st)}</span></td>
+                <td>
+                    <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
+                    <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
+                </td>
+            </tr>`).join('');
+        return `
+        <div class="plan-acc-item" style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
+            <div class="plan-acc-head" style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--bg3)" onclick="this.parentElement.classList.toggle('open')">
+                <div>
+                    <span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="event.stopPropagation();go('athleteProfile',{id:'${FormatUtils.escape(key)}'})">${FormatUtils.escape(g.name)}</span>
+                    <span class="tm ts" style="margin-left:8px">${g.plans.length} plan</span>
+                </div>
+                <div class="flex fca gap2">
+                    <span class="tw6 tg ts">${FormatUtils.currency(totalDebt)}</span>
+                    <span class="plan-acc-arrow" style="transition:transform .2s">▼</span>
+                </div>
+            </div>
+            <div class="plan-acc-body" style="display:none;padding:0 14px 14px">
+                <div class="tw" style="margin-top:10px"><table>
+                    <thead><tr><th>Ay</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `<div class="card">
+        <div class="tw6 tsm mb2">📋 Mevcut Ödeme Planları</div>
+        <input id="plan-list-search" type="text" placeholder="Sporcu ara..." oninput="filterPlanAccordion()" style="margin-bottom:10px;width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);color:var(--text1)"/>
+        <div id="plan-acc-container">${accordionItems}</div>
+    </div>`;
+}
+
+window.filterPlanAccordion = function() {
+    const q = (document.getElementById('plan-list-search')?.value || '').toLowerCase();
+    document.querySelectorAll('#plan-acc-container .plan-acc-item').forEach(el => {
+        const name = el.querySelector('.plan-acc-head .tw6')?.textContent?.toLowerCase() || '';
+        el.style.display = name.includes(q) ? '' : 'none';
+    });
+};
+
+// Tek ay ödeme planı oluştur — Feature 1: Multi-athlete support
 window.createPaymentPlan = async function() {
-    const aid = document.getElementById('plan-aid')?.value;
+    const selectedIds = _getSelectedAthleteIds();
     const amt = parseFloat(document.getElementById('plan-amt')?.value);
     const month = document.getElementById('plan-month')?.value; // YYYY-MM
     const desc = document.getElementById('plan-desc')?.value?.trim();
 
-    if (!aid) { toast('Sporcu seçiniz!', 'e'); return; }
+    if (selectedIds.length === 0) { toast('En az bir sporcu seçiniz!', 'e'); return; }
     if (!amt || amt <= 0) { toast('Tutar giriniz!', 'e'); return; }
     if (!month) { toast('Ay seçiniz!', 'e'); return; }
 
-    const ath = AppState.data.athletes.find(a => a.id === aid);
     const dt = month + '-01';
     const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
     const [y, m] = month.split('-');
     const autoDesc = desc || `${months[parseInt(m)-1]} ${y} Aidatı`;
+    let created = 0, skipped = 0;
 
-    // Aynı sporcu + aynı ay zaten var mı?
-    const exists = AppState.data.payments.find(p => p.source === 'plan' && p.aid === aid && p.dt === dt);
-    if (exists) { toast('Bu sporcu için bu ay zaten plan mevcut!', 'e'); return; }
-
-    const obj = {
-        id: generateId(), aid, an: `${ath.fn} ${ath.ln}`,
-        amt, dt, ty: 'income', st: 'pending',
-        ds: autoDesc, serviceName: autoDesc,
-        source: 'plan', notifStatus: '', payMethod: ''
-    };
-    const result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
-    if (result) {
-        AppState.data.payments.push(obj);
-        toast(`✅ ${ath.fn} ${ath.ln} için ${autoDesc} planı oluşturuldu!`, 'g');
-        // Sporcu aylık ücretini de güncelle
-        const athIdx = AppState.data.athletes.findIndex(a => a.id === aid);
-        if (athIdx >= 0) AppState.data.athletes[athIdx].fee = amt;
-        go('payments');
+    for (const aid of selectedIds) {
+        const ath = AppState.data.athletes.find(a => a.id === aid);
+        if (!ath) continue;
+        const exists = AppState.data.payments.find(p => p.source === 'plan' && p.aid === aid && p.dt === dt);
+        if (exists) { skipped++; continue; }
+        const obj = {
+            id: generateId(), aid, an: `${ath.fn} ${ath.ln}`,
+            amt, dt, ty: 'income', st: 'pending',
+            ds: autoDesc, serviceName: autoDesc,
+            source: 'plan', notifStatus: '', payMethod: ''
+        };
+        const result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
+        if (result) {
+            AppState.data.payments.push(obj);
+            created++;
+        }
     }
+    let msg = `✅ ${created} sporcu için ${autoDesc} planı oluşturuldu!`;
+    if (skipped > 0) msg += ` (${skipped} sporcu zaten mevcut, atlandı)`;
+    toast(msg, 'g');
+    go('payments');
 };
 
-// Toplu plan oluştur modal
+// Toplu plan oluştur modal — Feature 1: Multi-athlete support
 window.showBulkPlanModal = function() {
     const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
     const now = new Date();
+    const bulkAthCheckboxes = AppState.data.athletes.map(a =>
+        `<label class="ms-item" data-name="${FormatUtils.escape((a.fn+' '+a.ln).toLowerCase())}" data-id="${a.id}" data-fee="${a.fee||0}">
+            <input type="checkbox" class="bulk-ath-cb" value="${a.id}" data-fee="${a.fee||0}" data-name="${FormatUtils.escape(a.fn+' '+a.ln)}"/>
+            <span>${FormatUtils.escape(a.fn+' '+a.ln)}</span>
+        </label>`
+    ).join('');
     modal('📆 Toplu Ödeme Planı Oluştur', `
     <div class="al al-b mb3" style="font-size:13px">
-        Seçili sporcu için başlangıç ayından itibaren belirtilen ay sayısı kadar plan oluşturur.
+        Seçili sporcular için başlangıç ayından itibaren belirtilen ay sayısı kadar plan oluşturur.
     </div>
     <div class="fgr mb2">
-        <label>Sporcu *</label>
-        <select id="bulk-aid">
-            <option value="">Sporcu Seçin</option>
-            ${AppState.data.athletes.map(a => `<option value="${a.id}" data-fee="${a.fee||0}">${FormatUtils.escape(a.fn+' '+a.ln)}</option>`).join('')}
-        </select>
+        <label>Sporcu(lar) *</label>
+        <input id="bulk-ath-search" type="text" placeholder="Sporcu ara..." oninput="document.querySelectorAll('#bulk-ath-list .ms-item').forEach(el=>{el.style.display=(el.dataset.name||'').includes(this.value.toLowerCase())?'':'none'})" style="margin-bottom:6px"/>
+        <div class="flex gap2 mb2">
+            <button type="button" class="btn btn-xs bs" onclick="document.querySelectorAll('#bulk-ath-list .bulk-ath-cb').forEach(cb=>{if(cb.closest('.ms-item').style.display!=='none')cb.checked=true})">✅ Tümünü Seç</button>
+            <button type="button" class="btn btn-xs bd" onclick="document.querySelectorAll('#bulk-ath-list .bulk-ath-cb').forEach(cb=>cb.checked=false)">✕ Temizle</button>
+        </div>
+        <div id="bulk-ath-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">${bulkAthCheckboxes}</div>
     </div>
     <div class="g21 mb2">
         <div class="fgr">
@@ -2956,50 +3071,44 @@ window.showBulkPlanModal = function() {
     </div>
     <div class="fgr mb2">
         <label>Aylık Tutar (₺) *</label>
-        <input id="bulk-amt" type="number" placeholder="Sporcu seçince otomatik dolar"/>
+        <input id="bulk-amt" type="number" placeholder="Tutar giriniz"/>
     </div>
     `, [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
         { lbl: '✅ Planları Oluştur', cls: 'bp', fn: async () => {
-            const aid = document.getElementById('bulk-aid')?.value;
+            const selectedIds = Array.from(document.querySelectorAll('#bulk-ath-list .bulk-ath-cb:checked')).map(cb => cb.value);
             const startMonth = document.getElementById('bulk-start')?.value;
             const count = parseInt(document.getElementById('bulk-count')?.value) || 0;
             const amt = parseFloat(document.getElementById('bulk-amt')?.value) || 0;
-            if (!aid || !startMonth || count < 1 || amt <= 0) { toast('Tüm alanları doldurun!', 'e'); return; }
-            const ath = AppState.data.athletes.find(a => a.id === aid);
+            if (selectedIds.length === 0 || !startMonth || count < 1 || amt <= 0) { toast('Tüm alanları doldurun!', 'e'); return; }
             let created = 0;
             const [sy, sm] = startMonth.split('-').map(Number);
-            for (let i = 0; i < count; i++) {
-                const d = new Date(sy, sm - 1 + i, 1);
-                const y = d.getFullYear(), m = d.getMonth();
-                const dt = `${y}-${String(m+1).padStart(2,'0')}-01`;
-                const exists = AppState.data.payments.find(p => p.source === 'plan' && p.aid === aid && p.dt === dt);
-                if (exists) continue;
-                const autoDesc = `${months[m]} ${y} Aidatı`;
-                const obj = {
-                    id: generateId(), aid, an: `${ath.fn} ${ath.ln}`,
-                    amt, dt, ty: 'income', st: 'pending',
-                    ds: autoDesc, serviceName: autoDesc,
-                    source: 'plan', notifStatus: '', payMethod: ''
-                };
-                await DB.upsert('payments', DB.mappers.fromPayment(obj));
-                AppState.data.payments.push(obj);
-                created++;
+            for (const aid of selectedIds) {
+                const ath = AppState.data.athletes.find(a => a.id === aid);
+                if (!ath) continue;
+                for (let i = 0; i < count; i++) {
+                    const d = new Date(sy, sm - 1 + i, 1);
+                    const y = d.getFullYear(), m = d.getMonth();
+                    const dt = `${y}-${String(m+1).padStart(2,'0')}-01`;
+                    const exists = AppState.data.payments.find(p => p.source === 'plan' && p.aid === aid && p.dt === dt);
+                    if (exists) continue;
+                    const autoDesc = `${months[m]} ${y} Aidatı`;
+                    const obj = {
+                        id: generateId(), aid, an: `${ath.fn} ${ath.ln}`,
+                        amt, dt, ty: 'income', st: 'pending',
+                        ds: autoDesc, serviceName: autoDesc,
+                        source: 'plan', notifStatus: '', payMethod: ''
+                    };
+                    await DB.upsert('payments', DB.mappers.fromPayment(obj));
+                    AppState.data.payments.push(obj);
+                    created++;
+                }
             }
-            toast(`✅ ${created} aylık plan oluşturuldu!`, 'g');
+            toast(`✅ ${selectedIds.length} sporcu için ${created} plan oluşturuldu!`, 'g');
             closeModal();
             go('payments');
         }}
     ]);
-    // Sporcu seçince fee'yi doldur
-    setTimeout(() => {
-        const sel = document.getElementById('bulk-aid');
-        const amtInput = document.getElementById('bulk-amt');
-        if (sel && amtInput) sel.addEventListener('change', () => {
-            const opt = sel.options[sel.selectedIndex];
-            if (opt?.dataset?.fee && opt.dataset.fee !== '0') amtInput.value = opt.dataset.fee;
-        });
-    }, 50);
 };
 
 window.approvePayment = async function(id) {
@@ -3028,6 +3137,10 @@ window.approvePayment = async function(id) {
             }
 
             toast(`✅ ${p.an} ödemesi onaylandı!`, 'g');
+            // Feature 4: Auto-generate receipt after approval
+            if (typeof generateReceipt === 'function') {
+                try { generateReceipt(id); } catch(e) { console.warn('Makbuz oluşturulamadı:', e); }
+            }
             go('payments');
         }
     };
@@ -4109,6 +4222,7 @@ function spOdemeYap() {
     // Toplam borç (planlar)
     const totalDebt = myPlans.reduce((s, p) => s + (p.amt || 0), 0);
 
+    // Feature 3: Checkbox plan rows for multi-select
     const planRows = myPlans.length > 0
         ? myPlans.map(p => {
             const isOverdue = p.st === 'overdue';
@@ -4118,20 +4232,17 @@ function spOdemeYap() {
                 ? `<span class="bg bg-r">Gecikmiş</span>`
                 : `<span class="bg bg-y">Bekliyor</span>`;
             return `
-            <div class="plan-card${isOverdue || isLate ? ' plan-card-overdue' : ''}">
-                <div class="plan-card-left">
-                    <div class="plan-card-icon">${isOverdue || isLate ? '⚠️' : '📅'}</div>
-                    <div class="plan-card-info">
-                        <div class="tw6 ts">${FormatUtils.escape(p.ds || p.serviceName || 'Aidat')}</div>
-                        <div class="ts tm mt1">Vade: ${DateUtils.format(p.dt)}</div>
-                        <div class="tw6 ts tg mt1">${FormatUtils.currency(p.amt)}</div>
-                    </div>
+            <label class="sp-plan-cb-row" onclick="this.classList.toggle('checked');_spUpdateBulkTotal()">
+                <input type="checkbox" class="sp-plan-cb" value="${FormatUtils.escape(p.id)}" data-amt="${p.amt||0}" onclick="event.stopPropagation();this.parentElement.classList.toggle('checked');_spUpdateBulkTotal()"/>
+                <div style="flex:1;min-width:0">
+                    <div class="tw6 ts">${isOverdue || isLate ? '⚠️ ' : '📅 '}${FormatUtils.escape(p.ds || p.serviceName || 'Aidat')}</div>
+                    <div class="ts tm mt1">Vade: ${DateUtils.format(p.dt)}</div>
                 </div>
-                <div class="plan-card-right">
+                <div style="text-align:right;flex-shrink:0">
+                    <div class="tw6 ts tg">${FormatUtils.currency(p.amt)}</div>
                     ${badge}
-                    <button class="btn bp btn-sm mt2" onclick="spPayPlan('${FormatUtils.escape(p.id)}')">💳 Öde</button>
                 </div>
-            </div>`;
+            </label>`;
         }).join('')
         : `<div class="empty-state">
             <div style="font-size:48px;margin-bottom:12px">✅</div>
@@ -4148,6 +4259,16 @@ function spOdemeYap() {
         <div class="prb"><div style="height:100%;background:var(--red);border-radius:4px;width:100%"></div></div>
     </div>` : '';
 
+    const bulkControls = myPlans.length > 0 ? `
+    <div class="flex fjb fca gap2 mb2">
+        <button type="button" class="btn btn-xs bs" onclick="document.querySelectorAll('.sp-plan-cb').forEach(cb=>{cb.checked=true;cb.parentElement.classList.add('checked')});_spUpdateBulkTotal()">✅ Tümünü Seç</button>
+        <div id="sp-bulk-total" class="sp-bulk-total" style="display:none">
+            <span class="ts tm">Seçilen toplam:</span>
+            <span class="tw6 tg" id="sp-bulk-total-val">₺0</span>
+        </div>
+    </div>
+    <button class="btn bp w100 mb3" id="sp-bulk-pay-btn" style="display:none" onclick="spPayBulk()">💳 Seçilenleri Öde</button>` : '';
+
     return `
     <div class="card mb3">
         <div class="sp-athlete-header mb3">
@@ -4159,7 +4280,8 @@ function spOdemeYap() {
         </div>
         ${debtBar}
         <div class="tw6 ts mb2">📋 Ödeme Planlarım (${myPlans.length})</div>
-        <div class="plan-list">${planRows}</div>
+        ${bulkControls}
+        <div class="plan-list" style="gap:8px">${planRows}</div>
     </div>
 
     <div class="card" id="sp-pay-form" style="display:none">
@@ -4207,6 +4329,44 @@ window.spPayPlan = function(planId) {
     if (info) info.innerHTML = `<strong>${FormatUtils.escape(p.ds||p.serviceName||'Aidat')}</strong> — <span class="tg tw6">${FormatUtils.currency(p.amt)}</span>`;
     if (descInput) descInput.value = p.ds || p.serviceName || 'Aidat ödemesi';
     // Önceki seçimi temizle
+    if (detail) detail.innerHTML = '';
+    if (submitBtn) submitBtn.style.display = 'none';
+    const descWrapper = document.getElementById('sp-desc-wrapper');
+    if (descWrapper) descWrapper.classList.add('dn');
+    document.querySelectorAll('.pay-choice-card').forEach(c => c.classList.remove('active'));
+    form?.scrollIntoView({ behavior: 'smooth' });
+};
+
+// Feature 3: Bulk total calculation
+window._spUpdateBulkTotal = function() {
+    const checked = document.querySelectorAll('.sp-plan-cb:checked');
+    const totalEl = document.getElementById('sp-bulk-total');
+    const totalVal = document.getElementById('sp-bulk-total-val');
+    const payBtn = document.getElementById('sp-bulk-pay-btn');
+    const total = Array.from(checked).reduce((s, cb) => s + parseFloat(cb.dataset.amt || 0), 0);
+    if (totalEl) totalEl.style.display = checked.length > 0 ? 'flex' : 'none';
+    if (totalVal) totalVal.textContent = FormatUtils.currency(total);
+    if (payBtn) payBtn.style.display = checked.length > 0 ? 'block' : 'none';
+};
+
+// Feature 3: Initiate bulk payment for selected plans
+window.spPayBulk = function() {
+    const checked = Array.from(document.querySelectorAll('.sp-plan-cb:checked'));
+    if (checked.length === 0) { toast('Ödeme yapmak istediğiniz ayları seçiniz!', 'e'); return; }
+    const planIds = checked.map(cb => cb.value);
+    const totalAmt = checked.reduce((s, cb) => s + parseFloat(cb.dataset.amt || 0), 0);
+    // Store selected plan IDs
+    AppState.ui.activePlanIds = planIds;
+    AppState.ui.activePlanId = planIds.length === 1 ? planIds[0] : null;
+    AppState.ui.selectedPayMethod = null;
+    const form = document.getElementById('sp-pay-form');
+    const info = document.getElementById('sp-plan-info');
+    const descInput = document.getElementById('sp-desc');
+    const submitBtn = document.getElementById('pay-submit-btn');
+    const detail = document.getElementById('pay-method-detail');
+    if (form) form.style.display = 'block';
+    if (info) info.innerHTML = `<strong>${checked.length} ay seçildi</strong> — <span class="tg tw6">${FormatUtils.currency(totalAmt)}</span>`;
+    if (descInput) descInput.value = `${checked.length} aylık toplu ödeme`;
     if (detail) detail.innerHTML = '';
     if (submitBtn) submitBtn.style.display = 'none';
     const descWrapper = document.getElementById('sp-desc-wrapper');
@@ -4304,50 +4464,54 @@ window.submitSpPayment = async function() {
     const method = AppState.ui.selectedPayMethod;
     const a = AppState.currentSporcu;
     const planId = AppState.ui.activePlanId;
+    const planIds = AppState.ui.activePlanIds || (planId ? [planId] : []);
 
     if (!method) { toast('Lütfen ödeme yöntemi seçiniz!', 'e'); return; }
 
-    // Plan varsa plan tutarını kullan, yoksa sporcunun aylık ücretini
-    const plan = planId ? AppState.data.payments.find(p => p.id === planId) : null;
-    const amt = plan ? plan.amt : (a.fee || 0);
-    if (!amt || amt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
+    // Collect plans
+    const plans = planIds.map(id => AppState.data.payments.find(p => p.id === id)).filter(Boolean);
+    const totalAmt = plans.length > 0 ? plans.reduce((s, p) => s + (p.amt || 0), 0) : (a.fee || 0);
+    if (!totalAmt || totalAmt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
 
     if (method === 'paytr') {
-        await initiatePayTRPayment(amt, desc);
+        await initiatePayTRPayment(totalAmt, desc);
         return;
     }
 
-    const payObj = {
-        id: generateId(),
-        aid: a.id,
-        an: `${a.fn} ${a.ln}`,
-        amt,
-        ds: desc || plan?.ds || 'Veli bildirimi',
-        st: 'pending',
-        dt: DateUtils.today(),
-        ty: 'income',
-        serviceName: desc || plan?.ds || 'Veli bildirimi',
-        source: 'parent_notification',
-        notifStatus: 'pending_approval',
-        payMethod: method
-    };
-
     const sb = getSupabase();
-    if (sb) {
-        try {
+    if (!sb) { toast('Bağlantı hatası.', 'e'); return; }
+
+    try {
+        // Create a payment notification for each plan
+        for (const plan of (plans.length > 0 ? plans : [null])) {
+            const amt = plan ? plan.amt : totalAmt;
+            const payObj = {
+                id: generateId(),
+                aid: a.id,
+                an: `${a.fn} ${a.ln}`,
+                amt,
+                ds: desc || plan?.ds || 'Veli bildirimi',
+                st: 'pending',
+                dt: plan?.dt || DateUtils.today(),
+                ty: 'income',
+                serviceName: desc || plan?.ds || 'Veli bildirimi',
+                source: 'parent_notification',
+                notifStatus: 'pending_approval',
+                payMethod: method
+            };
             const { error } = await sb.from('payments').insert(DB.mappers.fromPayment(payObj));
             if (error) throw error;
             AppState.data.payments.push(payObj);
-            const methodLabel = method === 'nakit' ? 'Nakit' : method === 'kredi_karti' ? 'Kredi Kartı' : 'Havale';
-            toast(`✅ ${methodLabel} ödeme bildiriminiz alındı! Yönetici onaylayacak.`, 'g');
-            AppState.ui.activePlanId = null;
-            document.getElementById('sp-pay-form').style.display = 'none';
-            spTab('odemeler');
-        } catch(e) {
-            toast('Bildirim gönderilemedi: ' + (e.message || e), 'e');
         }
-    } else {
-        toast('Bağlantı hatası.', 'e');
+        const methodLabel = method === 'nakit' ? 'Nakit' : method === 'kredi_karti' ? 'Kredi Kartı' : 'Havale';
+        const count = plans.length > 1 ? ` (${plans.length} ay)` : '';
+        toast(`✅ ${methodLabel} ödeme bildiriminiz alındı${count}! Yönetici onaylayacak.`, 'g');
+        AppState.ui.activePlanId = null;
+        AppState.ui.activePlanIds = null;
+        document.getElementById('sp-pay-form').style.display = 'none';
+        spTab('odemeler');
+    } catch(e) {
+        toast('Bildirim gönderilemedi: ' + (e.message || e), 'e');
     }
 };
 
