@@ -383,6 +383,7 @@ function applyTheme(theme) {
     const isLight = theme === 'light';
     const btn = document.getElementById('theme-btn');
     const spBtn = document.getElementById('sp-theme-btn');
+    document.documentElement.classList.add('theme-transitioning');
     if (isLight) {
         document.documentElement.setAttribute('data-theme', 'light');
         if (btn) btn.innerHTML = '&#x1F319;';
@@ -394,6 +395,7 @@ function applyTheme(theme) {
     }
     StorageManager.set('sporcu_theme', theme);
     AppState.theme = theme;
+    setTimeout(function(){ document.documentElement.classList.remove('theme-transitioning'); }, 400);
 }
 
 function toggleTheme() {
