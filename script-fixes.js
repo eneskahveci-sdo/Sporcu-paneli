@@ -913,48 +913,7 @@ window.saveWhatsAppSettings = async function() {
     if (result) { AppState.data.settings = obj; toast('WhatsApp ayarları kaydedildi!', 'g'); }
 };
 
-// Patch settings page to add WhatsApp section after render — go() hook kullanarak
-var _settingsPatchTimer = null;
-if (typeof registerGoHook === 'function') {
-    registerGoHook('after', function(page) {
-        if (page === 'settings') {
-            clearTimeout(_settingsPatchTimer);
-            _settingsPatchTimer = setTimeout(function() {
-                var main = document.getElementById('main');
-                if (!main) return;
-                // Inject WhatsApp settings card before the closing of main
-                var s = AppState.data.settings || {};
-                var waCard = '<div class="card mb3" style="border-left:4px solid #25d366"><div class="flex fjb fca mb2"><div class="tw6 tsm" style="color:#25d366">💬 WhatsApp Business API</div><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="s-wa-active" ' + (s.waActive ? 'checked' : '') + '/><span class="ts tw6">Aktif</span></label></div><div class="al al-b mb3" style="font-size:12px">ℹ️ WhatsApp Business API ile otomatik bildirim gönderebilirsiniz.<br>Meta Business hesabınızdan API token ve Phone Number ID alınız.</div><div class="g21 mb2"><div class="fgr"><label>API Token</label><input id="s-wa-token" type="password" value="' + FormatUtils.escape(s.waApiToken || '') + '"/></div><div class="fgr"><label>Phone Number ID</label><input id="s-wa-phone" value="' + FormatUtils.escape(s.waPhoneId || '') + '"/></div></div><div class="fgr mb2"><label>Otomatik Hatırlatma Günü (1-28)</label><input id="s-wa-day" type="number" min="1" max="28" value="' + (s.waReminderDay || 1) + '"/></div><button class="btn bsu" onclick="saveWhatsAppSettings()">💬 WhatsApp Ayarlarını Kaydet</button></div>';
-
-                // Find PayTR section and insert after it
-                var paytrCard = main.querySelector('[style*="border-left: 4px solid #0070f3"], [style*="border-left:4px solid #0070f3"]');
-                if (paytrCard) {
-                    paytrCard.insertAdjacentHTML('afterend', waCard);
-                } else {
-                    // Append at the end
-                    main.insertAdjacentHTML('beforeend', waCard);
-                }
-
-                // Also patch ön kayıt cards with "Düzenle" button
-                var cards = main.querySelectorAll('.onkayit-card');
-                cards.forEach(function(card) {
-                    if (card.querySelector('[data-edit-ok]')) return;
-                    var convertBtn = card.querySelector('.btn.bsu');
-                    if (!convertBtn) return;
-                    var match = (convertBtn.getAttribute('onclick') || '').match(/convertOnKayit\('([^']+)'\)/);
-                    if (!match) return;
-                    var editBtn = document.createElement('button');
-                    editBtn.className = 'btn bs btn-sm';
-                    editBtn.setAttribute('data-edit-ok', 'true');
-                    editBtn.innerHTML = '✏️ Düzenle';
-                    editBtn.style.marginLeft = '4px';
-                    editBtn.onclick = function() { window.editOnKayit(match[1]); };
-                    convertBtn.parentNode.insertBefore(editBtn, convertBtn.nextSibling);
-                });
-            }, 300);
-        }
-    });
-}
+// WhatsApp kartı ve ön kayıt düzenle butonu artık script.js pgSettings() içinde birleştirildi.
 
 // ────────────────────────────────────────────────────────
 // 17) DOMContentLoaded: iOS Safari fix + misc

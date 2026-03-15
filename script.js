@@ -1266,7 +1266,7 @@ window.go = function(page, params = {}) {
     const main = document.getElementById('main');
     const pages = {
         dashboard: pgDashboard,
-        athletes: typeof __renderAthletes === 'function' ? __renderAthletes : (typeof pgAthletes === 'function' ? pgAthletes : null),
+        athletes: typeof __renderAthletes === 'function' ? __renderAthletes : null,
         athleteProfile: () => pgAthleteProfile(params.id),
         payments: pgPayments,
         accounting: typeof pgAccountingV8 === 'function' ? pgAccountingV8 : pgAccounting,
@@ -3442,6 +3442,26 @@ function pgSettings() {
         <button class="btn bp" onclick="savePayTRSettings()">PayTR Ayarlarını Kaydet</button>
     </div>
 
+    <div class="card mb3" style="border-left:4px solid #25d366">
+        <div class="flex fjb fca mb2">
+            <div class="tw6 tsm" style="color:#25d366">💬 WhatsApp Business API</div>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="s-wa-active" ${s?.waActive ? 'checked' : ''}/>
+                <span class="ts tw6">Aktif</span>
+            </label>
+        </div>
+        <div class="al al-b mb3" style="font-size:12px">ℹ️ WhatsApp Business API ile otomatik bildirim gönderebilirsiniz.<br>Meta Business hesabınızdan API token ve Phone Number ID alınız.</div>
+        <div class="g21 mb2">
+            <div class="fgr"><label>API Token</label><input id="s-wa-token" type="password" value="${FormatUtils.escape(s?.waApiToken || '')}"/></div>
+            <div class="fgr"><label>Phone Number ID</label><input id="s-wa-phone" value="${FormatUtils.escape(s?.waPhoneId || '')}"/></div>
+        </div>
+        <div class="fgr mb2">
+            <label>Otomatik Hatırlatma Günü (1-28)</label>
+            <input id="s-wa-day" type="number" min="1" max="28" value="${s?.waReminderDay || 1}"/>
+        </div>
+        <button class="btn bsu" onclick="saveWhatsAppSettings()">💬 WhatsApp Ayarlarını Kaydet</button>
+    </div>
+
     <div class="card mb3" style="border-left: 4px solid var(--yellow)">
         <div class="flex fjb fca mb3">
             <div class="flex fca gap2">
@@ -3467,6 +3487,7 @@ function pgSettings() {
               <div class="flex gap2">
                   ${ok.status === 'new' ? `
                   <button class="btn bsu btn-sm" onclick="convertOnKayit('${FormatUtils.escape(ok.id)}')">Sporcuya Dönüştür</button>
+                  <button class="btn bs btn-sm" onclick="editOnKayit('${FormatUtils.escape(ok.id)}')">✏️ Düzenle</button>
                   <button class="btn bs btn-sm" onclick="markOnKayitDone('${FormatUtils.escape(ok.id)}')">İşaretlendi</button>
                   ` : ''}
                   <button class="btn bd btn-sm" onclick="delOnKayit('${FormatUtils.escape(ok.id)}')">Sil</button>
