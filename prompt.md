@@ -1,121 +1,121 @@
-# 🛠️ Dragos Futbol Akademisi — Düzeltme Promptu
+# 🛠️ Dragos Futbol Akademisi — Yeni Özellikler Promptu
 
-Bu prompt sitedeki en kritik kod kalitesi ve güvenlik sorunlarını düzeltmek içindir.
+Aşağıdaki özellikleri mevcut projeye ekle. Mevcut çalışan hiçbir işlevi bozma.
 
-> ⚠️ **ÖNEMLİ KURALLAR:**
-> - Hiçbir düzeltme mevcut çalışan işlevselliği BOZAMAZ.
-> - Her değişiklikten sonra şu 3 giriş akışı çalışmalıdır: **Admin girişi** (e-posta + şifre), **Sporcu girişi** (TC + şifre), **Antrenör girişi** (TC + şifre).
-> - Sayfa navigasyonu (`go()` fonksiyonu) tüm sayfalar için çalışmalıdır: dashboard, athletes, athleteProfile, payments, accounting, attendance, coaches, sports, classes, settings, sms, onkayit.
-> - PayTR entegrasyonuna dokunma — henüz anlaşma yapılmadı, API kodları sonradan Supabase Edge Function ile eklenecek. PayTR ile ilgili mevcut UI kodlarını (settings sayfasındaki PayTR kartı, ödeme yöntemi seçeneklerindeki PayTR seçeneği) olduğu gibi bırak.
-> - Değişiklikleri küçük adımlarla yap, her adımda test et.
-
----
-
-## Düzeltme 1 — `doNormalLogin` Tekrarını Temizle (GÜVENLİK)
-
-**Neden güvenlik sorunu:**  
-Şu an `doNormalLogin` fonksiyonu hem `script.js` (satır 745–908) hem `Security.js` (satır 204–462) içinde tanımlı. Script yükleme sırası değişirse veya Security.js yüklenmezse, eski güvensiz login yolu aktif kalabilir.
-
-**Ne yapılacak:**
-- `script.js` satır 745–908 arasındaki tüm `doNormalLogin` fonksiyonunu **sil**.
-- Yerine sadece şu güvenli fallback'i koy:
-
-```js
-// doNormalLogin: Security.js tarafından tanımlanır (v5.0 — login_with_tc RPC).
-// Security.js yüklenmezse kullanıcıya uyarı gösterilir.
-window.doNormalLogin = function(role) {
-    console.error('Security.js yüklenemedi!');
-    var errId = role === 'coach' ? 'lc-err' : 'ls-err';
-    var errEl = document.getElementById(errId);
-    if (errEl) {
-        errEl.textContent = 'Güvenlik modülü yüklenemedi. Sayfayı yenileyip tekrar deneyin.';
-        errEl.classList.remove('dn');
-    }
-};
-```
-
-**⚠️ Dikkat:** `Security.js`'teki koda **hiç dokunma**. Sadece `script.js`'teki eski versiyonu temizliyorsun.
+> ⚠️ **KURALLAR:**
+> - Mevcut dosya yapısını koru: `index.html`, `script.js`, `script-fixes.js`, `ui-improvements.js`, `Security.js`, `style.css`
+> - Tüm giriş akışları çalışmaya devam etmeli: Admin, Sporcu/Veli, Antrenör
+> - PayTR entegrasyonuna dokunma — henüz aktif değil
+> - Supabase veritabanı yapısına uyumlu çalış (`payments`, `athletes`, `settings` tabloları)
+> - Türkçe arayüz kullan
 
 ---
 
-## Düzeltme 2 — `window.go()` Override Zincirini Birleştir (STABİLİTE)
+## 1. Ödeme Planı Oluştururken Çoklu Sporcu Seçimi (Admin Panel)
 
-**Neden sorun:**  
-`go()` fonksiyonu 4 farklı dosyada üst üste override ediliyor. Herhangi bir dosyanın yükleme sırası değişirse tüm navigasyon bozulur.
+**Konum:** Sidebar → Ödemeler → Ödeme Planları → "Sporcu Ödeme Planı Oluştur" butonu
 
-**Ne yapılacak:**
-`script.js`'teki `window.go()` fonksiyonunu (satır 1417–1470) genişleterek diğer dosyalardaki override'ları içine al:
+**Mevcut durum:** Tek sporcu seçilebiliyor.
 
-1. `script.js`'teki `pages` nesnesine şu sayfaları ekle:
-   - `accounting: pgAccountingV8` (script-fixes.js'ten)
-   - `sms: pgSmsV8` (script-fixes.js'ten)
-   - `onkayit: __renderOnKayit` (script-fixes.js'ten)
-
-2. `athletes` sayfası için: `script-fixes.js`'teki `__renderAthletes()` fonksiyonunu `pgAthletes` yerine kullan.
-
-3. Sayfa geçişine animasyon ekle (ui-improvements.js'ten):  
-   `go()` içinde `main.innerHTML = pages[page]()` çağrısından **önce** `main.style.opacity = '0'`, **sonra** `setTimeout` ile `main.style.opacity = '1'` yap.
-
-4. Settings sayfası için WhatsApp kartı enjeksiyonunu (script-fixes.js satır 971–1012) `pgSettings()` fonksiyonunun **return ettiği HTML'in sonuna** doğrudan ekle.
-
-5. Tüm bu birleştirmeler `script.js`'te yapıldıktan sonra:
-   - `script-fixes.js` satır 631–694'teki `go()` override bloğunu **sil**
-   - `script-fixes.js` satır 970–1012'deki WhatsApp settings go() patch'ini **sil**
-   - `ui-improvements.js` satır 186–202'deki `patchGoForAnimation()` fonksiyonunu **sil**
-
-**⚠️ Dikkat:**
-- `__renderAthletes()`, `__renderOnKayit()`, `pgAccountingV8()`, `pgSmsV8()` fonksiyonlarının kendilerine **dokunma**, sadece `go()` içinden çağır.
-- `closeSide()` çağrısını unutma — her sayfa geçişinde sidebar kapanmalı.
-- Antrenör rolü kısıtlamalarını koru — coach rolü `dashboard`, `payments`, `accounting`, `settings`, `sms`, `sports`, `classes` sayfalarına erişememelir.
-- `athleteProfile` sayfasından sonra `initProfileTabs()` çağrısını koru.
+**İstenen:**
+- Sporcu seçimi alanı **çoklu seçim (multi-select)** desteklesin.
+- Checkbox listesi veya arama yapılabilen multi-select dropdown kullan.
+- Seçilen sporcuların isimleri seçim alanının altında etiket (tag/chip) olarak görünsün, yanlarında ✕ ile tek tek kaldırılabilsin.
+- "Tümünü Seç" ve "Seçimi Temizle" butonları olsun.
+- Plan oluşturulduğunda seçilen **her sporcu için ayrı ayrı** ödeme planı kaydı oluşturulsun.
 
 ---
 
-## Düzeltme 3 — Ölü Kodu Temizle (KOD KALİTESİ)
+## 2. Mevcut Ödeme Planlarını Sporcuya Göre Grupla (Admin Panel)
 
-**Ne yapılacak:**
-- `script.js`'ten `sha256()` fonksiyonunu **sil** (satır 247–261). Hiçbir yerde kullanılmıyor, eski client-side doğrulamadan kalma.
-- `script.js`'ten eski `pgAthletes()` fonksiyonunu **sil** (satır 2111–2257). `script-fixes.js`'teki `__renderAthletes()` bunun yerini alıyor.
+**Konum:** Sidebar → Ödemeler → Ödeme Planları → "Mevcut Ödeme Planları" listesi
 
-**⚠️ Dikkat:** `sha256` fonksiyonunu kullanan başka bir yer olmadığından emin ol (`grep` ile kontrol et). Eğer bir yerde çağrılıyorsa silme.
+**Mevcut durum:** Tüm planlar düz liste halinde gösteriliyor, çok kalabalık ve karışık.
+
+**İstenen:**
+- Ödeme planları **sporcu ismine göre gruplanmış** şekilde listelensin.
+- Her sporcu bir **açılır-kapanır (accordion/collapse)** kart olsun:
+  - Kart başlığı: Sporcu adı soyadı + toplam plan sayısı + toplam borç tutarı
+  - Kart açıldığında o sporcuya ait tüm ödeme planı satırları görünsün
+- Üstte **arama kutusu** olsun — sporcu ismine göre filtreleme yapılabilsin.
+- Varsayılan olarak kartlar **kapalı** gelsin, tıklayınca açılsın.
 
 ---
 
-## Düzeltme 4 — `loadCashTransfers` Zamanlamasını Düzelt (STABİLİTE)
+## 3. Sporcu/Veli Portalında Çoklu Ay Seçerek Toplu Ödeme (Sporcu Paneli)
 
-**Neden sorun:**  
-`script-fixes.js` satır 1019'da `restoreSession`'ın bitmesini "2 saniye bekle" diye tahmin ediyor. Yavaş 3G bağlantısında bu yetersiz kalır.
+**Konum:** Sporcu/Veli girişi → "Ödeme Yap" sekmesi
+
+**Mevcut durum:** Tek tek ödeme yapılıyor.
+
+**İstenen:**
+- Ödeme planındaki bekleyen aylar **checkbox listesi** olarak gösterilsin.
+- Sporcu birden fazla ayı seçebilsin (çoklu seçim).
+- Seçilen ayların **toplam tutarı** anlık olarak hesaplanıp gösterilsin.
+- "Tümünü Seç" butonu olsun.
+- Ödeme yöntemi seçildikten sonra **seçilen tüm aylar için tek seferde** ödeme işlemi başlatılsın.
+- Her seçilen ay için ayrı ödeme kaydı (`payments` tablosuna) oluşturulsun.
+
+---
+
+## 4. Ödeme Sonrası Otomatik Makbuz Oluşturma
+
+### 4a. Havale/EFT Ödemesi → Admin Onayı Sonrası Makbuz
+
+**Akış:**
+1. Sporcu "Havale/EFT" ile ödeme yapar → ödeme kaydı `pending_approval` olarak kaydedilir
+2. Admin panelinde yönetici bu ödemeyi onaylar (`completed` durumuna geçirir)
+3. **Onay anında otomatik olarak** makbuz oluşturulsun (mevcut `generateReceipt()` fonksiyonunu çağır)
+4. Makbuz PDF olarak indirilsin veya sporcu portalında görüntülenebilsin
+
+### 4b. Kredi Kartı Ödemesi → Ödeme Tamamlandığında Otomatik Makbuz
+
+**Akış:**
+1. Sporcu "Kredi Kartı" ile ödeme yapar
+2. Ödeme başarılı olduğunda (`completed` durumu) **otomatik olarak** makbuz oluşturulsun
+3. Makbuz hemen ekranda gösterilsin ve PDF indirme butonu sunulsun
+4. Makbuz üzerinde "Kredi Kartı ile Ödendi" ibaresi bulunsun
+
+**Makbuz detayları:** Mevcut `generateReceipt()` fonksiyonunu kullan. Makbuz numarası otomatik artmalı. Makbuz içeriği: kurum adı, sporcu adı, tutar, tarih, ödeme yöntemi, makbuz numarası.
+
+---
+
+## 5. Sidebar "Gösterge" İsmini "Ana Sayfa" Olarak Değiştir
+
+**Konum:** Admin paneli sidebar menüsü ve alt navigasyon çubuğu
 
 **Ne yapılacak:**
-1. `script.js`'teki `loadBranchData()` fonksiyonunun sonuna (satır 1276, `checkOverdue()` çağrısından sonra) şunu ekle:
-```js
-// Kasa transferlerini de yükle
-if (typeof loadCashTransfers === 'function') {
-    try { await loadCashTransfers(); } catch(e) { console.warn('loadCashTransfers:', e); }
-}
-```
-
-2. `script-fixes.js`'teki DOMContentLoaded bloğundan (satır 1017–1023) `loadCashTransfers` setTimeout çağrısını **sil**.
-
-**⚠️ Dikkat:** `loadCashTransfers` fonksiyonunun kendisine dokunma, sadece çağrılma yerini değiştiriyorsun.
+- `index.html`'deki sidebar menüde `Gösterge` yazan yeri `Ana Sayfa` olarak değiştir
+- Alt navigasyon çubuğundaki (bottom nav) `Ana` yazan yeri de `Ana Sayfa` olarak değiştir
+- `script.js`'teki `i18n` nesnesinde `menuDash` değerini:
+  - TR: `'Ana Sayfa'`
+  - EN: `'Home'`
+- `data-i18n="menuDash"` attribute kullanan tüm elementler otomatik güncellenecektir
+- Header'daki (#bar-title) varsayılan başlık da `Ana Sayfa` olsun
 
 ---
 
 ## ÖNCELİK SIRASI
 
-| # | Düzeltme | Güvenlik mi? | Risk |
-|---|----------|-------------|------|
-| 1 | `doNormalLogin` temizleme | ✅ Evet — tek güvenli login yolu kalır | Düşük risk |
-| 2 | `go()` birleştirme | ⚡ Stabilite — navigasyon daha sağlam | Orta risk (dikkatli test gerekir) |
-| 3 | Ölü kod temizliği | 🧹 Temizlik | Çok düşük risk |
-| 4 | `loadCashTransfers` zamanlama | ⚡ Stabilite — yavaş ağda çalışır | Düşük risk |
+| # | Özellik | Karmaşıklık |
+|---|---------|-------------|
+| 5 | Sidebar isim değişikliği | 🟢 Kolay (5 dk) |
+| 1 | Çoklu sporcu seçimi | 🟡 Orta (30 dk) |
+| 2 | Planları sporcuya göre grupla | 🟡 Orta (25 dk) |
+| 3 | Çoklu ay seçerek toplu ödeme | 🟡 Orta (30 dk) |
+| 4 | Otomatik makbuz oluşturma | 🟡 Orta (20 dk) |
 
-> **PayTR Notu:** PayTR dosyasına ve PayTR ile ilgili mevcut UI kodlarına (settings kartı, ödeme yöntemi seçenekleri) dokunma. PayTR API entegrasyonu sonradan Supabase Edge Function olarak eklenecek.
+---
 
-> **Test Kontrol Listesi:** Her düzeltmeden sonra şunları test et:
-> 1. ✅ Admin girişi (e-posta + şifre) → Dashboard açılıyor mu?
-> 2. ✅ Sporcu girişi (TC + son 6 hane) → Sporcu portalı açılıyor mu?
-> 3. ✅ Antrenör girişi (TC + son 6 hane) → Yoklama sayfası açılıyor mu?
-> 4. ✅ Tüm menü butonları çalışıyor mu? (Sporcular, Ödemeler, Finans, Yoklama, Ayarlar, SMS)
-> 5. ✅ Sporcu portalındaki sekmeler çalışıyor mu? (Profil, Yoklama, Ödemeler, Ödeme Yap)
-> 6. ✅ Ön Kayıt butonu giriş ekranında görünüyor mu?
+## TEST KONTROL LİSTESİ
+
+Her özellikten sonra bunları test et:
+
+1. ✅ Admin girişi → Dashboard (Ana Sayfa) açılıyor mu?
+2. ✅ Sidebar'da "Ana Sayfa" yazıyor mu?
+3. ✅ Ödemeler → Ödeme Planları → Çoklu sporcu seçerek plan oluşturulabiliyor mu?
+4. ✅ Mevcut ödeme planları sporcu ismine göre gruplanmış mı?
+5. ✅ Sporcu girişi → Ödeme Yap → Birden fazla ay seçip toplu ödeme yapılabiliyor mu?
+6. ✅ Havale ödemesi admin onayı sonrası makbuz oluşuyor mu?
+7. ✅ Kredi kartı ödemesi tamamlandığında makbuz otomatik oluşuyor mu?
+8. ✅ Tüm mevcut özellikler bozulmadan çalışıyor mu?
