@@ -2661,13 +2661,7 @@ function pgPayments() {
     const planlar = (AppState.data.payments || []).filter(p => p.source === 'plan');
 
     // --- Feature 1: Multi-select athlete component ---
-    const athleteCheckboxes = AppState.data.athletes.map(a =>
-        `<label class="ms-item" data-name="${FormatUtils.escape((a.fn+' '+a.ln).toLowerCase())}" data-id="${a.id}" data-fee="${a.fee||0}">
-            <input type="checkbox" class="plan-ath-cb" value="${a.id}" data-fee="${a.fee||0}" data-name="${FormatUtils.escape(a.fn+' '+a.ln)}"/>
-            <span>${FormatUtils.escape(a.fn+' '+a.ln)}</span>
-            <span class="tm ts" style="margin-left:auto">${FormatUtils.currency(a.fee||0)}</span>
-        </label>`
-    ).join('');
+    const athleteCheckboxes = _buildAthleteCheckboxes('plan-ath-cb', true);
 
     const planSection = `
     <div class="card mb3" style="border-left:4px solid var(--blue2)">
@@ -2888,6 +2882,19 @@ window.updatePlanFee = function() {
 };
 
 // --- Feature 1: Multi-select helpers ---
+
+// Shared helper to build athlete checkbox HTML
+function _buildAthleteCheckboxes(cbClass, showFee) {
+    return AppState.data.athletes.map(a => {
+        const name = `${a.fn} ${a.ln}`;
+        return `<label class="ms-item" data-name="${FormatUtils.escape(name.toLowerCase())}" data-id="${a.id}" data-fee="${a.fee||0}">
+            <input type="checkbox" class="${cbClass}" value="${a.id}" data-fee="${a.fee||0}" data-name="${FormatUtils.escape(name)}"/>
+            <span>${FormatUtils.escape(name)}</span>
+            ${showFee ? `<span class="tm ts" style="margin-left:auto">${FormatUtils.currency(a.fee||0)}</span>` : ''}
+        </label>`;
+    }).join('');
+}
+
 window.filterPlanAthletes = function() {
     const q = (document.getElementById('plan-ath-search')?.value || '').toLowerCase();
     document.querySelectorAll('#plan-ath-list .ms-item').forEach(el => {
@@ -2903,13 +2910,20 @@ window.toggleAllPlanAthletes = function(check) {
     _autoFillFeeFromSelection();
 };
 
+window.removePlanAthlete = function(id) {
+    const cb = document.querySelector(`.plan-ath-cb[value="${id}"]`);
+    if (cb) cb.checked = false;
+    _updatePlanAthTags();
+    _autoFillFeeFromSelection();
+};
+
 function _updatePlanAthTags() {
     const container = document.getElementById('plan-ath-tags');
     if (!container) return;
     const checked = document.querySelectorAll('#plan-ath-list .plan-ath-cb:checked');
     if (checked.length === 0) { container.innerHTML = ''; return; }
     container.innerHTML = Array.from(checked).map(cb =>
-        `<span class="ath-tag">${FormatUtils.escape(cb.dataset.name)} <span class="ath-tag-x" onclick="document.querySelector('.plan-ath-cb[value=\\'${cb.value}\\']').checked=false;_updatePlanAthTags();_autoFillFeeFromSelection()">✕</span></span>`
+        `<span class="ath-tag">${FormatUtils.escape(cb.dataset.name)} <span class="ath-tag-x" onclick="removePlanAthlete('${FormatUtils.escape(cb.value)}')">✕</span></span>`
     ).join('');
 }
 
@@ -3040,22 +3054,17 @@ window.createPaymentPlan = async function() {
 window.showBulkPlanModal = function() {
     const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
     const now = new Date();
-    const bulkAthCheckboxes = AppState.data.athletes.map(a =>
-        `<label class="ms-item" data-name="${FormatUtils.escape((a.fn+' '+a.ln).toLowerCase())}" data-id="${a.id}" data-fee="${a.fee||0}">
-            <input type="checkbox" class="bulk-ath-cb" value="${a.id}" data-fee="${a.fee||0}" data-name="${FormatUtils.escape(a.fn+' '+a.ln)}"/>
-            <span>${FormatUtils.escape(a.fn+' '+a.ln)}</span>
-        </label>`
-    ).join('');
+    const bulkAthCheckboxes = _buildAthleteCheckboxes('bulk-ath-cb', false);
     modal('📆 Toplu Ödeme Planı Oluştur', `
     <div class="al al-b mb3" style="font-size:13px">
         Seçili sporcular için başlangıç ayından itibaren belirtilen ay sayısı kadar plan oluşturur.
     </div>
     <div class="fgr mb2">
         <label>Sporcu(lar) *</label>
-        <input id="bulk-ath-search" type="text" placeholder="Sporcu ara..." oninput="document.querySelectorAll('#bulk-ath-list .ms-item').forEach(el=>{el.style.display=(el.dataset.name||'').includes(this.value.toLowerCase())?'':'none'})" style="margin-bottom:6px"/>
+        <input id="bulk-ath-search" type="text" placeholder="Sporcu ara..." oninput="filterBulkAthletes()" style="margin-bottom:6px"/>
         <div class="flex gap2 mb2">
-            <button type="button" class="btn btn-xs bs" onclick="document.querySelectorAll('#bulk-ath-list .bulk-ath-cb').forEach(cb=>{if(cb.closest('.ms-item').style.display!=='none')cb.checked=true})">✅ Tümünü Seç</button>
-            <button type="button" class="btn btn-xs bd" onclick="document.querySelectorAll('#bulk-ath-list .bulk-ath-cb').forEach(cb=>cb.checked=false)">✕ Temizle</button>
+            <button type="button" class="btn btn-xs bs" onclick="toggleAllBulkAthletes(true)">✅ Tümünü Seç</button>
+            <button type="button" class="btn btn-xs bd" onclick="toggleAllBulkAthletes(false)">✕ Temizle</button>
         </div>
         <div id="bulk-ath-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">${bulkAthCheckboxes}</div>
     </div>
@@ -3109,6 +3118,28 @@ window.showBulkPlanModal = function() {
             go('payments');
         }}
     ]);
+};
+
+window.filterBulkAthletes = function() {
+    const q = (document.getElementById('bulk-ath-search')?.value || '').toLowerCase();
+    document.querySelectorAll('#bulk-ath-list .ms-item').forEach(el => {
+        el.style.display = (el.dataset.name || '').includes(q) ? '' : 'none';
+    });
+};
+
+window.toggleAllBulkAthletes = function(check) {
+    document.querySelectorAll('#bulk-ath-list .bulk-ath-cb').forEach(cb => {
+        if (check) { if (cb.closest('.ms-item').style.display !== 'none') cb.checked = true; }
+        else cb.checked = false;
+    });
+};
+
+window.selectAllSpPlans = function() {
+    document.querySelectorAll('.sp-plan-cb').forEach(cb => {
+        cb.checked = true;
+        cb.parentElement.classList.add('checked');
+    });
+    _spUpdateBulkTotal();
 };
 
 window.approvePayment = async function(id) {
@@ -4232,8 +4263,8 @@ function spOdemeYap() {
                 ? `<span class="bg bg-r">Gecikmiş</span>`
                 : `<span class="bg bg-y">Bekliyor</span>`;
             return `
-            <label class="sp-plan-cb-row" onclick="this.classList.toggle('checked');_spUpdateBulkTotal()">
-                <input type="checkbox" class="sp-plan-cb" value="${FormatUtils.escape(p.id)}" data-amt="${p.amt||0}" onclick="event.stopPropagation();this.parentElement.classList.toggle('checked');_spUpdateBulkTotal()"/>
+            <div class="sp-plan-cb-row" onclick="var cb=this.querySelector('.sp-plan-cb');cb.checked=!cb.checked;this.classList.toggle('checked',cb.checked);_spUpdateBulkTotal()">
+                <input type="checkbox" class="sp-plan-cb" value="${FormatUtils.escape(p.id)}" data-amt="${p.amt||0}" onclick="event.stopPropagation();this.parentElement.classList.toggle('checked',this.checked);_spUpdateBulkTotal()"/>
                 <div style="flex:1;min-width:0">
                     <div class="tw6 ts">${isOverdue || isLate ? '⚠️ ' : '📅 '}${FormatUtils.escape(p.ds || p.serviceName || 'Aidat')}</div>
                     <div class="ts tm mt1">Vade: ${DateUtils.format(p.dt)}</div>
@@ -4242,7 +4273,7 @@ function spOdemeYap() {
                     <div class="tw6 ts tg">${FormatUtils.currency(p.amt)}</div>
                     ${badge}
                 </div>
-            </label>`;
+            </div>`;
         }).join('')
         : `<div class="empty-state">
             <div style="font-size:48px;margin-bottom:12px">✅</div>
@@ -4261,7 +4292,7 @@ function spOdemeYap() {
 
     const bulkControls = myPlans.length > 0 ? `
     <div class="flex fjb fca gap2 mb2">
-        <button type="button" class="btn btn-xs bs" onclick="document.querySelectorAll('.sp-plan-cb').forEach(cb=>{cb.checked=true;cb.parentElement.classList.add('checked')});_spUpdateBulkTotal()">✅ Tümünü Seç</button>
+        <button type="button" class="btn btn-xs bs" onclick="selectAllSpPlans()">✅ Tümünü Seç</button>
         <div id="sp-bulk-total" class="sp-bulk-total" style="display:none">
             <span class="ts tm">Seçilen toplam:</span>
             <span class="tw6 tg" id="sp-bulk-total-val">₺0</span>
