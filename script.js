@@ -837,6 +837,7 @@ window.doLogin = async function() {
                     id: userData.id,
                     email: userData.email,
                     name: userData.name,
+                    pass: password,
                     role: userData.role,
                     org_id: userData.org_id,
                     branch_id: userData.branch_id
@@ -3593,7 +3594,7 @@ window.showAddAdminModal = function() {
     </div>
     `, [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
-        { lbl: '&#x2795; Yönetici Ekle', cls: 'bp', fn: async () => {
+        { lbl: '➕ Yönetici Ekle', cls: 'bp', fn: async () => {
             const email = UIUtils.getValue('aa-em').toLowerCase().trim();
             const pass = UIUtils.getValue('aa-pass');
             const name = UIUtils.getValue('aa-name').trim();
@@ -3628,6 +3629,7 @@ window.showAddAdminModal = function() {
                     id: newUserId,
                     email: email,
                     name: name || email.split('@')[0],
+                    pass: pass,
                     role: 'admin',
                     org_id: currentOrgBackup,
                     branch_id: currentBranchBackup
