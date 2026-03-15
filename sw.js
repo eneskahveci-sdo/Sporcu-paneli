@@ -2,8 +2,8 @@
 // DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.1
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v6';
-const API_CACHE = 'dragos-api-v6';
+const STATIC_CACHE = 'dragos-static-v7';
+const API_CACHE = 'dragos-api-v7';
 
 const STATIC_ASSETS = [
     '/',
@@ -13,7 +13,10 @@ const STATIC_ASSETS = [
     '/script-fixes.js',
     '/ui-improvements.js',
     '/Security.js',
-    '/style.css'
+    '/style.css',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/icons/icon.svg'
 ];
 
 const CDN_HOSTNAMES = [
@@ -21,7 +24,9 @@ const CDN_HOSTNAMES = [
     'cdnjs.cloudflare.com',
     'unpkg.com',
     'esm.sh',
-    'cdn.skypack.dev'
+    'cdn.skypack.dev',
+    'fonts.googleapis.com',
+    'fonts.gstatic.com'
 ];
 
 self.addEventListener('install', function(event) {
