@@ -3029,8 +3029,8 @@ function _buildGroupedTransactionList(list) {
     const groups = {};
     list.forEach(p => {
         const key = p.aid || '_independent';
-        if (!groups[key]) groups[key] = { name: p.aid ? (p.an || 'Bilinmeyen') : 'Diğer İşlemler', plans: [] };
-        groups[key].plans.push(p);
+        if (!groups[key]) groups[key] = { name: p.aid ? (p.an || 'Bilinmeyen') : 'Diğer İşlemler', txns: [] };
+        groups[key].txns.push(p);
     });
     const groupKeys = Object.keys(groups).sort((a, b) => {
         if (a === '_independent') return 1;
@@ -3039,8 +3039,8 @@ function _buildGroupedTransactionList(list) {
     });
     const accordionItems = groupKeys.map(key => {
         const g = groups[key];
-        const groupTotal = g.plans.reduce((s, p) => s + (p.ty === 'income' ? (p.amt || 0) : -(p.amt || 0)), 0);
-        const rows = g.plans.sort((a, b) => (b.dt || '').localeCompare(a.dt || '')).map(p => {
+        const groupTotal = g.txns.reduce((s, p) => s + (p.ty === 'income' ? (p.amt || 0) : -(p.amt || 0)), 0);
+        const rows = g.txns.sort((a, b) => (b.dt || '').localeCompare(a.dt || '')).map(p => {
             const mIcon = p.payMethod==='nakit'?'💵':p.payMethod==='kredi_karti'?'💳':p.payMethod==='havale'?'🏦':p.payMethod==='paytr'?'🔵':'';
             const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
             return `<tr>
@@ -3064,7 +3064,7 @@ function _buildGroupedTransactionList(list) {
             <div class="plan-acc-head" style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--bg3)" onclick="this.parentElement.classList.toggle('open')">
                 <div>
                     ${nameHtml}
-                    <span class="tm ts" style="margin-left:8px">${g.plans.length} işlem</span>
+                    <span class="tm ts" style="margin-left:8px">${g.txns.length} işlem</span>
                 </div>
                 <div class="flex fca gap2">
                     <span class="tw6 ${groupTotal >= 0 ? 'tg' : 'tr2'} ts">${FormatUtils.currency(Math.abs(groupTotal))}</span>
@@ -3073,7 +3073,7 @@ function _buildGroupedTransactionList(list) {
             </div>
             <div class="plan-acc-body" style="display:none;padding:0 14px 14px">
                 <div class="tw" style="margin-top:10px"><table>
-                    <thead><tr><th>Tarih</th><th>Açıklama</th><th>Yöntem</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlem</th></tr></thead>
+                    <thead><tr><th>Tarih</th><th>Açıklama</th><th>Yöntem</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table></div>
             </div>
