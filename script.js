@@ -3405,6 +3405,10 @@ function pgSettings() {
             <label>Kurum Telefonu</label>
             <input id="s-phone" type="tel" value="${FormatUtils.escape(s?.ownerPhone || '')}"/>
         </div>
+        <div class="fgr mb2">
+            <label>Kurum Adresi</label>
+            <textarea id="s-address" rows="2" placeholder="Örn: Atatürk Cad. No:1 Kartal/İstanbul">${FormatUtils.escape(s?.address || '')}</textarea>
+        </div>
         <button class="btn bp mt2" onclick="saveGeneralSettings()">Genel Ayarları Kaydet</button>
     </div>
 
@@ -3480,7 +3484,8 @@ window.saveGeneralSettings = async function() {
         bankName: UIUtils.getValue('s-bank'),
         accountName: UIUtils.getValue('s-acc'),
         iban: UIUtils.getValue('s-iban'),
-        ownerPhone: UIUtils.getValue('s-phone')
+        ownerPhone: UIUtils.getValue('s-phone'),
+        address: UIUtils.getValue('s-address')
     };
     const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
     if (result) {
@@ -3618,9 +3623,17 @@ window.showAddAdminModal = function() {
                 const sb = getSupabase();
                 if (!sb) throw new Error('Supabase bağlantısı yok');
                 
-                // Fetch API ile Supabase Auth Admin endpoint'i — bu mevcut session'ı bozmaz
-                // Bunun yerine doğrudan users tablosuna kayıt edip email ile davet edelim
-                // signUp mevcut session'ı bozar, bu yüzden önce veritabanına kaydedelim
+                // Mevcut oturum token'larını sakla
+                let savedSession = null;
+                try {
+                    const { data: sessData } = await sb.auth.getSession();
+                    if (sessData?.session) {
+                        savedSession = {
+                            access_token: sessData.session.access_token,
+                            refresh_token: sessData.session.refresh_token
+                        };
+                    }
+                } catch(e) { console.warn('Session backup warning:', e); }
                 
                 const newUserId = generateId();
                 
@@ -3644,10 +3657,11 @@ window.showAddAdminModal = function() {
                     throw insertResult.error;
                 }
                 
-                // signUp ile Supabase Auth'a da ekle (session değişebilir)
+                // signUp ile Supabase Auth'a da ekle
                 let signupOk = false;
+                let signupMsg = '';
                 try {
-                    const { error: signupErr } = await sb.auth.signUp({
+                    const { data: signupData, error: signupErr } = await sb.auth.signUp({
                         email, password: pass,
                         options: {
                             data: {
@@ -3658,16 +3672,23 @@ window.showAddAdminModal = function() {
                             }
                         }
                     });
-                    if (!signupErr) signupOk = true;
-                } catch(signupEx) { /* ignore */ }
+                    if (signupErr) {
+                        signupMsg = signupErr.message || '';
+                        console.warn('Auth signUp error:', signupErr);
+                    } else {
+                        signupOk = true;
+                    }
+                } catch(signupEx) {
+                    signupMsg = signupEx.message || '';
+                    console.warn('Auth signUp exception:', signupEx);
+                }
                 
                 // Oturumu geri yükle — signUp bozmuş olabilir
-                try {
-                    await sb.auth.signInWithPassword({
-                        email: currentUserBackup.email,
-                        password: '__restore__' // Bu başarısız olacak, sadece deniyoruz
-                    });
-                } catch(e) { /* ignore — session token hâlâ geçerli olabilir */ }
+                if (savedSession) {
+                    try {
+                        await sb.auth.setSession(savedSession);
+                    } catch(e) { console.warn('Session restore warning:', e); }
+                }
                 
                 // AppState'i kesinlikle geri yükle
                 AppState.currentUser = currentUserBackup;
@@ -3678,11 +3699,13 @@ window.showAddAdminModal = function() {
                 StorageManager.set('sporcu_app_org', currentOrgBackup);
                 StorageManager.set('sporcu_app_branch', currentBranchBackup);
                 
-                toast(signupOk 
-                    ? `✅ Yönetici eklendi! ${email} adresine onay bağlantısı gönderildi.`
-                    : `✅ Yönetici veritabanına eklendi. Supabase Dashboard'dan auth kaydını tamamlayın.`, 
-                    'g');
+                if (signupOk) {
+                    toast(`✅ Yönetici eklendi! ${email} adresine onay bağlantısı gönderildi.`, 'g');
+                } else {
+                    toast(`✅ Yönetici veritabanına eklendi.${signupMsg ? ' Auth: ' + signupMsg : ' Supabase Dashboard\'dan auth kaydını tamamlayın.'}`, 'g');
+                }
                 closeModal();
+                loadAndShowAdmins();
                 
             } catch (e) {
                 // Hata durumunda da AppState'i geri yükle

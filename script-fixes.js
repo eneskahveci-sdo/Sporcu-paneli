@@ -155,29 +155,39 @@ window.generateReceipt = function(paymentId) {
         // Header
         doc.setFontSize(18);
         doc.setFont(undefined, 'bold');
-        doc.text(s.schoolName || 'Dragos Futbol Akademisi', 74, 20, { align: 'center' });
-        doc.setFontSize(10);
+        doc.text(trToAscii(s.schoolName || 'Dragos Futbol Akademisi'), 74, 20, { align: 'center' });
+
+        var headerY = 28;
+        doc.setFontSize(9);
         doc.setFont(undefined, 'normal');
-        doc.text(s.address || '', 74, 28, { align: 'center' });
-        doc.text('Tel: ' + (s.ownerPhone || ''), 74, 33, { align: 'center' });
+        var addrText = trToAscii(s.address || '');
+        if (addrText) {
+            var addrLines = doc.splitTextToSize(addrText, 110);
+            doc.text(addrLines, 74, headerY, { align: 'center' });
+            headerY += addrLines.length * 4;
+        }
+        if (s.ownerPhone) {
+            doc.text('Tel: ' + trToAscii(s.ownerPhone), 74, headerY, { align: 'center' });
+            headerY += 5;
+        }
 
         // Çizgi
         doc.setLineWidth(0.5);
-        doc.line(10, 38, 138, 38);
+        doc.line(10, headerY + 2, 138, headerY + 2);
 
         // Makbuz No ve Tarih
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
-        doc.text('ODEME MAKBUZU', 74, 48, { align: 'center' });
+        doc.text('ODEME MAKBUZU', 74, headerY + 12, { align: 'center' });
         doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
-        doc.text('Makbuz No: ' + receiptNo, 10, 58);
-        doc.text('Tarih: ' + DateUtils.format(p.dt), 100, 58);
+        doc.text('Makbuz No: ' + receiptNo, 10, headerY + 22);
+        doc.text('Tarih: ' + DateUtils.format(p.dt), 100, headerY + 22);
 
         // Detaylar
         doc.setLineWidth(0.3);
-        doc.line(10, 62, 138, 62);
-        var y = 72;
+        doc.line(10, headerY + 26, 138, headerY + 26);
+        var y = headerY + 36;
         var addRow = function(label, value) {
             doc.setFont(undefined, 'bold');
             doc.text(label, 10, y);
@@ -200,7 +210,7 @@ window.generateReceipt = function(paymentId) {
         y += 12;
         doc.setFontSize(9);
         doc.text('Bu makbuz elektronik ortamda olusturulmustur.', 74, y, { align: 'center' });
-        doc.text(s.schoolName || 'Dragos Futbol Akademisi', 74, y + 6, { align: 'center' });
+        doc.text(trToAscii(s.schoolName || 'Dragos Futbol Akademisi'), 74, y + 6, { align: 'center' });
 
         doc.save('Makbuz_' + receiptNo + '.pdf');
 
@@ -220,6 +230,8 @@ function _generateReceiptHTML(p, receiptNo, s) {
     if (!w) { toast('Popup engellenmiş!', 'e'); return; }
     w.document.write('<html><head><title>Makbuz ' + receiptNo + '</title><style>body{font-family:Arial;padding:20px;max-width:400px;margin:auto}h1{text-align:center;font-size:18px}h2{text-align:center;font-size:14px;color:#666}.line{border-top:1px solid #333;margin:12px 0}.row{display:flex;justify-content:space-between;padding:6px 0}.label{font-weight:bold;color:#555}.footer{text-align:center;font-size:11px;color:#999;margin-top:20px}@media print{body{padding:10px}}</style></head><body>');
     w.document.write('<h1>' + _escHtml(s.schoolName || 'Dragos Futbol Akademisi') + '</h1>');
+    if (s.address) w.document.write('<div style="text-align:center;font-size:12px;color:#555;margin-bottom:2px">' + _escHtml(s.address) + '</div>');
+    if (s.ownerPhone) w.document.write('<div style="text-align:center;font-size:12px;color:#555;margin-bottom:4px">Tel: ' + _escHtml(s.ownerPhone) + '</div>');
     w.document.write('<h2>ÖDEME MAKBUZU</h2>');
     w.document.write('<div class="line"></div>');
     w.document.write('<div class="row"><span class="label">Makbuz No:</span><span>' + receiptNo + '</span></div>');
