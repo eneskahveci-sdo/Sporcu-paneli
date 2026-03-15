@@ -243,23 +243,6 @@ function generateId() {
     });
 }
 
-// Mobil uyumlu SHA256 - crypto.subtle yerine alternatif
-async function sha256(str) {
-    try {
-        // Önce native crypto.subtle dene (HTTPS veya localhost gerektirir)
-        if (typeof crypto !== 'undefined' && crypto.subtle) {
-            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-    } catch (e) {
-        console.warn('Native crypto failed, using fallback');
-    }
-    
-    // HATA: crypto.subtle erişilemiyor — HTTPS ortamı gereklidir.
-    // Kriptografik açıdan güvenli olmayan bir ortamda çalışıyorsunuz.
-    throw new Error('sha256: crypto.subtle kullanılamıyor. HTTPS üzerinden erişin.');
-}
-
 function getSupabase() {
     if (!AppState.sb) {
         try {
@@ -739,171 +722,15 @@ function setupTCInput(inputId) {
     });
 }
 
-// Client-side login fallback KALDIRILDI — tüm doğrulama login_with_tc RPC üzerinden yapılır.
-// Security.js yüklenmemişse bu basit RPC-only fonksiyon çalışır.
-
-window.doNormalLogin = async function(type) {
-    // Bu fonksiyon Security.js tarafından override edilir.
-    // Security.js yüklenmemişse bu RPC-only fallback çalışır.
-    const isCoach = type === 'coach';
-    const tcId = isCoach ? 'lc-tc' : 'ls-tc';
-    const passId = isCoach ? 'lc-pass' : 'ls-pass';
-    const errId = isCoach ? 'lc-err' : 'ls-err';
-    
-    const tc = FormatUtils.cleanTC(UIUtils.getValue(tcId));
-    const pass = UIUtils.getValue(passId);
-    const errEl = document.getElementById(errId);
-    
-    if (!tc || !pass) {
-        if (errEl) {
-            errEl.textContent = AppState.lang === 'TR' ? 'TC ve şifre giriniz!' : 'Enter ID and password!';
-            errEl.classList.remove('dn');
-        }
-        return;
-    }
-    
-    if (tc.length !== 11) {
-        if (errEl) {
-            errEl.textContent = AppState.lang === 'TR' ? 'TC Kimlik No 11 hane olmalıdır!' : 'ID must be 11 digits!';
-            errEl.classList.remove('dn');
-        }
-        return;
-    }
-    
-    UIUtils.setLoading(true);
-    if (errEl) errEl.classList.add('dn');
-    
-    try {
-        const sb = getSupabase();
-        if (!sb) throw new Error('Supabase başlatılamadı');
-
-        // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
-        try {
-            const _sess = await sb.auth.getSession();
-            if (_sess?.data?.session) {
-                await sb.auth.signOut();
-            }
-        } catch(e) { console.warn('signOut check:', e); }
-
-        const role = type === 'coach' ? 'coach' : 'sporcu';
-        let loginResult = null;
-
-        // Sadece RPC ile giriş — client-side fallback kaldırıldı
-        try {
-            const { data: rpcData, error: rpcErr } = await sb.rpc('login_with_tc', {
-                p_tc: tc, p_pass: pass, p_role: role
-            });
-
-            if (rpcErr) {
-                console.error('RPC hatası:', rpcErr.code, rpcErr.message);
-                if (errEl) {
-                    errEl.textContent = 'Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.';
-                    errEl.classList.remove('dn');
-                }
-                return;
-            }
-
-            if (typeof rpcData === 'string') {
-                try { loginResult = JSON.parse(rpcData); }
-                catch (parseErr) {
-                    console.error('RPC JSON parse hatası:', parseErr);
-                    if (errEl) {
-                        errEl.textContent = 'Giriş servisi geçici olarak kullanılamıyor. Lütfen tekrar deneyin.';
-                        errEl.classList.remove('dn');
-                    }
-                    return;
-                }
-            } else if (rpcData === null || rpcData === undefined) {
-                console.error('RPC null yanıt — fonksiyon bulunamadı');
-                if (errEl) {
-                    errEl.textContent = 'Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.';
-                    errEl.classList.remove('dn');
-                }
-                return;
-            } else {
-                loginResult = rpcData;
-            }
-        } catch (rpcCatchErr) {
-            console.error('RPC çağrısı başarısız:', rpcCatchErr);
-            if (errEl) {
-                errEl.textContent = 'Giriş servisi geçici olarak kullanılamıyor. Lütfen tekrar deneyin.';
-                errEl.classList.remove('dn');
-            }
-            return;
-        }
-
-        if (!loginResult || !loginResult.ok) {
-            throw new Error((loginResult && loginResult.error) || 'TC veya şifre hatalı!');
-        }
-
-        const found = loginResult.data;
-        
-        if (isCoach) {
-            AppState.currentUser = {
-                id: found.id,
-                name: `${found.fn} ${found.ln}`,
-                role: 'coach',
-                email: `${tc}@coach.local`
-            };
-            AppState.currentOrgId = found.org_id;
-            AppState.currentBranchId = found.branch_id;
-            
-            StorageManager.set('sporcu_app_user', AppState.currentUser);
-            StorageManager.set('sporcu_app_org', AppState.currentOrgId);
-            StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
-            
-            await loadBranchData();
-            
-            const lboxWrap = document.getElementById('lbox-wrap');
-            const wrap = document.getElementById('wrap');
-            const suname = document.getElementById('suname');
-            
-            if (lboxWrap) lboxWrap.style.display = 'none';
-            if (wrap) wrap.classList.remove('dn');
-            if (suname) suname.textContent = AppState.currentUser.name;
-            
-            updateBranchUI();
-            go('attendance');
-        } else {
-            AppState.currentSporcu = DB.mappers.toAthlete(found);
-            AppState.currentOrgId = found.org_id;
-            AppState.currentBranchId = found.branch_id;
-            
-            StorageManager.set('sporcu_app_sporcu', {
-                user: { ...AppState.currentSporcu, spPass: undefined },
-                orgId: AppState.currentOrgId,
-                branchId: AppState.currentBranchId
-            });
-            
-            await loadBranchData();
-            
-            const lboxWrap = document.getElementById('lbox-wrap');
-            const sporcuPortal = document.getElementById('sporcu-portal');
-            const spName = document.getElementById('sp-name');
-            const spOrgname = document.getElementById('sp-orgname');
-            
-            if (lboxWrap) lboxWrap.style.display = 'none';
-            if (sporcuPortal) sporcuPortal.style.display = 'flex';
-            if (spName) spName.textContent = `${AppState.currentSporcu.fn} ${AppState.currentSporcu.ln}`;
-            if (spOrgname) spOrgname.textContent = AppState.data.settings?.schoolName || 'Dragos Futbol Akademisi';
-            
-            const initials = FormatUtils.initials(AppState.currentSporcu.fn, AppState.currentSporcu.ln);
-            UIUtils.setElementAvatar('sp-avatar', null, initials);
-            
-            // Logoyu sporcu portaline uygula
-            applyLogoEverywhere(AppState.data.settings?.logoUrl || '');
-            
-            spTab('profil');
-        }
-        
-    } catch (e) {
-        console.error('Login error:', e);
-        if (errEl) {
-            errEl.textContent = AppState.lang === 'TR' ? 'Kayıt bulunamadı veya şifre hatalı!' : 'Record not found or incorrect password!';
-            errEl.classList.remove('dn');
-        }
-    } finally {
-        UIUtils.setLoading(false);
+// doNormalLogin: Security.js tarafından tanımlanır (v5.0 — login_with_tc RPC).
+// Security.js yüklenmezse kullanıcıya uyarı gösterilir.
+window.doNormalLogin = function(role) {
+    console.error('Security.js yüklenemedi!');
+    var errId = role === 'coach' ? 'lc-err' : 'ls-err';
+    var errEl = document.getElementById(errId);
+    if (errEl) {
+        errEl.textContent = 'Güvenlik modülü yüklenemedi. Sayfayı yenileyip tekrar deneyin.';
+        errEl.classList.remove('dn');
     }
 };
 
@@ -1275,6 +1102,11 @@ async function loadBranchData() {
         
         checkOverdue();
         refreshNotifBadges();
+
+        // Kasa transferlerini de yükle
+        if (typeof loadCashTransfers === 'function') {
+            try { await loadCashTransfers(); } catch(e) { console.warn('loadCashTransfers:', e); }
+        }
     } catch (e) {
         console.error('Load branch data error:', e);
         toast(i18n[AppState.lang].connectionError, 'e');
@@ -1433,25 +1265,31 @@ window.go = function(page, params = {}) {
     const main = document.getElementById('main');
     const pages = {
         dashboard: pgDashboard,
-        athletes: pgAthletes,
+        athletes: typeof __renderAthletes === 'function' ? __renderAthletes : (typeof pgAthletes === 'function' ? pgAthletes : null),
         athleteProfile: () => pgAthleteProfile(params.id),
         payments: pgPayments,
-        accounting: pgAccounting,
+        accounting: typeof pgAccountingV8 === 'function' ? pgAccountingV8 : pgAccounting,
         attendance: pgAttendance,
         coaches: pgCoaches,
         sports: pgSports,
         classes: pgClasses,
         settings: pgSettings,
-        sms: pgSms
+        sms: typeof pgSmsV8 === 'function' ? pgSmsV8 : pgSms,
+        onkayit: typeof __renderOnKayit === 'function' ? __renderOnKayit : null
     };
     
     if (!main) return;
     
     if (pages[page]) {
-        main.innerHTML = pages[page]();
-        if (page === 'athleteProfile') {
-            initProfileTabs();
-        }
+        // Sayfa geçiş animasyonu
+        main.style.opacity = '0';
+        setTimeout(() => {
+            main.innerHTML = pages[page]();
+            if (page === 'athleteProfile') {
+                initProfileTabs();
+            }
+            main.style.opacity = '1';
+        }, 100);
     }
     
     document.querySelectorAll('.ni').forEach(el => {
@@ -2104,154 +1942,6 @@ function pgDashboard() {
                     <div style="width:${income + expense > 0 ? (income / (income + expense) * 100) : 50}%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue))"></div>
                 </div>
             </div>
-        </div>
-    </div>`;
-}
-
-function pgAthletes() {
-    let list = [...AppState.data.athletes];
-    const f = AppState.filters.athletes;
-    
-    if (f.sp) list = list.filter(a => a.sp === f.sp);
-    if (f.st) list = list.filter(a => a.st === f.st);
-    if (f.cls) list = list.filter(a => a.clsId === f.cls);
-    if (f.q) {
-        const q = f.q.toLowerCase();
-        list = list.filter(a => 
-            `${a.fn} ${a.ln}`.toLowerCase().includes(q) || 
-            a.tc.includes(q)
-        );
-    }
-    
-    const isAdmin = AppState.currentUser?.role === 'admin';
-    const isCoach = AppState.currentUser?.role === 'coach';
-    const onKayitlar = AppState.data.onKayitlar || [];
-    const pendingOnKayit = onKayitlar.filter(o => o.status === 'new');
-    
-    // Ön kayıt bölümü — yönetici ve antrenör görebilir
-    const onKayitSection = (isAdmin || isCoach) ? `
-    <div class="card mb3" style="border-left:4px solid var(--yellow)">
-        <div class="flex fjb fca mb3">
-            <div class="tw6 tsm">📝 Ön Kayıt Başvuruları
-                ${pendingOnKayit.length > 0 ? `<span style="background:var(--yellow);color:#000;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:800;margin-left:6px">${pendingOnKayit.length} Yeni</span>` : ''}
-            </div>
-            <button class="btn btn-sm bs" onclick="refreshOnKayitlar()">&#x21BB; Yenile</button>
-        </div>
-        ${onKayitlar.length === 0 ? `
-        <div style="text-align:center;padding:20px;color:var(--text3)">
-            <div style="font-size:32px;margin-bottom:8px">📋</div>
-            <div class="ts">Henüz ön kayıt başvurusu yok.</div>
-            <button class="btn btn-sm bs mt2" onclick="refreshOnKayitlar()">Tekrar Kontrol Et</button>
-        </div>` : `
-        <div class="tw" style="overflow-x:auto">
-            <table>
-                <thead><tr>
-                    <th>Tarih</th>
-                    <th>Ad Soyad</th>
-                    <th>TC</th>
-                    <th>Doğum</th>
-                    <th>Sınıf Talebi</th>
-                    <th>Veli / Telefon</th>
-                    <th>Durum</th>
-                    ${isAdmin ? '<th>İşlemler</th>' : ''}
-                </tr></thead>
-                <tbody>
-                ${onKayitlar.map(ok => {
-                    const adSoyad = ((ok.fn || '') + ' ' + (ok.ln || '')).trim() || ok.studentName || '-';
-                    return `
-                <tr style="${ok.status === 'new' ? 'background:rgba(234,179,8,.07)' : 'opacity:.65'}">
-                    <td class="ts">${ok.createdAt ? DateUtils.format(ok.createdAt) : '-'}</td>
-                    <td class="tw6">${FormatUtils.escape(adSoyad)}</td>
-                    <td class="ts">${FormatUtils.escape(ok.tc || '-')}</td>
-                    <td class="ts">${ok.bd ? DateUtils.format(ok.bd) : '-'}</td>
-                    <td>${FormatUtils.escape(ok.className || '-')}</td>
-                    <td class="ts">${FormatUtils.escape(ok.parentName || '-')}<br><small style="color:var(--text2)">${FormatUtils.escape(ok.parentPhone || '')}</small></td>
-                    <td><span class="bg ${ok.status === 'new' ? 'bg-y' : 'bg-g'}">${ok.status === 'new' ? '⏳ Bekliyor' : '✅ İşlendi'}</span></td>
-                    ${isAdmin ? `<td>
-                        ${ok.status === 'new' ? `<button class="btn btn-xs bp" onclick="convertOnKayit('${FormatUtils.escape(ok.id)}')">Kayıt Aç</button> ` : ''}
-                        <button class="btn btn-xs bd" onclick="delOnKayit('${FormatUtils.escape(ok.id)}')">Sil</button>
-                    </td>` : ''}
-                </tr>`;
-                }).join('')}
-                </tbody>
-            </table>
-        </div>`}
-    </div>` : '';
-    
-    return `
-    <div class="ph">
-        <div class="stit" data-i18n="menuAth">Sporcular</div>
-    </div>
-    ${onKayitSection}
-    <div class="flex fjb fca mb3 fwrap gap2">
-        <div class="flex gap2 fwrap">
-            <select class="fs" onchange="AppState.filters.athletes.sp=this.value;go('athletes')">
-                <option value="">Tüm Branşlar</option>
-                ${AppState.data.sports.map(s => 
-                    `<option value="${FormatUtils.escape(s.name)}"${f.sp === s.name ? ' selected' : ''}>${FormatUtils.escape(s.name)}</option>`
-                ).join('')}
-            </select>
-            <select class="fs" onchange="AppState.filters.athletes.st=this.value;go('athletes')">
-                <option value="">Tüm Durumlar</option>
-                <option value="active"${f.st === 'active' ? ' selected' : ''}>Aktif</option>
-                <option value="inactive"${f.st === 'inactive' ? ' selected' : ''}>Pasif</option>
-            </select>
-            <select class="fs" onchange="AppState.filters.athletes.cls=this.value;go('athletes')">
-                <option value="">Tüm Sınıflar</option>
-                ${AppState.data.classes.map(c => 
-                    `<option value="${FormatUtils.escape(c.id)}"${f.cls === c.id ? ' selected' : ''}>${FormatUtils.escape(c.name)}</option>`
-                ).join('')}
-            </select>
-        </div>
-        <input class="fs" type="text" placeholder="&#x1F50D; İsim veya TC Ara..." 
-               style="max-width:250px" value="${FormatUtils.escape(f.q)}" 
-               onchange="AppState.filters.athletes.q=this.value;go('athletes')"/>
-    </div>
-    <div class="flex fjb fca mb3 gap2">
-        ${isAdmin ? `<button class="btn bp" onclick="editAth()">+ Yeni Sporcu</button>` : '<div></div>'}
-        ${isAdmin ? `<div class="flex gap2">
-            <button class="btn bsu" onclick="importAthletesFromExcel()">&#x1F4CA; Excel'den İçe Aktar</button>
-            <button class="btn bs" onclick="exportAthletes()">&#x1F4E4; Excel İndir</button>
-        </div>` : ''}
-    </div>
-    <div class="card">
-        <div class="tw">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Ad Soyad</th>
-                        <th>TC</th>
-                        <th>Branş</th>
-                        <th>Sınıf</th>
-                        <th>Durum</th>
-                        <th>İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${list.map(a => `
-                    <tr>
-                        <td>
-                            <div class="flex fca gap2">
-                                ${UIUtils.getAvatar(36, null, FormatUtils.initials(a.fn, a.ln))}
-                                <div>
-                                    <div class="tw6">${FormatUtils.escape(a.fn)} ${FormatUtils.escape(a.ln)}</div>
-                                    <div class="ts tm">${DateUtils.age(a.bd)} yaş</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td>${FormatUtils.escape(a.tc)}</td>
-                        <td>${sportEmoji(a.sp)} ${FormatUtils.escape(a.sp)}</td>
-                        <td>${FormatUtils.escape(className(a.clsId))}</td>
-                        <td><span class="bg ${statusClass(a.st)}">${statusLabel(a.st)}</span></td>
-                        <td>
-                            <button class="btn btn-xs bp" onclick="go('athleteProfile', {id:'${FormatUtils.escape(a.id)}'})">Profil</button>
-                            <button class="btn btn-xs bs" onclick="editAth('${FormatUtils.escape(a.id)}')">Düzenle</button>
-                            <button class="btn btn-xs bd" onclick="delAth('${FormatUtils.escape(a.id)}')">Sil</button>
-                        </td>
-                    </tr>
-                    `).join('')}
-                </tbody>
-            </table>
         </div>
     </div>`;
 }
@@ -5321,41 +5011,83 @@ function getNotifications() {
     const today = new Date();
     const payments = AppState.data.payments || [];
 
-    // Yaklaşan ödeme planlarını bildirime çevir
-    payments.filter(p => p.source === 'plan' && p.st !== 'completed').forEach(p => {
-        const dueDate = new Date(p.dt);
-        const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-        const athName = p.an || 'Sporcu';
+    // Sporcu/veli girişi: sadece kendi ödeme bildirimlerini görsün
+    const isSporcu = !!AppState.currentSporcu;
+    const sporcuId = isSporcu ? AppState.currentSporcu.id : null;
 
-        if (diffDays < 0) {
-            notifications.push({
-                id: 'notif-' + p.id,
-                icon: '⚠️',
-                text: `${athName} — ${FormatUtils.currency(p.amt)} ödeme ${Math.abs(diffDays)} gün gecikti!`,
-                time: DateUtils.format(p.dt),
-                type: 'danger'
-            });
-        } else if (diffDays <= 7) {
-            notifications.push({
-                id: 'notif-' + p.id,
-                icon: '🔔',
-                text: `${athName} — ödemesine ${diffDays} gün kaldı (${FormatUtils.currency(p.amt)})`,
-                time: DateUtils.format(p.dt),
-                type: 'warning'
-            });
-        }
-    });
+    if (isSporcu) {
+        // Sporcu/veli: sadece kendi ödemelerine ait bildirimleri göster
+        // Yaklaşan/gecikmiş ödeme planları (admin/antrenör tarafından oluşturulmuş)
+        payments.filter(p => p.aid === sporcuId && p.source === 'plan' && p.st !== 'completed').forEach(p => {
+            const dueDate = new Date(p.dt);
+            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
 
-    // Onay bekleyen veli bildirimleri
-    payments.filter(p => p.notifStatus === 'pending_approval').forEach(p => {
-        notifications.push({
-            id: 'notif-approval-' + p.id,
-            icon: '📩',
-            text: `${p.an || 'Veli'} ödeme bildirimi gönderdi (${FormatUtils.currency(p.amt)}) — Onay bekliyor`,
-            time: DateUtils.format(p.dt),
-            type: 'info'
+            if (diffDays < 0) {
+                notifications.push({
+                    id: 'notif-' + p.id,
+                    icon: '⚠️',
+                    text: `${FormatUtils.currency(p.amt)} ödemeniz ${Math.abs(diffDays)} gün gecikti!`,
+                    time: DateUtils.format(p.dt),
+                    type: 'danger'
+                });
+            } else if (diffDays <= 7) {
+                notifications.push({
+                    id: 'notif-' + p.id,
+                    icon: '🔔',
+                    text: `Ödemenize ${diffDays} gün kaldı (${FormatUtils.currency(p.amt)})`,
+                    time: DateUtils.format(p.dt),
+                    type: 'warning'
+                });
+            }
         });
-    });
+
+        // Kendi gönderdiği onay bekleyen bildirimler
+        payments.filter(p => p.aid === sporcuId && p.notifStatus === 'pending_approval').forEach(p => {
+            notifications.push({
+                id: 'notif-approval-' + p.id,
+                icon: '📩',
+                text: `Ödeme bildiriminiz onay bekliyor (${FormatUtils.currency(p.amt)})`,
+                time: DateUtils.format(p.dt),
+                type: 'info'
+            });
+        });
+    } else {
+        // Admin/Antrenör: tüm ödemeleri görebilir
+        payments.filter(p => p.source === 'plan' && p.st !== 'completed').forEach(p => {
+            const dueDate = new Date(p.dt);
+            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            const athName = p.an || 'Sporcu';
+
+            if (diffDays < 0) {
+                notifications.push({
+                    id: 'notif-' + p.id,
+                    icon: '⚠️',
+                    text: `${athName} — ${FormatUtils.currency(p.amt)} ödeme ${Math.abs(diffDays)} gün gecikti!`,
+                    time: DateUtils.format(p.dt),
+                    type: 'danger'
+                });
+            } else if (diffDays <= 7) {
+                notifications.push({
+                    id: 'notif-' + p.id,
+                    icon: '🔔',
+                    text: `${athName} — ödemesine ${diffDays} gün kaldı (${FormatUtils.currency(p.amt)})`,
+                    time: DateUtils.format(p.dt),
+                    type: 'warning'
+                });
+            }
+        });
+
+        // Onay bekleyen veli bildirimleri (admin/antrenör için)
+        payments.filter(p => p.notifStatus === 'pending_approval').forEach(p => {
+            notifications.push({
+                id: 'notif-approval-' + p.id,
+                icon: '📩',
+                text: `${p.an || 'Veli'} ödeme bildirimi gönderdi (${FormatUtils.currency(p.amt)}) — Onay bekliyor`,
+                time: DateUtils.format(p.dt),
+                type: 'info'
+            });
+        });
+    }
 
     // Dismissed olanları filtrele
     const dismissed = JSON.parse(StorageManager.get('dismissed_notifs') || '[]');
