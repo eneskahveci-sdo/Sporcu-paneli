@@ -31,13 +31,13 @@
 <script src="/init.js"></script>
 </head>
 <body>
-<div id="splash-screen" style="position:fixed;inset:0;background:#080c14;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;transition:opacity .5s ease">
+<div id="splash-screen" role="status" aria-live="polite" style="position:fixed;inset:0;background:#080c14;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;transition:opacity .5s ease">
 <div style="width:80px;height:80px;margin-bottom:20px;animation:splash-pulse 1.5s ease-in-out infinite"><img src="/icons/icon.svg" alt="Dragos Futbol Akademisi" width="80" height="80" style="border-radius:20px"/></div>
 <div style="font-family:Inter,system-ui,sans-serif;font-weight:800;font-size:20px;color:#e2e8f0;letter-spacing:-.5px">Dragos Futbol Akademisi</div>
 <div style="margin-top:20px;width:40px;height:40px;border:3px solid #1e3352;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite"></div>
 </div>
 <style>@keyframes splash-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}</style>
-<script>setTimeout(function(){var s=document.getElementById('splash-screen');if(s){s.style.opacity='0';setTimeout(function(){s.remove()},500)}},5000);</script>
+<script>function removeSplash(){var s=document.getElementById('splash-screen');if(s&&!s.dataset.removing){s.dataset.removing='1';s.style.opacity='0';setTimeout(function(){if(s.parentNode)s.remove()},500)}}window.addEventListener('load',removeSplash);setTimeout(removeSplash,5000);</script>
 <a href="#main" class="skip-nav">Ana içeriğe geç</a>
 <div id="loading-overlay" style="display:none" role="status" aria-live="polite"><div class="spinner"></div><div style="font-weight:600;color:var(--text2)" data-i18n="loading">Yükleniyor...</div></div>
 <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="m-box"><div class="m-head"><div class="m-tit" id="modal-title">Başlık</div><button class="menu-btn" onclick="closeModal()" aria-label="Modalı kapat" style="display:block;padding:4px;border:none;min-width:44px;min-height:44px"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div><div class="m-body" id="modal-body"></div><div class="m-foot" id="modal-footer"></div></div></div>
@@ -97,6 +97,5 @@
 <script src="ui-improvements.js"></script>
 <script src="Security.js"></script>
 <script src="pwa-register.js"></script>
-<script>window.addEventListener('load',function(){var s=document.getElementById('splash-screen');if(s){s.style.opacity='0';setTimeout(function(){s.remove()},500)}});</script>
 </body>
 </html>
