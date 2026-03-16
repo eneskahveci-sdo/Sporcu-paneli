@@ -1046,7 +1046,8 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
     UIUtils.setLoading(true);
     try {
-        var orderId = 'PAY-' + a.id.slice(0, 8) + '-' + Date.now();
+        // PayTR: merchant_oid sadece alfanumerik olmalı, özel karakter kabul etmez
+        var orderId = 'PAY' + a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now();
         var amtKurus = Math.round(amt * 100);
 
         // user_basket: PayTR Base64 encode bekler
@@ -1126,5 +1127,3 @@ window.initiatePayTRPayment = async function(amt, desc) {
 };
 
 console.log('✅ PayTR initiatePayTRPayment override yüklendi (oid fix + HMAC)');
-
- 
