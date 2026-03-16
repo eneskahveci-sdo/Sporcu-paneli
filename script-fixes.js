@@ -1021,6 +1021,72 @@ if (!_extendMappers()) {
 console.log('✅ Script-fixes V9.1 yüklendi — DB.mappers retry fix dahil');
 
 // ────────────────────────────────────────────────────────
+// PayTR FIX: submitSpPayment override
+// Orijinal submitSpPayment, local scope'daki initiatePayTRPayment'ı
+// çağırıyor. window.initiatePayTRPayment override'ımızı kullanması
+// için submitSpPayment'ı da override ediyoruz.
+// ────────────────────────────────────────────────────────
+
+window.submitSpPayment = async function() {
+    var desc = UIUtils.getValue('sp-desc');
+    var method = AppState.ui.selectedPayMethod;
+    var a = AppState.currentSporcu;
+    var planId = AppState.ui.activePlanId;
+    var planIds = AppState.ui.activePlanIds || (planId ? [planId] : []);
+
+    if (!method) { toast('Lütfen ödeme yöntemi seçiniz!', 'e'); return; }
+
+    var plans = planIds.map(function(id) { return AppState.data.payments.find(function(p) { return p.id === id; }); }).filter(Boolean);
+    var totalAmt = plans.length > 0 ? plans.reduce(function(s, p) { return s + (p.amt || 0); }, 0) : (a.fee || 0);
+    if (!totalAmt || totalAmt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
+
+    if (method === 'paytr') {
+        // ✅ FIX: window.initiatePayTRPayment çağır (override'lı versiyon)
+        await window.initiatePayTRPayment(totalAmt, desc);
+        return;
+    }
+
+    // PayTR değilse: havale/nakit/kredi kartı bildirimi
+    var sb = getSupabase();
+    if (!sb) { toast('Bağlantı hatası.', 'e'); return; }
+
+    try {
+        var payList = plans.length > 0 ? plans : [null];
+        for (var i = 0; i < payList.length; i++) {
+            var plan = payList[i];
+            var amt = plan ? plan.amt : totalAmt;
+            var payObj = {
+                id: generateId(),
+                aid: a.id,
+                an: a.fn + ' ' + a.ln,
+                amt: amt,
+                ds: desc || (plan && plan.ds) || 'Veli bildirimi',
+                st: 'pending',
+                dt: (plan && plan.dt) || DateUtils.today(),
+                ty: 'income',
+                serviceName: desc || (plan && plan.ds) || 'Veli bildirimi',
+                source: 'parent_notification',
+                notifStatus: 'pending_approval',
+                payMethod: method
+            };
+            var result = await sb.from('payments').insert(DB.mappers.fromPayment(payObj));
+            if (result.error) throw result.error;
+            AppState.data.payments.push(payObj);
+        }
+        var methodLabel = method === 'nakit' ? 'Nakit' : method === 'kredi_karti' ? 'Kredi Kartı' : 'Havale';
+        var count = plans.length > 1 ? ' (' + plans.length + ' ay)' : '';
+        toast('✅ ' + methodLabel + ' ödeme bildiriminiz alındı' + count + '! Yönetici onaylayacak.', 'g');
+        AppState.ui.activePlanId = null;
+        AppState.ui.activePlanIds = null;
+        var payForm = document.getElementById('sp-pay-form');
+        if (payForm) payForm.style.display = 'none';
+        spTab('odemeler');
+    } catch(e) {
+        toast('Bildirim gönderilemedi: ' + (e.message || e), 'e');
+    }
+};
+
+// ────────────────────────────────────────────────────────
 // PayTR FIX: user_basket Base64 encode + oid parametresi + hata yönetimi
 // Orijinal initiatePayTRPayment'ı override eder.
 //
