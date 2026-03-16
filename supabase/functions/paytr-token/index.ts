@@ -13,9 +13,20 @@ function jsonResp(body: Record<string, unknown>, status: number) {
 
 async function hmacSha256Base64(data: string, key: string): Promise<string> {
   const enc = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey("raw", enc.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+  const bytes = new Uint8Array(sig);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 Deno.serve(async (req: Request) => {
@@ -67,10 +78,16 @@ Deno.serve(async (req: Request) => {
 
     const userIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "1.1.1.1";
 
+    // PayTR hash hesaplama - dokümantasyondaki sıra:
+    // merchant_id + user_ip + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode;
+
+    // PayTR: base64_encode(hash_hmac('sha256', hashStr + merchant_salt, merchant_key, true))
     const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    console.log("PayTR API cagrilacak, merchant_oid:", merchant_oid, "test_mode:", test_mode);
+    console.log("PayTR hash input length:", (hashStr + MERCHANT_SALT).length);
+    console.log("PayTR token (first 20):", paytrToken.substring(0, 20));
+    console.log("PayTR API cagrilacak, merchant_oid:", merchant_oid, "test_mode:", test_mode, "user_ip:", userIp);
 
     const formData = new URLSearchParams();
     formData.append("merchant_id", MERCHANT_ID);
