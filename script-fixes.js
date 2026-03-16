@@ -1041,7 +1041,6 @@ window.submitSpPayment = async function() {
     if (!totalAmt || totalAmt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
 
     if (method === 'paytr') {
-        // ✅ FIX: window.initiatePayTRPayment çağır (override'lı versiyon)
         await window.initiatePayTRPayment(totalAmt, desc);
         return;
     }
@@ -1087,16 +1086,10 @@ window.submitSpPayment = async function() {
 };
 
 // ────────────────────────────────────────────────────────
-// PayTR FIX: user_basket Base64 encode + oid parametresi + hata yönetimi
-// Orijinal initiatePayTRPayment'ı override eder.
-//
-// DÜZELTMELER:
-// 1. merchant_ok_url ve merchant_fail_url'ye &oid= parametresi eklendi
-//    (checkPayTRReturn orderId'yi bulamıyordu)
-// 2. user_basket zaten script.js'de base64 — burada da garanti altına alındı
-// 3. Daha iyi hata mesajları
+// PayTR FIX: initiatePayTRPayment — doğrudan fetch ile Edge Function çağrısı
+// sb.functions.invoke JWT doğrulaması yüzünden başarısız olabiliyor.
+// Doğrudan fetch kullanarak bu sorunu bypass ediyoruz.
 // ────────────────────────────────────────────────────────
-var _origInitiatePayTR = typeof initiatePayTRPayment === 'function' ? initiatePayTRPayment : null;
 
 window.initiatePayTRPayment = async function(amt, desc) {
     var s = AppState.data.settings;
@@ -1120,46 +1113,58 @@ window.initiatePayTRPayment = async function(amt, desc) {
         var basketRaw = JSON.stringify([[desc || 'Aidat', String(amtKurus), 1]]);
         var userBasket = btoa(unescape(encodeURIComponent(basketRaw)));
 
-        var invokeResult = await sb.functions.invoke('paytr-token', {
-            body: {
-                merchant_id: s.paytrMerchantId,
-                merchant_oid: orderId,
-                email: a.em || (a.tc + '@veli.local'),
-                payment_amount: String(amtKurus),
-                user_name: (a.fn + ' ' + a.ln).substring(0, 25),
-                user_address: 'Turkiye',
-                user_phone: a.pph || a.ph || '05000000000',
-                // ✅ FIX: oid parametresi eklendi — checkPayTRReturn() bunu okuyacak
-                merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok&oid=' + orderId,
-                merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail&oid=' + orderId,
-                user_basket: userBasket,
-                currency: 'TL',
-                test_mode: '0',
-                no_installment: '1',
-                max_installment: '0',
-                lang: 'tr',
-                org_id: AppState.currentOrgId,
-                branch_id: AppState.currentBranchId,
-                athlete_id: a.id,
-                athlete_name: a.fn + ' ' + a.ln
-            }
+        var requestBody = {
+            merchant_id: s.paytrMerchantId,
+            merchant_oid: orderId,
+            email: a.em || (a.tc + '@veli.local'),
+            payment_amount: String(amtKurus),
+            user_name: (a.fn + ' ' + a.ln).substring(0, 25),
+            user_address: 'Turkiye',
+            user_phone: a.pph || a.ph || '05000000000',
+            merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok&oid=' + orderId,
+            merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail&oid=' + orderId,
+            user_basket: userBasket,
+            currency: 'TL',
+            test_mode: '0',
+            no_installment: '1',
+            max_installment: '0',
+            lang: 'tr'
+        };
+
+        // Doğrudan fetch ile Edge Function çağır (JWT sorununu bypass eder)
+        var supabaseUrl = 'https://wfarbydojxtufnkjuhtc.supabase.co';
+        var supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
+
+        console.log('PayTR: Edge Function çağrılıyor...', orderId);
+
+        var response = await fetch(supabaseUrl + '/functions/v1/paytr-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseAnonKey,
+                'Authorization': 'Bearer ' + supabaseAnonKey
+            },
+            body: JSON.stringify(requestBody)
         });
 
-        var tokenData = invokeResult.data;
-        var error = invokeResult.error;
+        console.log('PayTR: Edge Function response status:', response.status);
 
-        if (error || !tokenData || !tokenData.token) {
-            var errMsg = '';
-            if (error && error.message) {
-                errMsg = error.message;
-            } else if (tokenData && tokenData.error) {
-                errMsg = tokenData.error;
-            } else if (error) {
-                errMsg = JSON.stringify(error);
-            } else {
-                errMsg = 'Token alınamadı. Edge function çalışıyor mu?';
-            }
-            console.error('PayTR edge function hatası:', error, tokenData);
+        var tokenData;
+        try {
+            tokenData = await response.json();
+        } catch(jsonErr) {
+            var textResp = await response.text();
+            console.error('PayTR: Response JSON parse hatası, raw:', textResp);
+            throw new Error('Edge Function yanıt parse hatası: ' + textResp.substring(0, 200));
+        }
+
+        console.log('PayTR: Edge Function response data:', tokenData);
+
+        if (!response.ok || !tokenData || !tokenData.token) {
+            var errMsg = tokenData && tokenData.error ? tokenData.error : 
+                         tokenData && tokenData.msg ? tokenData.msg :
+                         'Token alınamadı (HTTP ' + response.status + ')';
+            console.error('PayTR token hatası:', errMsg, tokenData);
             throw new Error(errMsg);
         }
 
@@ -1192,4 +1197,4 @@ window.initiatePayTRPayment = async function(amt, desc) {
     }
 };
 
-console.log('✅ PayTR initiatePayTRPayment override yüklendi (oid fix + HMAC)');
+console.log('✅ PayTR initiatePayTRPayment override yüklendi (direct fetch + oid fix)');
