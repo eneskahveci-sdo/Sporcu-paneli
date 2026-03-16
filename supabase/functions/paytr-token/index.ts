@@ -23,7 +23,21 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResp({ error: "Method not allowed" }, 405);
 
   try {
-    const body = await req.json();
+    // Body'yi önce text olarak oku — debug için
+    const rawBody = await req.text();
+    console.log("Raw body length:", rawBody.length, "content:", rawBody.substring(0, 500));
+    
+    if (!rawBody || rawBody.length === 0) {
+      return jsonResp({ error: "Request body bos geldi. Content-Type: application/json gonderdiginizden emin olun." }, 400);
+    }
+
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (parseErr) {
+      return jsonResp({ error: "JSON parse hatasi: " + String(parseErr), rawBodyPreview: rawBody.substring(0, 200) }, 400);
+    }
+
     const MERCHANT_ID = Deno.env.get("PAYTR_MERCHANT_ID") ?? body.merchant_id ?? "";
     const MERCHANT_KEY = Deno.env.get("PAYTR_MERCHANT_KEY") ?? "";
     const MERCHANT_SALT = Deno.env.get("PAYTR_MERCHANT_SALT") ?? "";
@@ -46,25 +60,4 @@ Deno.serve(async (req) => {
 
     const formData = new URLSearchParams({
       merchant_id: MERCHANT_ID, user_ip: userIp, merchant_oid, email,
-      payment_amount: String(payment_amount), paytr_token: paytrToken, user_basket,
-      debug_on: test_mode === "1" ? "1" : "0", no_installment, max_installment,
-      user_name: user_name.substring(0, 25), user_address: (user_address || "Turkiye").substring(0, 200),
-      user_phone: user_phone || "05000000000", merchant_ok_url, merchant_fail_url,
-      timeout_limit: "30", currency, test_mode, lang,
-    });
-
-    const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData.toString(),
-    });
-    const data = await res.json();
-
-    if (data.status === "success") return jsonResp({ token: data.token }, 200);
-    console.error("PayTR token hatasi:", data);
-    return jsonResp({ error: data.reason || "Token alinamadi", detail: data }, 400);
-  } catch (err) {
-    console.error("paytr-token error:", err);
-    return jsonResp({ error: String(err) }, 500);
-  }
-});
+      payment_amount: String(payment_amount), pay
