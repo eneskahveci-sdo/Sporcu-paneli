@@ -1125,7 +1125,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
             merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail&oid=' + orderId,
             user_basket: userBasket,
             currency: 'TL',
-            test_mode: '0',
+            test_mode: '1',
             no_installment: '1',
             max_installment: '0',
             lang: 'tr'
