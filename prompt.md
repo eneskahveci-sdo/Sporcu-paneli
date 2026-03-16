@@ -1,605 +1,668 @@
-# DRAGOS FUTBOL AKADEMİSİ — GELİŞTİRME PROMPT'U
+# 🔧 Dragos Futbol Akademisi — Hata Tespiti ve Düzeltme Kılavuzu
 
-## ⚠️ KRİTİK KURALLAR
-
-> Bu prompt ile yapılacak tüm değişikliklerde aşağıdaki kurallara **kesinlikle** uyulmalıdır:
->
-> 1. **Mevcut çalışan hiçbir fonksiyon bozulmamalıdır.** Giriş sistemi (admin, sporcu, antrenör), yoklama, ödeme, finans raporu, WhatsApp/SMS, ön kayıt, QR, Excel import/export, makbuz oluşturma gibi tüm mevcut özellikler aynen çalışmaya devam etmelidir.
-> 2. **Arayüz karmaşık hale gelmemelidir.** Mevcut temiz ve sade yapı korunmalı, yeni özellikler mevcut tasarım diline uygun eklenmelidir.
-> 3. **Hatasız olmalıdır.** Her değişiklik test edilebilir, console hatası üretmemeli ve mobil uyumlu olmalıdır.
-> 4. **Geriye dönük uyumluluk** sağlanmalıdır. Supabase veritabanı şeması, RLS politikaları ve mevcut veri yapıları korunmalıdır.
-> 5. **Supabase + Vercel deploy yapısı** korunmalıdır.
+> **ÖNEMLİ KURAL:** `script.js` dosyası hiçbir şekilde değiştirilmeyecek! Tüm düzeltmeler `script-fixes.js`, `vercel.json`, `Security.js` veya yeni Edge Function dosyaları üzerinden yapılacak. Mevcut çalışan hiçbir fonksiyon bozulmayacak!
 
 ---
 
-## PROJE YAPISI (MEVCUT)
+## HATA #1 — KRİTİK: PayTR iframe CSP (Content Security Policy) Tarafından Engelleniyor
 
+### Sorun
+`vercel.json` içindeki CSP başlığında `frame-src` direktifi tanımlı değil. PayTR ödeme iframe'i `https://www.paytr.com/odeme/guvenli/...` adresinden yükleniyor ama tarayıcı bunu engelliyor. Ayrıca `X-Frame-Options: DENY` başlığı da tüm iframe'leri engelliyor.
+
+**Ek sorun:** `Permissions-Policy: payment=()` başlığı Payment Request API'yi devre dışı bırakıyor.
+
+### Dosya: `vercel.json`
+### Çözüm
+
+CSP başlığına `frame-src` direktifini ekle ve `X-Frame-Options`'ı PayTR iframe'i için uyumlu hale getir:
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://cdn.skypack.dev https://graph.facebook.com https://www.paytr.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://www.paytr.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'" }
+      ]
+    }
+  ]
+}
 ```
-Sporcu-paneli-main/
-├── index.html          — Ana HTML (tek sayfa PWA)
-├── script.js           — Ana uygulama mantığı (~5500 satır)
-├── script-fixes.js     — Ek özellikler ve düzeltmeler (V9)
-├── ui-improvements.js  — UI/UX iyileştirme paketi
-├── Security.js         — Güvenlik modülü (login_with_tc RPC)
-├── init.js             — Supabase CDN yükleme ve fallback
-├── pwa-register.js     — PWA Service Worker kaydı
-├── sw.js               — Service Worker (cache stratejisi)
-├── style.css           — Tüm stiller (minify edilmemiş)
-├── manifest.json       — PWA manifest
-├── vercel.json         — Vercel deploy + güvenlik header'ları
-├── RLS_POLICIES.sql    — Supabase RLS politikaları ve login_with_tc fonksiyonu
-├── icons/              — PWA ikonları
-└── supabase/           — Supabase config ve edge function'lar
+
+**Değişiklikler:**
+1. `frame-src https://www.paytr.com` eklendi (iframe izni)
+2. `frame-ancestors 'none'` → `frame-ancestors 'self'` olarak değiştirildi
+3. `X-Frame-Options: DENY` → `X-Frame-Options: SAMEORIGIN` olarak değiştirildi
+4. `Permissions-Policy`'den `payment=()` kaldırıldı
+
+---
+
+## HATA #2 — KRİTİK: `paytr-token` Edge Function Mevcut Değil
+
+### Sorun
+`script.js` satır 4685'te `sb.functions.invoke('paytr-token', {...})` çağrılıyor ama `supabase/functions/` dizininde sadece `send-sms` fonksiyonu var. `paytr-token` fonksiyonu hiç oluşturulmamış. Bu yüzden PayTR ödeme tokeni alınamıyor.
+
+### Dosya: `supabase/functions/paytr-token/index.ts` (YENİ OLUŞTURULACAK)
+### Çözüm
+
+`supabase/functions/paytr-token/index.ts` dosyasını oluştur:
+
+```typescript
+// Supabase Edge Function: paytr-token
+// PayTR iframe token'ı sunucu tarafında oluşturur.
+// Merchant Key ve Salt yalnızca Supabase Secrets'tan okunur — frontend'e asla gönderilmez.
+
+import { createHmac } from "node:crypto";
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // API key doğrulama
+  const apikey = req.headers.get('apikey') || req.headers.get('authorization')?.replace('Bearer ', '');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!apikey || !supabaseAnonKey || apikey !== supabaseAnonKey) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  try {
+    const body = await req.json();
+
+    const merchantId = body.merchant_id;
+    const merchantKey = Deno.env.get('PAYTR_MERCHANT_KEY');
+    const merchantSalt = Deno.env.get('PAYTR_MERCHANT_SALT');
+
+    if (!merchantId || !merchantKey || !merchantSalt) {
+      return new Response(
+        JSON.stringify({ error: 'PayTR yapılandırması eksik. Supabase Secrets kontrol edin.' }),
+        { status: 503, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const merchantOid = body.merchant_oid;
+    const email = body.email;
+    const paymentAmount = body.payment_amount; // kuruş cinsinden
+    const userName = body.user_name;
+    const userAddress = body.user_address || 'Türkiye';
+    const userPhone = body.user_phone;
+    const merchantOkUrl = body.merchant_ok_url;
+    const merchantFailUrl = body.merchant_fail_url;
+    const userBasket = body.user_basket; // JSON string
+    const currency = body.currency || 'TL';
+    const testMode = body.test_mode || '0';
+    const noInstallment = '1';
+    const maxInstallment = '0';
+    const userIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1';
+    const timeout_limit = '30';
+    const debug_on = '0';
+
+    // PayTR token hash hesaplama
+    // Hash string: merchant_id + user_ip + merchant_oid + email + payment_amount +
+    //              user_basket + no_installment + max_installment + currency + test_mode
+    const hashStr = `${merchantId}${userIp}${merchantOid}${email}${paymentAmount}${userBasket}${noInstallment}${maxInstallment}${currency}${testMode}`;
+    
+    // HMAC hesapla: hash(hashStr + merchantSalt, merchantKey)
+    const paytrToken = createHmac('sha256', merchantKey)
+      .update(hashStr + merchantSalt)
+      .digest('base64');
+
+    // PayTR API'ye token isteği gönder
+    const formData = new URLSearchParams();
+    formData.append('merchant_id', merchantId);
+    formData.append('user_ip', userIp);
+    formData.append('merchant_oid', merchantOid);
+    formData.append('email', email);
+    formData.append('payment_amount', String(paymentAmount));
+    formData.append('paytr_token', paytrToken);
+    formData.append('user_basket', userBasket);
+    formData.append('user_name', userName);
+    formData.append('user_address', userAddress);
+    formData.append('user_phone', userPhone);
+    formData.append('merchant_ok_url', merchantOkUrl);
+    formData.append('merchant_fail_url', merchantFailUrl);
+    formData.append('timeout_limit', timeout_limit);
+    formData.append('debug_on', debug_on);
+    formData.append('no_installment', noInstallment);
+    formData.append('max_installment', maxInstallment);
+    formData.append('currency', currency);
+    formData.append('test_mode', testMode);
+    formData.append('lang', 'tr');
+
+    const paytrResp = await fetch('https://www.paytr.com/odeme/api/get-token', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const paytrResult = await paytrResp.json();
+
+    if (paytrResult.status === 'success') {
+      return new Response(
+        JSON.stringify({ token: paytrResult.token }),
+        { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      console.error('PayTR token hatası:', paytrResult);
+      return new Response(
+        JSON.stringify({ error: paytrResult.reason || 'Token alınamadı' }),
+        { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+  } catch (err) {
+    console.error('PayTR token edge function hatası:', err);
+    return new Response(
+      JSON.stringify({ error: 'Sunucu hatası: ' + (err as Error).message }),
+      { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+  }
+});
 ```
 
-## TEKNOLOJİ STACK'İ
+**Sonrasında Supabase CLI ile deploy et:**
+```bash
+supabase functions deploy paytr-token --no-verify-jwt
+```
 
-- **Frontend:** Vanilla HTML/CSS/JS (tek sayfa PWA)
-- **Backend:** Supabase (PostgreSQL + Auth + RLS + Edge Functions)
-- **Deploy:** Vercel (statik hosting)
-- **Kütüphaneler:** Supabase JS SDK, SheetJS (xlsx), jsPDF
-
----
-
-## YAPILACAK İYİLEŞTİRMELER
-
----
-
-### A1. Modern Tipografi (Google Fonts)
-
-**Amaç:** Varsayılan sistem fontu yerine profesyonel bir font kullanımı.
-
-**Yapılacaklar:**
-- `index.html`'e Google Fonts linki ekle (Inter veya Outfit fontu)
-- `style.css`'deki `font-family` tanımını güncelle
-- Tüm `font-weight` değerlerini yeni fonta uygun ayarla
-- Performans için `font-display: swap` kullan
-- `preconnect` ile `fonts.googleapis.com` ve `fonts.gstatic.com` ekle
-
-**Dikkat:**
-- Mevcut layout'u bozmamalı
-- Mobilde font boyutları aynen kalmalı
-- `vercel.json` CSP'ye `fonts.googleapis.com` ve `fonts.gstatic.com` eklenmelidir
+**Supabase Secrets ayarla:**
+```bash
+supabase secrets set PAYTR_MERCHANT_KEY=XXXXXXX PAYTR_MERCHANT_SALT=XXXXXXX
+```
 
 ---
 
-### A2. Dark/Light Tema Geçişi Animasyonu
+## HATA #3 — KRİTİK: `paytr-webhook` Edge Function Mevcut Değil
 
-**Amaç:** Tema değişiminde sorunsuz ve görsel olarak hoş bir geçiş animasyonu.
+### Sorun
+PayTR, ödeme sonucu için webhook çağrısı yapar. `script.js` satır 3679'da webhook URL'i gösteriliyor (`/functions/v1/paytr-webhook`) ama bu fonksiyon oluşturulmamış. Ödeme tamamlansa bile `payments` tablosu güncellenmez.
 
-**Yapılacaklar:**
-- `style.css`'deki CSS değişkenlerine `transition` ekle (renk değişimleri için)
-- `applyTheme()` fonksiyonunda geçiş sırasında kısa bir `class` toggle animasyonu
-- Geçiş sırasında bir "ripple" veya "fade" efekti (isteğe bağlı, performansı düşürmemeli)
-- Tema tercihini `prefers-color-scheme` media query ile otomatik algılama
+### Dosya: `supabase/functions/paytr-webhook/index.ts` (YENİ OLUŞTURULACAK)
+### Çözüm
 
-**Dikkat:**
-- Mevcut `applyTheme()` ve `toggleTheme()` fonksiyonları korunmalı
-- `StorageManager` ile tema kaydetme aynen çalışmalı
+`supabase/functions/paytr-webhook/index.ts` dosyasını oluştur:
 
----
+```typescript
+// Supabase Edge Function: paytr-webhook
+// PayTR ödeme sonucu webhook callback'i.
+// PayTR bu endpoint'e POST yapar, hash doğrulaması yapılır, payments tablosu güncellenir.
 
-### A4. Logo Tasarımı
+import { createHmac } from "node:crypto";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-**Amaç:** SVG base64 placeholder yerine gerçek logo dosyası kullanımı.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'content-type',
+};
 
-**Yapılacaklar:**
-- `/icons/` klasörüne profesyonel bir futbol akademisi logosu ekle (SVG + PNG formatlarında)
-- `manifest.json`'daki ikon referanslarını güncelle
-- `DEFAULT_LOGO` sabitini yeni logo dosya yolu ile güncelle
-- `applyLogoEverywhere()` fonksiyonunun yeni logo ile uyumlu çalıştığını doğrula
-- Giriş ekranında logonun responsive ve güzel görünmesini sağla
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
 
-**Dikkat:**
-- Supabase settings'ten yüklenen özel logo özelliği bozulmamalı
-- `applyLogoEverywhere()` fonksiyonu aynen çalışmalı
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 });
+  }
 
----
+  try {
+    const formData = await req.formData();
 
-### B7. Supabase Anon Key'in Ortam Değişkenine Taşınması
+    const merchantOid = formData.get('merchant_oid') as string;
+    const status = formData.get('status') as string; // 'success' veya 'failed'
+    const totalAmount = formData.get('total_amount') as string;
+    const hash = formData.get('hash') as string;
+    const failedReasonCode = formData.get('failed_reason_code') as string || '';
+    const failedReasonMsg = formData.get('failed_reason_msg') as string || '';
 
-**Amaç:** Hardcoded anon key yerine Vercel environment variable kullanımı.
+    const merchantKey = Deno.env.get('PAYTR_MERCHANT_KEY');
+    const merchantSalt = Deno.env.get('PAYTR_MERCHANT_SALT');
 
-**Yapılacaklar:**
-- Vercel Dashboard'da `SUPABASE_URL` ve `SUPABASE_ANON_KEY` environment variable'ları tanımla
-- `script.js`'deki `SUPABASE_CONFIG` sabitini ortam değişkeninden oku
-- Build sırasında veya runtime'da environment variable'ları inject etmek için bir mekanizma oluştur
-- Vercel serverless function veya build-time injection ile config dosyası oluştur (örn: `/api/config.js` endpoint'i)
+    if (!merchantKey || !merchantSalt) {
+      console.error('PayTR webhook: Secrets eksik');
+      return new Response('OK', { status: 200 }); // PayTR'ye OK dönmezsen tekrar dener
+    }
 
-**Dikkat:**
-- Anon key public-safe olduğu için kritik bir güvenlik açığı değil, ama best practice olarak environment variable kullanılmalı
-- `getSupabase()` fonksiyonu aynen çalışmalı
-- Offline modda fallback olmalı
+    // Hash doğrulama
+    const hashStr = `${merchantOid}${merchantSalt}${status}${totalAmount}`;
+    const expectedHash = createHmac('sha256', merchantKey)
+      .update(hashStr)
+      .digest('base64');
 
----
+    if (hash !== expectedHash) {
+      console.error('PayTR webhook: Hash doğrulaması başarısız!');
+      return new Response('OK', { status: 200 });
+    }
 
-### B8. Rate Limiting Sunucu Tarafında
+    // Supabase service_role client (RLS bypass)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const sb = createClient(supabaseUrl, supabaseServiceKey);
 
-**Amaç:** Client-side rate limiting yerine sunucu tarafında rate limiting.
+    if (status === 'success') {
+      await sb.from('payments').update({
+        st: 'completed',
+        source: 'paytr',
+        notif_status: 'approved',
+        pay_method: 'paytr'
+      }).eq('id', merchantOid);
 
-**Yapılacaklar:**
-- Supabase Edge Function oluştur: `supabase/functions/rate-limit/`
-- `login_with_tc` RPC fonksiyonuna rate limiting mantığı ekle (veya ayrı bir PostgreSQL fonksiyonu)
-- Supabase'de `login_attempts` tablosu oluştur (ip, tc_hash, attempt_count, locked_until, created_at)
-- Başarısız girişleri kaydet, 5 başarısız denemeden sonra 5 dakika kilitle
-- Security.js'deki client-side rate limiting'i yedek olarak koru
+      console.log(`PayTR webhook: Ödeme başarılı — ${merchantOid}`);
+    } else {
+      await sb.from('payments').update({
+        st: 'failed',
+        notif_status: ''
+      }).eq('id', merchantOid);
 
-**Dikkat:**
-- `login_with_tc` RPC fonksiyonu mevcut çalışma mantığını korumalı
-- `_checkRateLimit()` ve `_recordFailedAttempt()` fonksiyonları client tarafında yedek olarak kalmalı
+      console.log(`PayTR webhook: Ödeme başarısız — ${merchantOid} — ${failedReasonCode}: ${failedReasonMsg}`);
+    }
 
----
+    // PayTR'ye mutlaka "OK" dönülmeli, aksi halde tekrar tekrar çağırır
+    return new Response('OK', { status: 200 });
 
-### B9. CSP Politikasını Sıkılaştırma
+  } catch (err) {
+    console.error('PayTR webhook hatası:', err);
+    return new Response('OK', { status: 200 });
+  }
+});
+```
 
-**Amaç:** `unsafe-inline` kaldırarak nonce tabanlı CSP uygulamak.
-
-**Yapılacaklar:**
-- `vercel.json`'daki CSP header'ını güncelle
-- İnline script'leri harici dosyalara taşı (zaten büyük ölçüde yapılmış)
-- İnline style'ları CSS dosyasına taşı
-- `index.html`'deki inline `onclick` handler'ları mümkün olduğunca `addEventListener` ile değiştir
-- Kalan zorunlu inline script/style için nonce mekanizması düşün
-
-**Dikkat:**
-- Mevcut tüm fonksiyonellik korunmalı
-- CDN kaynaklarının (jsdelivr, cdnjs, unpkg, esm.sh) CSP'de izinli olduğunu doğrula
-
----
-
-### C12. Kod Bölümleme (Code Splitting)
-
-**Amaç:** 246KB'lık tek `script.js` dosyasını modüler yapıya geçirmek.
-
-**Yapılacaklar:**
-- `script.js`'yi mantıksal modüllere böl:
-  - `core.js` — AppState, DB, FormatUtils, DateUtils, UIUtils, toast, modal
-  - `auth.js` — Login, logout, session yönetimi
-  - `pages/dashboard.js` — Dashboard sayfası
-  - `pages/athletes.js` — Sporcular sayfası ve profil
-  - `pages/payments.js` — Ödemeler sayfası
-  - `pages/attendance.js` — Yoklama sayfası
-  - `pages/coaches.js` — Antrenörler sayfası
-  - `pages/settings.js` — Ayarlar sayfası
-  - `pages/accounting.js` — Finans raporu
-  - `pages/sms.js` — SMS/WhatsApp
-  - `sporcu-portal.js` — Sporcu/veli portalı
-- Her modül `window` üzerinden gerekli fonksiyonları dışa aç
-- `index.html`'de script'leri sırasıyla yükle veya dynamic import kullan
-- Lazy loading: Sayfa değiştiğinde ilgili modülü yükle
-
-**Dikkat:**
-- Tüm global fonksiyon referansları korunmalı (`window.go`, `window.editAth`, vb.)
-- `script-fixes.js`, `ui-improvements.js`, `Security.js` ile uyumluluk korunmalı
-- Service Worker cache listesi güncellenmeli
+**Deploy:**
+```bash
+supabase functions deploy paytr-webhook --no-verify-jwt
+```
 
 ---
 
-### C13. CSS Minification
+## HATA #4 — KRİTİK: Sporcu/Veli `anon` Role ile `payments` Tablosuna INSERT Yapamıyor
 
-**Amaç:** CSS dosyasını minify ederek boyutunu küçültmek.
+### Sorun
+Sporcu/veli girişi Supabase Auth kullanmıyor — `login_with_tc` RPC ile doğrulama yapılıyor ve tüm sorgular `anon` key ile çalışıyor. Ancak RLS_POLICIES.sql'de `payments` tablosuna `anon` rolünün sadece `SELECT` izni var. INSERT/UPDATE yok. Bu yüzden:
+- Havale/Nakit ödeme bildirimi gönderilemiyor (`submitSpPayment` → satır 4643)
+- PayTR pending ödeme kaydı oluşturulamıyor (`initiatePayTRPayment` → satır 4727)
 
-**Yapılacaklar:**
-- Build sürecine CSS minification adımı ekle (cssnano, clean-css veya PostCSS)
-- Development için orijinal `style.css`, production için `style.min.css` kullan
-- `package.json`'a build script ekle
-- Vercel deploy'da otomatik minification
+### Dosya: Supabase SQL Editor'de çalıştırılacak SQL
+### Çözüm
 
-**Dikkat:**
-- Orijinal `style.css` kaynak olarak korunmalı (development için)
-- CSS değişkenleri (custom properties) korunmalı
+Aşağıdaki SQL'i Supabase Dashboard → SQL Editor'de çalıştır:
 
----
+```sql
+-- Sporcu/veli paneli anon role ile ödeme bildirimi ve PayTR pending kayıt oluşturabilmeli
+GRANT INSERT ON payments TO anon;
 
-### C15. CDN Bağımlılıklarını Self-Host
+-- Mevcut RLS policy zaten authenticated için var, anon için INSERT policy ekle
+CREATE POLICY "payments_insert_anon" ON payments
+  FOR INSERT TO anon
+  WITH CHECK (true);
 
-**Amaç:** Dış CDN bağımlılıklarını proje içinde barındırmak.
+-- PayTR webhook sonrası güncelleme yapabilmesi için (opsiyonel, service_role zaten bypass eder)
+-- Ama handlePayTRCallback frontend'den çağrılabiliyor (satır 4765), anon ile UPDATE gerekli
+GRANT UPDATE ON payments TO anon;
 
-**Yapılacaklar:**
-- Supabase JS SDK'yı `/vendor/supabase.min.js` olarak indir ve ekle
-- SheetJS'yi `/vendor/xlsx.full.min.js` olarak indir ve ekle
-- jsPDF'i `/vendor/jspdf.umd.min.js` olarak indir ve ekle
-- `index.html`'deki CDN referanslarını yerel dosyalara güncelle
-- CDN fallback mekanizmasını koru (eğer yerel dosya yüklenemezse CDN'den dene)
-- `init.js`'deki fallback mantığını güncelle
-- `vercel.json` CSP'yi güncelle
+CREATE POLICY "payments_update_anon" ON payments
+  FOR UPDATE TO anon
+  USING (true)
+  WITH CHECK (true);
+```
 
-**Dikkat:**
-- Kütüphane versiyonları sabitlenmeli
-- `sw.js` cache listesine vendor dosyaları eklenmeli
-- Toplam deploy boyutu artacak, Vercel limitlerine dikkat
-
----
-
-### D20. Splash Screen
-
-**Amaç:** Uygulama açılırken profesyonel bir yükleme ekranı.
-
-**Yapılacaklar:**
-- `index.html`'e animasyonlu splash screen ekle (logo + yükleme animasyonu)
-- Supabase ve tüm script'ler yüklendikten sonra splash screen'i kaldır
-- CSS-only animasyon kullan (JS bağımlılığı olmamalı)
-- `manifest.json`'a `splash_screen` özelliklerini ekle
-- PWA olarak açıldığında native splash screen göster
-
-**Dikkat:**
-- Mevcut `#loading-overlay` ile çakışmamalı
-- Yükleme süresi uzaması durumunda timeout ekle (max 5 saniye)
+> **GÜVENLİK NOTU:** Uzun vadede sporcu/veli girişini de Supabase Auth üzerinden `authenticated` role'e taşımak en güvenli çözümdür. Şu an için `anon` INSERT izni gereklidir çünkü `login_with_tc` RPC yalnızca veri doğrulaması yapar, JWT token oluşturmaz.
 
 ---
 
-### E27. Veli İletişim Portali
+## HATA #5 — ORTA: `on_kayitlar` Tablosu RLS Tanımsız
 
-**Amaç:** Velilerin antrenörle mesajlaşabildiği basit bir mesajlaşma sistemi.
+### Sorun
+`on_kayitlar` tablosu `RLS_POLICIES.sql`'de hiç tanımlı değil. Ön kayıt formu login sayfasından `anon` olarak çalışıyor ve `INSERT` yapıyor (satır 5006). Tablo Supabase'de manuel oluşturulmuş olabilir ama RLS politikaları eksikse:
+- Ya hiçbir sorgu çalışmıyor (RLS aktif, policy yok)
+- Ya da tüm veriler herkese açık (RLS kapalı)
 
-**Yapılacaklar:**
-- Sporcu portalına "Mesajlar" sekmesi ekle (`sp-tab` olarak)
-- `messages` tablosunu kullanarak sporcu-antrenör mesajlaşma
-- Mesaj gönderme formu (konu + mesaj içeriği)
-- Antrenör panelinde gelen mesajları görüntüleme
-- Admin panelinde tüm mesajları yönetme
-- Okundu/okunmadı durumu takibi
-- Bildirim badge'i (yeni mesaj sayısı)
+### Dosya: Supabase SQL Editor'de çalıştırılacak SQL
+### Çözüm
 
-**Dikkat:**
-- Mevcut `messages` tablosu ve `AppState.data.messages` yapısı korunmalı
-- RLS politikaları güncellenmeli (sporcu kendi mesajlarını görsün)
-- Sporcu portalının mevcut tab yapısıyla uyumlu olmalı
+```sql
+-- Tablo yoksa oluştur
+CREATE TABLE IF NOT EXISTS on_kayitlar (
+    id TEXT PRIMARY KEY,
+    student_name TEXT,
+    fn TEXT,
+    ln TEXT,
+    bd DATE,
+    tc TEXT,
+    cls_id TEXT,
+    class_name TEXT,
+    parent_name TEXT,
+    parent_phone TEXT,
+    status TEXT DEFAULT 'new',
+    created_at DATE,
+    org_id TEXT,
+    branch_id TEXT
+);
 
----
+-- RLS aktif et
+ALTER TABLE on_kayitlar ENABLE ROW LEVEL SECURITY;
 
-### E29. Çoklu Branş/Şube Yönetimi
+-- anon: INSERT (ön kayıt formu login sayfasında çalışıyor)
+GRANT SELECT, INSERT ON on_kayitlar TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON on_kayitlar TO authenticated, service_role;
 
-**Amaç:** Birden fazla şubenin tek panelden yönetimi.
-
-**Yapılacaklar:**
-- Admin panelinde şube seçici dropdown ekle (header'a)
-- Şube ekleme/düzenleme/silme sayfası (veya settings altında)
-- `branches` ve `orgs` tablolarını tam kullan
-- Şube değiştiğinde `loadBranchData()` ile veri güncelle
-- Her şubenin kendi sporcuları, antrenörleri, ödemeleri olmalı
-- Şubeler arası sporcu transferi özelliği
-- Dashboard'da tüm şubelerin özet istatistikleri
-
-**Dikkat:**
-- Mevcut `AppState.currentBranchId` ve `AppState.currentOrgId` yapısı korunmalı
-- `branch_id` filtresi tüm veri sorgularında zaten var, bu genişletilmeli
-- Tek şubeli kurumlar için geriye dönük uyumluluk
-
----
-
-### F31. PDF Rapor Oluşturma
-
-**Amaç:** Aylık gelir-gider raporu ve sporcu ilerleme raporu PDF olarak indirme.
-
-**Yapılacaklar:**
-- Finans raporu sayfasına "PDF İndir" butonu ekle
-- jsPDF kullanarak:
-  - Aylık gelir-gider özet raporu
-  - Sporcu listesi raporu (filtrelere göre)
-  - Yoklama raporu (tarih aralığına göre)
-  - Borç raporu (gecikmiş ödemeler)
-- Rapor header'ında kurum adı, logo ve tarih
-- Türkçe karakter desteği (mevcut `trToAscii` fonksiyonu kullanılabilir veya font embed)
-- Tablo formatında düzenli çıktı
-
-**Dikkat:**
-- Mevcut `generateReceipt()` fonksiyonu bozulmamalı
-- jsPDF zaten projede yüklü, ek kütüphane gerekmemeli
+CREATE POLICY "onkayit_select" ON on_kayitlar FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "onkayit_insert" ON on_kayitlar FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "onkayit_update" ON on_kayitlar FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "onkayit_delete" ON on_kayitlar FOR DELETE TO authenticated USING (true);
+```
 
 ---
 
-### F32. Devam Durumu Analizi
+## HATA #6 — ORTA: `cash_transfers` Tablosu RLS Tanımsız
 
-**Amaç:** Branş/sınıf bazında detaylı yoklama istatistikleri ve grafikleri.
+### Sorun
+`script-fixes.js` satır 290 ve 724-731'de `cash_transfers` tablosuna INSERT ve SELECT yapılıyor ama RLS_POLICIES.sql'de bu tablo tanımlı değil.
 
-**Yapılacaklar:**
-- Dashboard'a veya ayrı bir sayfaya yoklama analiz bölümü ekle
-- Gösterilecek metrikler:
-  - Branş bazında ortalama devam oranı
-  - Sınıf bazında devam oranı karşılaştırması
-  - Haftalık/aylık devam trendi grafiği
-  - En düşük devamı olan sporcular listesi
-  - Günlük devam oranı takvim görünümü (heat-map tarzı)
-- Mevcut `getAttendanceStats()` ve `attendanceRate()` fonksiyonlarını genişlet
-- Bar chart ve donut chart kullanarak görselleştir
+### Dosya: Supabase SQL Editor'de çalıştırılacak SQL
+### Çözüm
 
-**Dikkat:**
-- Mevcut yoklama sistemi ve `AppState.data.attendance` yapısı korunmalı
-- Antrenör panelinde de görüntülenebilmeli
+```sql
+-- Tablo yoksa oluştur
+CREATE TABLE IF NOT EXISTS cash_transfers (
+    id TEXT PRIMARY KEY,
+    amount NUMERIC,
+    type TEXT,
+    description TEXT,
+    dt DATE,
+    org_id TEXT,
+    branch_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
----
+-- RLS aktif et
+ALTER TABLE cash_transfers ENABLE ROW LEVEL SECURITY;
 
-### G35. TypeScript'e Geçiş
+GRANT SELECT ON cash_transfers TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON cash_transfers TO authenticated, service_role;
 
-**Amaç:** Tip güvenliği sağlamak ve hataları derleme zamanında yakalamak.
-
-**Yapılacaklar:**
-- `tsconfig.json` oluştur
-- Mevcut `.js` dosyalarını `.ts`'e çevir (kademeli geçiş)
-- Interface'ler tanımla: `Athlete`, `Payment`, `Coach`, `Settings`, `AppStateType`, vb.
-- `script.js` içindeki tipe bağımlı hataları düzelt
-- Build sırasında TypeScript → JavaScript derleme pipeline'ı kur
-- `strict: true` ile en katı tip kontrolü
-
-**Dikkat:**
-- Tüm mevcut fonksiyonellik korunmalı
-- Kademeli geçiş yapılmalı (`.js` ve `.ts` birlikte çalışabilmeli)
-- Vercel deploy süreci güncellenmeli
+CREATE POLICY "cash_transfers_select" ON cash_transfers FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "cash_transfers_insert" ON cash_transfers FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "cash_transfers_update" ON cash_transfers FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "cash_transfers_delete" ON cash_transfers FOR DELETE TO authenticated USING (true);
+```
 
 ---
 
-### G36. Framework Kullanımı
+## HATA #7 — ORTA: `wa_messages` Tablosu RLS Tanımsız
 
-**Amaç:** Bileşen bazlı mimari için modern framework'e geçiş.
+### Sorun
+`script-fixes.js` satır 346'da `sb.from('wa_messages').insert(...)` çağrılıyor ama bu tablo RLS_POLICIES.sql'de yok.
 
-**Yapılacaklar:**
-- Vite + React veya Vite + Vue.js ile proje yeniden yapılandır
-- Mevcut sayfa fonksiyonlarını bileşenlere dönüştür:
-  - `<Dashboard />`, `<Athletes />`, `<AthleteProfile />`, `<Payments />`
-  - `<Attendance />`, `<Coaches />`, `<Settings />`, `<Login />`
-  - `<SporcuPortal />`, `<Sidebar />`, `<Header />`
-- React Router veya Vue Router ile sayfa yönetimi
-- State management (Context API / Zustand veya Pinia)
-- Supabase JS SDK'yı modüler import ile kullan
-- Mevcut tüm özellikler birebir taşınmalı
+### Dosya: Supabase SQL Editor'de çalıştırılacak SQL
+### Çözüm
 
-**Dikkat:**
-- **Bu en büyük değişikliktir** — tüm diğer maddelerden sonra veya birlikte yapılmalı
-- Mevcut vanilla JS mantığı referans alınmalı
-- PWA özellikleri korunmalı
-- Vercel deploy süreci güncellenmeli
+```sql
+CREATE TABLE IF NOT EXISTS wa_messages (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    phone TEXT,
+    message TEXT,
+    status TEXT DEFAULT 'sent',
+    org_id TEXT,
+    branch_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
----
+ALTER TABLE wa_messages ENABLE ROW LEVEL SECURITY;
 
-### G37. Test Altyapısı
+GRANT SELECT ON wa_messages TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON wa_messages TO authenticated, service_role;
 
-**Amaç:** Otomatik testlerle kod kalitesini garanti altına almak.
-
-**Yapılacaklar:**
-- Vitest veya Jest ile unit test altyapısı kur
-- Playwright veya Cypress ile E2E test altyapısı kur
-- Kritik fonksiyonlar için unit test yaz:
-  - `FormatUtils.tcValidate()` — TC doğrulama
-  - `DateUtils` — tarih fonksiyonları
-  - `DB.mappers` — veri dönüşümleri
-  - `statusLabel()`, `statusClass()` — durum etiketleri
-- E2E testler:
-  - Admin girişi akışı
-  - Sporcu girişi akışı
-  - Sporcu ekleme/düzenleme/silme
-  - Ödeme ekleme
-  - Yoklama alma
-- `package.json`'a test script'leri ekle
-
-**Dikkat:**
-- Testler CI/CD pipeline'ına entegre edilmeli
-- Mock Supabase client ile bağımsız test edilebilmeli
+CREATE POLICY "wa_messages_select" ON wa_messages FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "wa_messages_insert" ON wa_messages FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "wa_messages_update" ON wa_messages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "wa_messages_delete" ON wa_messages FOR DELETE TO authenticated USING (true);
+```
 
 ---
 
-### G38. CI/CD Pipeline
+## HATA #8 — DÜŞÜK: PayTR Dosyası Boş
 
-**Amaç:** GitHub Actions ile otomatik lint, test ve deploy.
+### Sorun
+Projede `PayTR` adlı boş bir dosya var (0 byte). Bu bir konfigürasyon dosyası olması gerekiyorsa eksik, değilse gereksiz.
 
-**Yapılacaklar:**
-- `.github/workflows/ci.yml` oluştur:
-  - Push ve PR'da otomatik çalışsın
-  - Lint kontrolü (ESLint)
-  - TypeScript derleme kontrolü
-  - Unit testleri çalıştır
-  - E2E testleri çalıştır (headless browser)
-  - Build kontrolü
-- `.github/workflows/deploy.yml` oluştur:
-  - `main` branch'e push'ta Vercel'e otomatik deploy
-  - Preview deploy (PR'lar için)
-- `package.json`'a `lint`, `test`, `build` script'leri ekle
-- `.eslintrc.json` oluştur (ESLint kuralları)
-- `.prettierrc` oluştur (kod formatlama)
-
-**Dikkat:**
-- Vercel GitHub entegrasyonu zaten varsa çakışma olmamalı
-- Environment variable'lar GitHub Secrets'ta tanımlanmalı
+### Çözüm
+Bu dosyayı silin veya gerekli PayTR konfigürasyon bilgilerini içine ekleyin:
+```bash
+rm PayTR
+```
 
 ---
 
-### G39. Error Tracking
+## HATA #9 — DÜŞÜK: `initiatePayTRPayment` Fonksiyonunda user_basket Formatı
 
-**Amaç:** Production'da hataları izlemek ve raporlamak.
+### Sorun
+`script.js` satır 4696'da `user_basket` şu şekilde gönderiliyor:
+```js
+user_basket: JSON.stringify([[desc || 'Aidat', amtKurus, 1]])
+```
+PayTR API'si `user_basket`'ı **Base64 encoded** bekler. Ham JSON string göndermek PayTR API hatasına neden olabilir.
 
-**Yapılacaklar:**
-- Sentry veya LogRocket entegrasyonu
-- `window.onerror` ve `unhandledrejection` handler'larını error tracking servisine bağla
-- Kullanıcı bilgilerini anonimize ederek hata raporlarına ekle
-- Source map desteği (hata satır numaraları doğru gösterilsin)
-- Hata gruplandırma ve bildirim ayarları
-- Performans izleme (sayfa yükleme süreleri)
-- Vercel Analytics ile entegrasyon (isteğe bağlı)
+### Dosya: `script-fixes.js` (override eklenecek)
+### Çözüm
 
-**Dikkat:**
-- `vercel.json` CSP'ye Sentry/LogRocket domain'leri eklenmeli
-- Kullanıcı gizliliği korunmalı (TC, şifre gibi bilgiler loglara yazılmamalı)
-- Mevcut `window.onerror` handler'ı ile uyumlu çalışmalı
+`script-fixes.js` dosyasına `initiatePayTRPayment` fonksiyonunun override'ını ekle. Tüm fonksiyonu değil, sadece `user_basket` kısmını düzelt. Bunun en temiz yolu, fonksiyonu tamamen override etmektir:
 
----
+```javascript
+// ────────────────────────────────────────────────────────
+// PayTR FIX: user_basket Base64 encode + hata yönetimi
+// ────────────────────────────────────────────────────────
+var _origInitiatePayTR = typeof initiatePayTRPayment === 'function' ? initiatePayTRPayment : null;
 
-### G40. Database Migration
+window.initiatePayTRPayment = async function(amt, desc) {
+    var s = AppState.data.settings;
+    var a = AppState.currentSporcu;
 
-**Amaç:** Veritabanı değişikliklerini versiyonlama.
+    if (!s || !s.paytrActive || !s.paytrMerchantId) {
+        toast('PayTR ayarları yapılandırılmamış. Yöneticiye başvurun.', 'e');
+        return;
+    }
 
-**Yapılacaklar:**
-- `supabase/migrations/` klasörü oluştur
-- Mevcut tablo yapısını ilk migration olarak kaydet (`001_initial_schema.sql`)
-- `RLS_POLICIES.sql`'i migration formatına dönüştür (`002_rls_policies.sql`)
-- Her yeni tablo veya değişiklik için sıralı migration dosyası oluştur
-- `supabase CLI` ile `supabase db push` / `supabase db diff` kullanımı
-- README'ye migration çalıştırma talimatları ekle
-- Rollback migration'ları (down migration) da yaz
+    var sb = getSupabase();
+    if (!sb) { toast('Bağlantı hatası', 'e'); return; }
 
-**Dikkat:**
-- Mevcut veritabanı yapısı bozulmamalı
-- Migration'lar idempotent olmalı (`IF NOT EXISTS`, `CREATE OR REPLACE` kullan)
-- Production veritabanına uygulamadan önce staging'de test et
+    UIUtils.setLoading(true);
+    try {
+        var orderId = 'PAY-' + a.id.slice(0, 8) + '-' + Date.now();
+        var amtKurus = Math.round(amt * 100);
 
----
+        // user_basket: PayTR Base64 encode bekler
+        var basketRaw = JSON.stringify([[desc || 'Aidat', String(amtKurus), 1]]);
+        var userBasket = btoa(unescape(encodeURIComponent(basketRaw)));
 
-### H41. SEO Meta Tag'leri
+        var invokeResult = await sb.functions.invoke('paytr-token', {
+            body: {
+                merchant_id: s.paytrMerchantId,
+                merchant_oid: orderId,
+                email: a.em || (a.tc + '@veli.local'),
+                payment_amount: amtKurus,
+                user_name: a.fn + ' ' + a.ln,
+                user_address: 'Türkiye',
+                user_phone: a.pph || a.ph || '05000000000',
+                merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok&oid=' + orderId,
+                merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail&oid=' + orderId,
+                user_basket: userBasket,
+                currency: 'TL',
+                test_mode: '0',
+                org_id: AppState.currentOrgId,
+                branch_id: AppState.currentBranchId,
+                athlete_id: a.id,
+                athlete_name: a.fn + ' ' + a.ln
+            }
+        });
 
-**Amaç:** Arama motoru optimizasyonu ve sosyal medya paylaşım kartları.
+        var tokenData = invokeResult.data;
+        var error = invokeResult.error;
 
-**Yapılacaklar:**
-- `index.html`'e ekle:
-  - Open Graph meta tag'leri (`og:title`, `og:description`, `og:image`, `og:url`)
-  - Twitter Card meta tag'leri (`twitter:card`, `twitter:title`, `twitter:description`)
-  - `canonical` URL
-  - `author` meta tag
-  - Yapısal veri (JSON-LD) — `SportsOrganization` schema
-- Akademi logo görseli OG image olarak kullanılmalı
-- `<title>` tag'ini dinamik olarak sayfa değiştikçe güncelle
+        if (error || !tokenData || !tokenData.token) {
+            throw new Error((error && error.message) || (tokenData && tokenData.error) || 'Token alınamadı. Edge function çalışıyor mu?');
+        }
 
-**Dikkat:**
-- Mevcut `<meta>` tag'leri korunmalı
-- PWA meta tag'leriyle çakışma olmamalı
+        // Bekleyen ödeme kaydı oluştur
+        var pendingPay = {
+            id: orderId,
+            aid: a.id,
+            an: a.fn + ' ' + a.ln,
+            amt: amt,
+            ds: desc || 'PayTR Ödemesi',
+            st: 'pending',
+            dt: DateUtils.today(),
+            ty: 'income',
+            serviceName: desc || 'PayTR Ödemesi',
+            source: 'paytr',
+            notifStatus: '',
+            payMethod: 'paytr'
+        };
+        await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
+        AppState.data.payments.push(pendingPay);
 
----
+        // PayTR iframe aç
+        showPayTRModal(tokenData.token, orderId);
 
-### H42. Erişilebilirlik (A11y)
+    } catch (e) {
+        console.error('PayTR error:', e);
+        toast('PayTR hatası: ' + e.message, 'e');
+    } finally {
+        UIUtils.setLoading(false);
+    }
+};
+```
 
-**Amaç:** Engelli kullanıcılar için erişilebilirlik standartlarına uyum.
-
-**Yapılacaklar:**
-- Tüm butonlara ve interaktif elemanlara `aria-label` ekle
-- Tüm `<img>` tag'lerine anlamlı `alt` text ekle
-- Form elemanlarına `<label>` ile bağlantı (mevcut olanları doğrula)
-- Keyboard navigation desteği:
-  - Tab sırası mantıklı olmalı
-  - Enter/Space ile buton tıklanabilmeli
-  - Escape ile modal kapatılabilmeli
-  - Side menu keyboard ile açılıp kapanabilmeli
-- Renk kontrastı WCAG 2.1 AA standardına uygun olmalı
-- `role` attribute'ları ekle (navigation, main, complementary, vb.)
-- Skip navigation linki ekle
-- Focus visible stilleri iyileştir (zaten `focus-visible` var, genişlet)
-- Screen reader uyumlu toast bildirimleri (`role="alert"`, `aria-live="polite"`)
-
-**Dikkat:**
-- Mevcut UI'ı değiştirmeden, sadece erişilebilirlik attribute'ları ekle
-- Hem dark hem light temada kontrast kontrol et
-
----
-
-### H43. Sitemap.xml & robots.txt
-
-**Amaç:** Arama motoru tarayıcıları için rehber dosyalar.
-
-**Yapılacaklar:**
-- `/robots.txt` dosyası oluştur:
-  ```
-  User-agent: *
-  Allow: /
-  Sitemap: https://SITE_URL/sitemap.xml
-  ```
-- `/sitemap.xml` dosyası oluştur (tek sayfalık uygulama için basit)
-- `vercel.json`'a statik dosya route'ları ekle (gerekirse)
-
-**Dikkat:**
-- Giriş ekranı dışındaki sayfalar SPA içinde olduğu için sitemap basit tutulmalı
-- `Disallow` ile hassas endpoint'ler engellenebilir
+**Ayrıca** `merchant_ok_url` ve `merchant_fail_url`'ye `oid` parametresi eklendi — orijinal kodda `oid` dönüş URL'ine eklenmiyordu, bu yüzden `checkPayTRReturn()` (satır 4780-4788) `orderId`'yi bulamıyordu.
 
 ---
 
-### H44. Çoklu Dil Desteği (i18n) Geliştirme
+## HATA #10 — DÜŞÜK: PayTR Callback URL'de `oid` Parametresi Eksik
 
-**Amaç:** Mevcut kısıtlı TR/EN desteğini tüm uygulamaya yaymak.
+### Sorun
+`script.js` satır 4780-4788'de URL'den `oid` veya `merchant_oid` parametresi okunuyor:
+```js
+const orderId = params.get('oid') || params.get('merchant_oid');
+```
+Ancak `merchant_ok_url` ve `merchant_fail_url` oluşturulurken `oid` parametresi eklenmiyor (satır 4697-4698):
+```js
+merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok',
+merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail',
+```
+Bu nedenle kullanıcı ödeme sayfasından döndüğünde `orderId` her zaman `null` oluyor.
 
-**Yapılacaklar:**
-- Mevcut `i18n` objesini genişlet — tüm sayfaların metinlerini ekle:
-  - Dashboard metinleri
-  - Sporcu ekleme/düzenleme formu label'ları
-  - Ödeme formu metinleri
-  - Yoklama sayfası metinleri
-  - Ayarlar sayfası metinleri
-  - Finans raporu metinleri
-  - Sporcu portalı metinleri
-  - Hata mesajları
-  - Tüm buton metinleri
-- i18n'i ayrı bir JSON dosyasına taşı (`/i18n/tr.json`, `/i18n/en.json`)
-- Sayfa render fonksiyonlarında hardcoded Türkçe metinleri `i18n` çağrılarına dönüştür
-- Dil değiştiğinde tüm sayfa yeniden render edilmeli
-- Yeni dil ekleme kolaylığı sağla (örn: Almanca, Arapça)
-- `navigator.language` ile otomatik dil algılama
-
-**Dikkat:**
-- Mevcut `applyLang()` ve `changeLang()` fonksiyonları korunmalı
-- `data-i18n` attribute mekanizması genişletilmeli
-- Tarih formatları dil bazında değişmeli
+### Çözüm
+Hata #9'daki override'da düzeltildi — URL'lere `&oid=` parametresi eklendi.
 
 ---
 
-## UYGULAMA ÖNCELİK SIRASI
+## HATA #11 — DÜŞÜK: `WhatsApp API Token` CSP'de İzinli Ancak Güvenlik Riski
 
-Aşağıdaki sıra önerilir (bağımlılıklara göre):
+### Sorun
+WhatsApp Business API token'ı (`waApiToken`) `settings` tablosunda saklanıyor ve frontend'den doğrudan `graph.facebook.com` API'sine fetch yapılıyor (script-fixes.js satır 336-338). Bu demek ki:
+1. API token tarayıcıda görünür (DevTools → Network)
+2. `settings` tablosuna `anon` SELECT izni olduğu için herhangi biri token'ı okuyabilir
 
-### Faz 1 — Altyapı Hazırlığı
-1. G40 — Database Migration
-2. G38 — CI/CD Pipeline
-3. G39 — Error Tracking
-4. B7 — Supabase Anon Key Ortam Değişkeni
-5. C15 — CDN Self-Host
-
-### Faz 2 — Kod Modernizasyonu
-6. C12 — Kod Bölümleme
-7. G35 — TypeScript'e Geçiş
-8. G36 — Framework Kullanımı (React/Vue + Vite)
-9. G37 — Test Altyapısı
-10. C13 — CSS Minification
-
-### Faz 3 — Güvenlik ve Performans
-11. B8 — Rate Limiting Sunucu Tarafında
-12. B9 — CSP Sıkılaştırma
-
-### Faz 4 — Görsel ve UX
-13. A1 — Modern Tipografi
-14. A2 — Tema Geçiş Animasyonu
-15. A4 — Logo Tasarımı
-16. D20 — Splash Screen
-17. H42 — Erişilebilirlik
-
-### Faz 5 — Yeni Özellikler
-18. E27 — Veli İletişim Portali
-19. E29 — Çoklu Branş/Şube Yönetimi
-20. F31 — PDF Rapor Oluşturma
-21. F32 — Devam Durumu Analizi
-
-### Faz 6 — SEO ve i18n
-22. H41 — SEO Meta Tag'leri
-23. H43 — Sitemap.xml & robots.txt
-24. H44 — Çoklu Dil Desteği
+### Çözüm (Orta vadeli)
+WhatsApp mesaj gönderimini de bir Edge Function üzerinden yapmak en güvenli çözümdür. Ancak şu an çalışıyor, bozulmaması için **acil düzeltme gerekmez**. İleride `send-whatsapp` Edge Function oluşturulması önerilir.
 
 ---
 
-## TEST KONTROL LİSTESİ
+## HATA #12 — BİLGİ: `login_with_tc` RPC Fonksiyonu Kontrol Edilmeli
 
-Her değişiklikten sonra aşağıdaki fonksiyonellikler test edilmelidir:
+### Sorun
+`Security.js`'deki `_securityDoNormalLogin` fonksiyonu `login_with_tc` RPC'sini çağırıyor. RLS_POLICIES.sql'de bu fonksiyon tanımlı. **Eğer bu SQL Supabase'de çalıştırılmamışsa** sporcu/veli girişi çalışmaz. Kontrol edilecek hata kodları:
+- `PGRST202`: Fonksiyon bulunamadı (SQL çalıştırılmamış)
+- `42883`: pgcrypto extension eksik
 
-- [ ] Admin e-posta/şifre ile giriş
-- [ ] Sporcu TC/şifre ile giriş
-- [ ] Antrenör TC/şifre ile giriş
-- [ ] Oturum kaydı ve geri yükleme (restoreSession)
-- [ ] Dark/Light tema geçişi
-- [ ] Sporcu ekleme/düzenleme/silme
-- [ ] Sporcu profili görüntüleme
-- [ ] Ödeme ekleme/düzenleme
-- [ ] Yoklama alma
-- [ ] Finans raporu görüntüleme
-- [ ] WhatsApp/SMS mesaj gönderme
-- [ ] Excel import/export
-- [ ] Makbuz oluşturma (PDF + HTML fallback)
-- [ ] Ön kayıt formu ve onaylama
-- [ ] Ayarlar sayfası (logo, banka, WhatsApp)
-- [ ] Çıkış yapma
-- [ ] Mobil responsive tasarım
-- [ ] PWA kurulum ve offline kullanım
-- [ ] Service Worker cache güncelleme
-- [ ] Bildirim sistemi çalışıyor
-- [ ] KVKK ve Kullanım Şartları popup'ları
+### Çözüm
+Supabase SQL Editor'de kontrol et:
+```sql
+-- pgcrypto extension aktif mi?
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Fonksiyon var mı?
+SELECT proname FROM pg_proc WHERE proname = 'login_with_tc';
+```
+Eğer sonuç boşsa `RLS_POLICIES.sql` dosyasının tamamını Supabase SQL Editor'de çalıştır.
+
+---
+
+## UYGULAMA SIRASI (Checklist)
+
+Aşağıdaki sırayla uygulayın. Her adımdan sonra test edin:
+
+### Adım 1: Supabase SQL — Eksik Tabloları ve İzinleri Oluştur
+1. [ ] `on_kayitlar` tablosu + RLS (Hata #5)
+2. [ ] `cash_transfers` tablosu + RLS (Hata #6)
+3. [ ] `wa_messages` tablosu + RLS (Hata #7)
+4. [ ] `payments` tablosuna `anon` INSERT/UPDATE izni (Hata #4)
+5. [ ] `login_with_tc` ve `pgcrypto` kontrolü (Hata #12)
+
+### Adım 2: Supabase Edge Functions — PayTR Backend
+6. [ ] `supabase/functions/paytr-token/index.ts` oluştur ve deploy et (Hata #2)
+7. [ ] `supabase/functions/paytr-webhook/index.ts` oluştur ve deploy et (Hata #3)
+8. [ ] Supabase Secrets ayarla: `PAYTR_MERCHANT_KEY`, `PAYTR_MERCHANT_SALT`
+
+### Adım 3: vercel.json — CSP ve Header Düzeltmeleri
+9. [ ] `frame-src https://www.paytr.com` ekle (Hata #1)
+10. [ ] `frame-ancestors 'self'` olarak değiştir (Hata #1)
+11. [ ] `X-Frame-Options: SAMEORIGIN` olarak değiştir (Hata #1)
+12. [ ] `Permissions-Policy`'den `payment=()` kaldır (Hata #1)
+
+### Adım 4: script-fixes.js — Frontend Düzeltmeleri
+13. [ ] `initiatePayTRPayment` override'ını ekle (Hata #9 + #10)
+14. [ ] `PayTR` boş dosyasını sil (Hata #8)
+
+### Adım 5: Test
+15. [ ] Sporcu/veli girişi çalışıyor mu? (login_with_tc RPC)
+16. [ ] Ön kayıt formu çalışıyor mu? (on_kayitlar INSERT)
+17. [ ] Sporcu portalında "Ödeme Yap" → Havale bildirimi gönderilebiliyor mu? (payments INSERT anon)
+18. [ ] PayTR ile Öde → iframe açılıyor mu? (CSP frame-src)
+19. [ ] PayTR iframe'de ödeme tamamlanınca payments tablosu güncellenıyor mu? (webhook)
+20. [ ] Yönetici panelinde ödemeler, nakit transferler, ön kayıtlar görünüyor mu?
+21. [ ] WhatsApp mesaj gönderimi çalışıyor mu?
+
+---
+
+## DİKKAT — DOKUNULMAYACAK DOSYALAR
+
+| Dosya | Neden |
+|-------|-------|
+| `script.js` | Ana kaynak kodu — asla değiştirilmez |
+| `Security.js` | Giriş güvenlik modülü — çalışıyor, dokunma |
+| `ui-improvements.js` | UI iyileştirmeleri — çalışıyor, dokunma |
+| `init.js` | Supabase CDN yükleyici — çalışıyor, dokunma |
+| `error-handler.js` | Hata yakalayıcı — çalışıyor, dokunma |
+| `style.css` | Stiller — bozulma riski yüksek, dokunma |
+
+## DEĞİŞTİRİLECEK / OLUŞTURULACAK DOSYALAR
+
+| Dosya | İşlem |
+|-------|-------|
+| `vercel.json` | CSP ve header düzeltmeleri |
+| `script-fixes.js` | `initiatePayTRPayment` override eklenmesi |
+| `supabase/functions/paytr-token/index.ts` | YENİ — PayTR token Edge Function |
+| `supabase/functions/paytr-webhook/index.ts` | YENİ — PayTR webhook Edge Function |
+| Supabase SQL Editor | Eksik tablo + RLS policy'ler |
+| `PayTR` (boş dosya) | SİL |
