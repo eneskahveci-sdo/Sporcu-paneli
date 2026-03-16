@@ -1,2 +1,8 @@
 [functions.send-sms]
 verify_jwt = false
+
+[functions.paytr-token]
+verify_jwt = false
+
+[functions.paytr-webhook]
+verify_jwt = false
