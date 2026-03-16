@@ -1,14 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-async function hmacSha256Base64(data, key) {
+async function hmacSha256Base64(data: string, key: string): Promise<string> {
   const enc = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey("raw", enc.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
 
   try {
     const formData = await req.formData();
@@ -40,10 +42,18 @@ Deno.serve(async (req) => {
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
     if (status === "success") {
-      await sb.from("payments").update({ st: "completed", source: "paytr", notif_status: "approved", pay_method: "paytr" }).eq("id", merchant_oid);
+      await sb.from("payments").update({
+        st: "completed",
+        source: "paytr",
+        notif_status: "approved",
+        pay_method: "paytr",
+      }).eq("id", merchant_oid);
       console.log("Odeme tamamlandi:", merchant_oid);
     } else {
-      await sb.from("payments").update({ st: "failed", notif_status: "" }).eq("id", merchant_oid);
+      await sb.from("payments").update({
+        st: "failed",
+        notif_status: "",
+      }).eq("id", merchant_oid);
       console.log("Odeme basarisiz:", merchant_oid, failed_reason_code, failed_reason_msg);
     }
 
