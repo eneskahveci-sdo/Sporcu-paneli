@@ -1,11 +1,6 @@
 // supabase/functions/paytr-token/index.ts
 // PayTR iframe token'ı sunucu tarafında oluşturur.
-// Merchant Key ve Salt yalnızca Supabase Secrets'tan okunur — frontend'e asla gönderilmez.
-//
-// DÜZELTME: crypto.subtle.digest (düz SHA-256) yerine HMAC-SHA-256 kullanılıyor.
-// PayTR dokümantasyonuna göre hash = HMAC(hashStr + merchantSalt, merchantKey) → base64
-
-import { createHmac } from "node:crypto";
+// Deno-native Web Crypto API kullanılıyor (node:crypto yerine).
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -19,6 +14,25 @@ function jsonResp(body: Record<string, unknown>, status: number) {
     status,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
+}
+
+// HMAC-SHA256 hesaplama (Deno Web Crypto API ile)
+async function hmacSha256Base64(data: string, key: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    encoder.encode(data)
+  );
+  // Base64 encode
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
 Deno.serve(async (req: Request) => {
@@ -47,22 +61,20 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Frontend'den gelen alanlar ────────────────────────
-    const {
-      merchant_oid,
-      email,
-      payment_amount,
-      user_name,
-      user_address = "Turkiye",
-      user_phone   = "05000000000",
-      merchant_ok_url,
-      merchant_fail_url,
-      user_basket,
-      currency       = "TL",
-      test_mode      = "0",
-      no_installment = "1",
-      max_installment = "0",
-      lang           = "tr",
-    } = body;
+    const merchant_oid    = body.merchant_oid ?? "";
+    const email           = body.email ?? "";
+    const payment_amount  = String(body.payment_amount ?? "");
+    const user_name       = body.user_name ?? "";
+    const user_address    = body.user_address ?? "Turkiye";
+    const user_phone      = body.user_phone ?? "05000000000";
+    const merchant_ok_url = body.merchant_ok_url ?? "";
+    const merchant_fail_url = body.merchant_fail_url ?? "";
+    const user_basket     = body.user_basket ?? "";
+    const currency        = body.currency ?? "TL";
+    const test_mode       = body.test_mode ?? "0";
+    const no_installment  = body.no_installment ?? "1";
+    const max_installment = body.max_installment ?? "0";
+    const lang            = body.lang ?? "tr";
 
     // ── Zorunlu alan kontrolü ─────────────────────────────
     const required: Record<string, string> = {
@@ -97,16 +109,14 @@ Deno.serve(async (req: Request) => {
       userIp +
       merchant_oid +
       email +
-      String(payment_amount) +
+      payment_amount +
       user_basket +
       no_installment +
       max_installment +
       currency +
       test_mode;
 
-    const paytrToken = createHmac("sha256", MERCHANT_KEY)
-      .update(hashStr + MERCHANT_SALT)
-      .digest("base64");
+    const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
     // ── PayTR API'ye token isteği ─────────────────────────
     const formData = new URLSearchParams({
@@ -114,7 +124,7 @@ Deno.serve(async (req: Request) => {
       user_ip:          userIp,
       merchant_oid,
       email,
-      payment_amount:   String(payment_amount),
+      payment_amount,
       paytr_token:      paytrToken,
       user_basket,
       debug_on:         test_mode === "1" ? "1" : "0",
@@ -151,7 +161,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error("paytr-token function error:", err);
     return jsonResp(
-      { error: err instanceof Error ? err.message : "Sunucu hatası" },
+      { error: err instanceof Error ? err.message : "Sunucu hatası: " + String(err) },
       500
     );
   }
