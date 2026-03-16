@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
     try {
       body = JSON.parse(rawBody);
     } catch (parseErr) {
-      return jsonResp({ error: "JSON parse hatasi: " + String(parseErr), rawBodyPreview: rawBody.substring(0, 200) }, 400);
+      return jsonResp({ error: "JSON parse hatasi: " + String(parseErr), raw: rawBody.substring(0, 200) }, 400);
     }
 
     const MERCHANT_ID = Deno.env.get("PAYTR_MERCHANT_ID") ?? body.merchant_id ?? "";
@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     const merchant_fail_url = body.merchant_fail_url ?? "";
     const user_basket = body.user_basket ?? "";
     const currency = body.currency ?? "TL";
-    const test_mode = body.test_mode ?? "0";
+    const test_mode = body.test_mode ?? "1";
     const no_installment = body.no_installment ?? "1";
     const max_installment = body.max_installment ?? "0";
     const lang = body.lang ?? "tr";
@@ -70,6 +70,8 @@ Deno.serve(async (req: Request) => {
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode;
     const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
+    console.log("PayTR API cagrilacak, merchant_oid:", merchant_oid, "test_mode:", test_mode);
+
     const formData = new URLSearchParams();
     formData.append("merchant_id", MERCHANT_ID);
     formData.append("user_ip", userIp);
@@ -78,7 +80,7 @@ Deno.serve(async (req: Request) => {
     formData.append("payment_amount", payment_amount);
     formData.append("paytr_token", paytrToken);
     formData.append("user_basket", user_basket);
-    formData.append("debug_on", test_mode === "1" ? "1" : "0");
+    formData.append("debug_on", "1");
     formData.append("no_installment", no_installment);
     formData.append("max_installment", max_installment);
     formData.append("user_name", user_name.substring(0, 25));
@@ -97,7 +99,15 @@ Deno.serve(async (req: Request) => {
       body: formData.toString(),
     });
 
-    const data = await res.json();
+    const resText = await res.text();
+    console.log("PayTR API response status:", res.status, "body:", resText.substring(0, 500));
+
+    let data: Record<string, string>;
+    try {
+      data = JSON.parse(resText);
+    } catch (_e) {
+      return jsonResp({ error: "PayTR API JSON parse hatasi", paytrStatus: res.status, paytrResponse: resText.substring(0, 300) }, 502);
+    }
 
     if (data.status === "success") {
       return jsonResp({ token: data.token }, 200);
