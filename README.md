@@ -1,108 +1,123 @@
-# Sporcu Paneli - Guvenlik Guncellemesi
+# Dragos Futbol Akademisi — Sporcu Paneli
 
-## Degisen Dosyalar
+Sporcu kayıt, ödeme takibi, yoklama ve yönetim sistemi. Supabase + Vercel üzerinde çalışan tek sayfa PWA.
 
-Bu pakette sadece **gerekli guvenlik duzeltmeleri** yapilmistir:
+## Özellikler
 
-| Dosya | Aciklama |
-|-------|----------|
-| `index.html` | Ana HTML dosyasi (orijinal yapisi korundu) |
-| `script.js` | **Guvenlik duzeltmeli** JavaScript dosyasi |
-| `RLS_POLICIES.sql` | Supabase RLS politikaları (calistirilmali!) |
+- **Çoklu Giriş Sistemi:** Yönetici, antrenör ve sporcu/veli panelleri
+- **Sporcu Yönetimi:** Kayıt, profil, TC kimlik doğrulama
+- **Ödeme Takibi:** Tahsilat, borç takibi, makbuz oluşturma (PayTR entegrasyonu)
+- **Yoklama (Devam) Yönetimi:** QR kod ile yoklama, devam raporu
+- **SMS / WhatsApp Bildirimleri:** NetGSM entegrasyonu (Supabase Edge Function üzerinden)
+- **Finans Raporu:** Gelir/gider özeti, Excel export
+- **Excel Import/Export:** Sporcu ve ödeme verileri
+- **Ön Kayıt Formu:** Veliler için çevrimiçi ön kayıt
+- **PWA Desteği:** Service Worker, offline çalışma, ana ekrana ekle
+- **Çoklu Dil:** Türkçe / İngilizce (i18n altyapısı)
+- **Karanlık / Aydınlık Tema:** Otomatik sistem tercihi + manuel geçiş
+- **Erişilebilirlik:** WCAG uyumlu, aria etiketleri, klavye navigasyonu
+- **SEO:** Open Graph, Twitter Card, JSON-LD, canonical URL, sitemap
 
-## Guvenlik Duzeltmeleri
-
-### 1. Supabase Auth Entegrasyonu (Kritik!)
-
-**Eski (Guvensiz):**
-```javascript
-// TUM kullanicilar tarayiciya cekiliyordu!
-var allUsers = await supaGet('users') || [];
-// Sifre tarayicida kontrol ediliyordu
-if (u.pass === p || u.pass === ph) { ... }
-```
-
-**Yeni (Guvenli):**
-```javascript
-// Sifre Supabase sunucusunda kontrol ediliyor
-var { data, error } = await sb.auth.signInWithPassword({
-  email: e,
-  password: p
-});
-```
-
-### 2. Session Yonetimi
-
-- `onAuthStateChange` ile oturum durumu izleniyor
-- 15 dakika hareketsizlikte otomatik cikis
-- Cikis yaparken auth session temizleniyor
-
-### 3. RLS Politikalari
-
-`RLS_POLICIES.sql` dosyasini Supabase SQL Editor'de calistirin!
-
-## Kurulum Adimlari
-
-### 1. Supabase Auth Ayarlari
-
-Supabase Dashboard > Authentication > Settings:
+## Dosya Yapısı
 
 ```
-Site URL: https://siteniz.com
-Redirect URLs: https://siteniz.com/*
+Sporcu-paneli/
+├── index.html            — Ana HTML (tek sayfa PWA)
+├── script.js             — Ana uygulama mantığı
+├── script-fixes.js       — Ek özellikler ve düzeltmeler
+├── ui-improvements.js    — UI/UX iyileştirme paketi
+├── Security.js           — Güvenlik modülü
+├── init.js               — Supabase CDN yükleme ve fallback
+├── error-handler.js      — Global hata takibi altyapısı
+├── pwa-register.js       — PWA Service Worker kaydı
+├── sw.js                 — Service Worker
+├── style.css             — Tüm stiller
+├── manifest.json         — PWA manifest
+├── vercel.json           — Vercel deploy + güvenlik header'ları
+├── RLS_POLICIES.sql      — Supabase RLS politikaları
+├── robots.txt            — SEO
+├── sitemap.xml           — SEO
+├── i18n/
+│   ├── tr.json           — Türkçe çeviri anahtarları
+│   └── en.json           — İngilizce çeviri anahtarları
+├── icons/                — PWA ikonları
+└── supabase/
+    ├── config.toml       — Supabase CLI yapılandırması
+    ├── migrations/       — Veritabanı migration dosyaları
+    │   └── 001_rls_policies.sql
+    └── functions/
+        └── send-sms/     — SMS gönderimi Edge Function
 ```
 
-### 2. RLS Politikalari
+## Kurulum
 
-Supabase Dashboard > SQL Editor:
-- `RLS_POLICIES.sql` icerigini yapistirin
-- Run butonuna basin
+### Gereksinimler
 
-### 3. Users Tablosu Guncelleme
+- [Supabase](https://supabase.com) hesabı
+- [Vercel](https://vercel.com) hesabı
 
-Mevcut kullanicilar icin Supabase Auth kullanicisi olusturun:
+### 1. Supabase Kurulumu
 
-```sql
--- Mevcut kullanicilarinizi auth.users'a eklemek icin
--- Supabase Dashboard > Authentication > Users > Add User
--- Veya kullanicilardan sifre sifirlama ile yeni sifre almalarini isteyin
+1. Yeni bir Supabase projesi oluşturun.
+2. `RLS_POLICIES.sql` veya `supabase/migrations/001_rls_policies.sql` dosyasını **SQL Editor**'de çalıştırın.
+3. Authentication > Settings bölümünde:
+   - **Site URL:** `https://sporcu-paneli.vercel.app`
+4. Projenizin **URL** ve **anon key** bilgilerini kopyalayın.
+
+### 2. Supabase Ayarlarını Güncelleme
+
+`init.js` dosyasında `SUPABASE_URL` ve `SUPABASE_ANON_KEY` değerlerini kendi projenize göre güncelleyin.
+
+> **Not:** `index.html` içindeki `canonical` ve `og:url` meta etiketleri varsayılan olarak `https://sporcu-paneli.vercel.app/` adresini gösterir. Farklı bir domain kullanıyorsanız bu değerleri güncelleyin.
+
+### 3. Vercel Deploy
+
+1. Bu repoyu Vercel'e bağlayın.
+2. `vercel.json` otomatik olarak okunur, ek yapılandırma gerekmez.
+3. Deploy edin.
+
+### 4. SMS Entegrasyonu (isteğe bağlı)
+
+NetGSM ile SMS gönderimi için Supabase Edge Function ortam değişkenlerini ayarlayın:
+
+```
+NETGSM_USER=<kullanıcı adı>
+NETGSM_PASS=<şifre>
+NETGSM_HEADER=<başlık>
 ```
 
-### 4. Dosyalari Yukleyin
+## Veritabanı Migration
 
+Yeni bir Supabase projesi için tüm tabloları ve RLS politikalarını oluşturmak üzere çalıştırın:
+
+```bash
+# Supabase CLI ile
+supabase db push
+
+# veya manuel olarak Supabase SQL Editor'de
+# supabase/migrations/001_rls_policies.sql dosyasını yapıştırıp çalıştırın
 ```
-/fixed/
-  index.html    -> Ana dizine
-  script.js     -> Ana dizine
-  RLS_POLICIES.sql -> Supabase'de calistir
-```
 
-## Onemli Notlar
+## CI/CD
 
-1. **Mevcut kullanicilar** icin Supabase Auth hesabi olusturulmali
-2. **Logo** artik `/assets/logo.png` dosyasindan yukleniyor (Base64 kaldirildi)
-3. Tum **orijinal ozellikler** calisiyor: QR, SMS, Excel, vb.
+Her push ve pull request'te `.github/workflows/ci.yml` otomatik olarak:
 
-## Test Kontrol Listesi
+- Gerekli dosyaların varlığını kontrol eder
+- HTML yapısını doğrular
+- JSON dosyalarını (manifest, vercel.json, i18n) validate eder
+- JS dosyalarını sözdizimi hatası için kontrol eder
+- CSP header yapılandırmasını doğrular
 
-- [ ] Kurum girisi calisiyor
-- [ ] Sporcu/Veli girisi calisiyor
-- [ ] Sifre sifirlama calisiyor
-- [ ] Kayit olma calisiyor
-- [ ] QR yoklama calisiyor
-- [ ] Excel import/export calisiyor
-- [ ] SMS gonderimi calisiyor
-- [ ] Tum sayfalar aciliyor
+## Güvenlik
 
-## Sorun Cozumu
+- **CSP (Content Security Policy)** header'ı `vercel.json` ile uygulanır
+- **RLS (Row Level Security)** tüm Supabase tablolarında aktif
+- **HTTPS Only** — Vercel otomatik SSL
+- **X-Frame-Options: DENY** — Clickjacking koruması
+- **Strict-Transport-Security** — HSTS aktif
+- Sporcu/antrenör girişi `login_with_tc` SECURITY DEFINER fonksiyonu ile yapılır
 
-### "E-posta veya sifre hatali" hatasi
+## Lisans
 
-Kullanici Supabase Auth'da kayitli degil. Cozum:
-1. Supabase Dashboard > Authentication > Users
-2. Kullaniciyi manuel ekleyin VEYA
-3. Kayit ol sayfasindan yeni hesap olusturun
+MIT
 
-### RLS hatasi
-
-RLS politikalarini calistirmadiniz. `RLS_POLICIES.sql` dosyasini Supabase'de calistirin.

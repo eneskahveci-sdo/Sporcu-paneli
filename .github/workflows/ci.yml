@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  lint-and-validate:
+    name: HTML/CSS/JS Lint & File Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify required files exist
+        run: |
+          echo "Checking required files..."
+          files=(
+            "index.html"
+            "script.js"
+            "script-fixes.js"
+            "ui-improvements.js"
+            "Security.js"
+            "init.js"
+            "pwa-register.js"
+            "sw.js"
+            "style.css"
+            "manifest.json"
+            "vercel.json"
+            "RLS_POLICIES.sql"
+            "robots.txt"
+            "sitemap.xml"
+          )
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "  ✔ $f"
+            else
+              echo "  ✘ MISSING: $f"
+              exit 1
+            fi
+          done
+          echo "All required files present."
+
+      - name: Check HTML structure
+        run: |
+          echo "Checking index.html structure..."
+          grep -q '<html' index.html && echo "  ✔ <html> tag found"
+          grep -q '<head>' index.html && echo "  ✔ <head> tag found"
+          grep -q '<body' index.html && echo "  ✔ <body> tag found"
+          grep -q 'rel="canonical"' index.html && echo "  ✔ canonical link found"
+          grep -q 'og:url' index.html && echo "  ✔ og:url meta found"
+          grep -q 'og:title' index.html && echo "  ✔ og:title meta found"
+          grep -q 'application/ld+json' index.html && echo "  ✔ JSON-LD found"
+          grep -q 'rel="manifest"' index.html && echo "  ✔ manifest link found"
+          echo "HTML structure check passed."
+
+      - name: Check manifest.json is valid JSON
+        run: |
+          echo "Validating manifest.json..."
+          python3 -c "import json, sys; json.load(open('manifest.json')); print('  ✔ manifest.json is valid JSON')"
+
+      - name: Check vercel.json is valid JSON
+        run: |
+          echo "Validating vercel.json..."
+          python3 -c "import json, sys; json.load(open('vercel.json')); print('  ✔ vercel.json is valid JSON')"
+
+      - name: Check i18n files are valid JSON
+        run: |
+          echo "Validating i18n files..."
+          python3 -c "import json; json.load(open('i18n/tr.json')); print('  ✔ i18n/tr.json is valid JSON')"
+          python3 -c "import json; json.load(open('i18n/en.json')); print('  ✔ i18n/en.json is valid JSON')"
+
+      - name: Check JS files for syntax errors
+        run: |
+          echo "Checking JS syntax..."
+          node --check error-handler.js && echo "  ✔ error-handler.js OK"
+          node --check script.js && echo "  ✔ script.js OK"
+          node --check script-fixes.js && echo "  ✔ script-fixes.js OK"
+          node --check ui-improvements.js && echo "  ✔ ui-improvements.js OK"
+          node --check Security.js && echo "  ✔ Security.js OK"
+          node --check init.js && echo "  ✔ init.js OK"
+          node --check pwa-register.js && echo "  ✔ pwa-register.js OK"
+          node --check sw.js && echo "  ✔ sw.js OK"
+          echo "JS syntax check passed."
+
+      - name: Check CSP header exists in vercel.json
+        run: |
+          echo "Checking CSP configuration..."
+          python3 -c "
+          import json
+          v = json.load(open('vercel.json'))
+          headers = v.get('headers', [])
+          csp_found = False
+          for h in headers:
+            for kv in h.get('headers', []):
+              if kv.get('key') == 'Content-Security-Policy':
+                csp_found = True
+                print('  ✔ CSP header found')
+                break
+          if not csp_found:
+            print('  ✘ CSP header missing')
+            exit(1)
+          "
+          echo "Security header check passed."
