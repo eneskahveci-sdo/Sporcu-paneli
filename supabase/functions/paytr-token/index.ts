@@ -1,6 +1,7 @@
-// PayTR Token Edge Function v10
+// PayTR Token Edge Function v11
+// v11: cleanSecret artık tırnak/BOM soyar, tüm body değerleri trim edilir,
+//      HMAC sonucu boş kontrol eklendi, paytr-webhook ile aynı btoa deseni
 // v10: node:crypto yerine native Web Crypto API kullanılıyor (paytr-webhook ile tutarlı)
-//      Deno compat katmanı bypass edilerek doğrudan platform API'si kullanılıyor
 // v9: fetch'e explicit Content-Type header ve body.toString() eklendi
 // v8: FormData (multipart/form-data) yerine URLSearchParams (x-www-form-urlencoded) kullanılıyor
 
@@ -17,7 +18,7 @@ function jsonResp(body: Record<string, unknown>, status: number) {
   });
 }
 
-// PayTR HMAC — Web Crypto API (paytr-webhook ile aynı yöntem)
+// PayTR HMAC — Web Crypto API (paytr-webhook ile birebir aynı yöntem)
 // PHP: base64_encode(hash_hmac('sha256', $data, $key, true))
 async function paytrHmac(data: string, key: string): Promise<string> {
   const enc = new TextEncoder();
@@ -27,11 +28,15 @@ async function paytrHmac(data: string, key: string): Promise<string> {
     false, ["sign"],
   );
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
-  return btoa(Array.from(new Uint8Array(sig), (b) => String.fromCharCode(b)).join(""));
+  // paytr-webhook ile aynı desen: String.fromCharCode spread
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
+// Supabase secret'lardan gelen değerlerdeki tırnak, BOM ve boşluk karakterlerini temizler
 function cleanSecret(val: string): string {
-  return val.replace(/[\s\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, "");
+  return val
+    .replace(/^["']|["']$/g, "")
+    .replace(/[\s\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, "");
 }
 
 function sanitizeEmail(email: string): string {
@@ -61,27 +66,28 @@ Deno.serve(async (req: Request) => {
     const MERCHANT_KEY  = cleanSecret(Deno.env.get("PAYTR_MERCHANT_KEY")  ?? "");
     const MERCHANT_SALT = cleanSecret(Deno.env.get("PAYTR_MERCHANT_SALT") ?? "");
 
-    console.error("[v10] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
+    console.error("[v11] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
 
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
-      return jsonResp({ error: "PayTR credentials eksik." }, 503);
+      return jsonResp({ error: "PayTR credentials eksik. Supabase Secrets'ta PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY, PAYTR_MERCHANT_SALT tanımlı olmalı." }, 503);
     }
 
-    const merchant_oid    = body.merchant_oid ?? "";
-    const rawEmail        = body.email ?? "";
+    // Tüm body değerlerini trim et — boşluk hash uyumsuzluğuna neden olabilir
+    const merchant_oid    = (body.merchant_oid ?? "").trim();
+    const rawEmail        = (body.email ?? "").trim();
     const email           = sanitizeEmail(rawEmail);
-    const payment_amount  = String(body.payment_amount ?? "");
-    const user_name       = body.user_name ?? "";
-    const user_address    = body.user_address ?? "Turkiye";
-    const user_phone      = body.user_phone ?? "05000000000";
-    const merchant_ok_url = body.merchant_ok_url ?? "";
-    const merchant_fail_url = body.merchant_fail_url ?? "";
-    const user_basket     = body.user_basket ?? "";
-    const currency        = body.currency ?? "TL";
-    const test_mode       = body.test_mode ?? "1";
-    const no_installment  = body.no_installment ?? "1";
-    const max_installment = body.max_installment ?? "0";
-    const lang            = body.lang ?? "tr";
+    const payment_amount  = String(body.payment_amount ?? "").trim();
+    const user_name       = (body.user_name ?? "").trim();
+    const user_address    = (body.user_address ?? "Turkiye").trim();
+    const user_phone      = (body.user_phone ?? "05000000000").trim();
+    const merchant_ok_url = (body.merchant_ok_url ?? "").trim();
+    const merchant_fail_url = (body.merchant_fail_url ?? "").trim();
+    const user_basket     = (body.user_basket ?? "").trim();
+    const currency        = (body.currency ?? "TL").trim();
+    const test_mode       = (body.test_mode ?? "1").trim();
+    const no_installment  = (body.no_installment ?? "1").trim();
+    const max_installment = (body.max_installment ?? "0").trim();
+    const lang            = (body.lang ?? "tr").trim();
 
     const required: Record<string, string> = {
       merchant_oid, email, payment_amount, user_name, user_basket, merchant_ok_url, merchant_fail_url
@@ -91,7 +97,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const userIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-                || req.headers.get("x-real-ip")
+                || req.headers.get("x-real-ip")?.trim()
                 || "1.2.3.4";
 
     // ─── HASH — PayTR resmi PHP örneğiyle birebir aynı ───
@@ -103,8 +109,14 @@ Deno.serve(async (req: Request) => {
 
     const paytrToken = await paytrHmac(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    console.error("[v10] hash_str:", hashStr.substring(0, 80) + "...");
-    console.error("[v10] paytr_token:", paytrToken);
+    // HMAC sonucu boş ise crypto hatası var demektir
+    if (!paytrToken) {
+      console.error("[v11] HMAC hesaplama başarısız — token boş!");
+      return jsonResp({ error: "HMAC hesaplama hatası — token oluşturulamadı" }, 500);
+    }
+
+    console.error("[v11] hash_str:", hashStr.substring(0, 80) + "...");
+    console.error("[v11] paytr_token:", paytrToken);
 
     // ─── PayTR API POST (URLSearchParams — application/x-www-form-urlencoded) ───
     // PayTR PHP örnekleri http_build_query / string CURLOPT_POSTFIELDS kullanır
@@ -135,7 +147,7 @@ Deno.serve(async (req: Request) => {
                    || (SUPABASE_URL ? SUPABASE_URL + "/functions/v1/paytr-webhook" : "");
     if (notifyUrl) formData.append("merchant_notify_url", notifyUrl);
 
-    console.error("[v10] Sending to PayTR, notify_url:", notifyUrl || "(yok)");
+    console.error("[v11] Sending to PayTR, notify_url:", notifyUrl || "(yok)");
 
     const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
       method: "POST",
@@ -146,20 +158,21 @@ Deno.serve(async (req: Request) => {
     });
 
     const resText = await res.text();
-    console.error("[v10] PayTR response:", res.status, resText.substring(0, 300));
+    console.error("[v11] PayTR response:", res.status, resText.substring(0, 300));
 
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
     catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200) }, 502); }
 
     if (data.status === "success") {
-      console.error("[v10] BAŞARILI! Token alındı.");
-      return jsonResp({ token: data.token }, 200);
+      console.error("[v11] BAŞARILI! Token alındı.");
+      return jsonResp({ token: data.token, version: "v11" }, 200);
     }
 
-    console.error("[v10] BAŞARISIZ:", data.reason);
+    console.error("[v11] BAŞARISIZ:", data.reason);
     return jsonResp({
       error: data.reason || "Token alınamadı",
+      version: "v11",
       debug: {
         merchant_id: MERCHANT_ID, key_len: MERCHANT_KEY.length, salt_len: MERCHANT_SALT.length,
         user_ip: userIp, merchant_oid, email, payment_amount,
@@ -171,7 +184,7 @@ Deno.serve(async (req: Request) => {
     }, 400);
 
   } catch (err) {
-    console.error("[v10] EXCEPTION:", String(err));
-    return jsonResp({ error: String(err) }, 500);
+    console.error("[v11] EXCEPTION:", String(err));
+    return jsonResp({ error: String(err), version: "v11" }, 500);
   }
 });
