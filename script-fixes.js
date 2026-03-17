@@ -1127,7 +1127,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         var userBasket = btoa(basketJson);
 
         console.log('PayTR basket debug:', {
-            amtTL: amtTL,
+            amtTL: (amtKurus / 100).toFixed(2),
             amtKurus: amtKurus,
             basketJson: basketJson,
             userBasketB64: userBasket.substring(0, 40) + '...'
