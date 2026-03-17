@@ -33,7 +33,7 @@ async function paytrHmac(data: string, key: string): Promise<string> {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-// Credential fingerprint — ilk 4 + son 4 karakter (güvenli kısmi gösterim)
+// Credential fingerprint — ilk 2 + son 2 karakter (güvenli kısmi gösterim)
 function fingerprint(val: string): string {
   if (val.length <= 4) return "***";
   return val.substring(0, 2) + "..." + val.substring(val.length - 2);
@@ -181,11 +181,13 @@ Deno.serve(async (req: Request) => {
       return jsonResp({ error: "HMAC hesaplama hatası — token oluşturulamadı", version: "v12" }, 500);
     }
 
-    // Self-test: bilinen test vektörü ile HMAC doğrulaması
-    const selfTest = await paytrHmac("paytr_test_data" + MERCHANT_SALT, MERCHANT_KEY);
+    // Self-test: HMAC fonksiyonunun çalıştığını doğrula (sabit test verisiyle)
+    // Not: Bu test sadece crypto API'nin çalışıp çalışmadığını kontrol eder,
+    //      credential doğrulaması YAPMAZ. Sonuç sadece sunucu loglarında görünür.
+    const selfTest = await paytrHmac("paytr_selftest", "test_key");
     console.error("[v12] HMAC self-test:", selfTest ? "OK" : "FAIL");
     console.error("[v12] hash_str:", hashStr.substring(0, 100) + "...");
-    console.error("[v12] paytr_token:", paytrToken.substring(0, 20) + "...");
+    console.error("[v12] paytr_token:", paytrToken.substring(0, 10) + "...");
     console.error("[v12] notify_url:", notifyUrl);
     console.error("[v12] credential fingerprints — KEY:", fingerprint(MERCHANT_KEY), "SALT:", fingerprint(MERCHANT_SALT));
 
@@ -265,7 +267,7 @@ Deno.serve(async (req: Request) => {
         key_hash: keyHash,
         salt_hash: saltHash,
         user_ip: userIp,
-        raw_ip: rawIp !== userIp ? rawIp : undefined,
+        raw_ip: rawIp,
         merchant_oid,
         email,
         payment_amount,
@@ -276,7 +278,7 @@ Deno.serve(async (req: Request) => {
         test_mode,
         notify_url: notifyUrl,
         hash_str_preview: hashStr.substring(0, 120) + "...",
-        token_preview: paytrToken.substring(0, 20) + "...",
+        token_preview: paytrToken.substring(0, 10) + "...",
         self_test: selfTest ? "OK" : "FAIL",
       },
       troubleshooting: isTokenError ? troubleshooting : undefined,
