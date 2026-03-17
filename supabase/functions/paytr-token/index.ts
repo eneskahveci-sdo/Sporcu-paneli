@@ -1,9 +1,9 @@
-// PayTR Token Edge Function v6
-// v6: FormData (multipart/form-data) ile gönderim — PHP curl davranışı ile birebir uyumlu
-// v5'ten farklar:
-// - URLSearchParams yerine FormData kullanılıyor (PHP'deki gibi multipart)
-// - Key/Salt ilk-son karakter preview loglanıyor
-// - hash_str tam olarak loglanıyor
+// PayTR Token Edge Function v7
+// v7: Deno'nun node:crypto compat katmanı ile HMAC hesaplama
+// Web Crypto API (crypto.subtle) yerine Node.js uyumlu createHmac kullanılıyor
+// Bu, PayTR'nin PHP/Node.js örnekleriyle birebir aynı davranışı garanti eder
+
+import { createHmac } from "node:crypto";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -18,22 +18,10 @@ function jsonResp(body: Record<string, unknown>, status: number) {
   });
 }
 
-async function hmacSha256Base64(data: string, key: string): Promise<string> {
-  const enc = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(key),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
-  const bytes = new Uint8Array(sig);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+// PayTR Node.js resmi örnek:
+// crypto.createHmac('sha256', merchant_key).update(hash_str + merchant_salt).digest('base64')
+function paytrHmac(data: string, key: string): string {
+  return createHmac("sha256", key).update(data).digest("base64");
 }
 
 function cleanSecret(val: string): string {
@@ -42,8 +30,7 @@ function cleanSecret(val: string): string {
 
 function sanitizeEmail(email: string): string {
   if (!email) return "musteri@dragosakademi.com";
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) return "musteri@dragosakademi.com";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "musteri@dragosakademi.com";
   if (email.endsWith(".local")) return "musteri@dragosakademi.com";
   return email;
 }
@@ -58,31 +45,20 @@ Deno.serve(async (req: Request) => {
 
   try {
     const rawBody = await req.text();
-    if (!rawBody || rawBody.length === 0) {
-      return jsonResp({ error: "Request body boş geldi." }, 400);
-    }
+    if (!rawBody) return jsonResp({ error: "Request body boş." }, 400);
 
     let body: Record<string, string>;
-    try {
-      body = JSON.parse(rawBody);
-    } catch (parseErr) {
-      return jsonResp({ error: "JSON parse hatası: " + String(parseErr) }, 400);
-    }
+    try { body = JSON.parse(rawBody); }
+    catch (e) { return jsonResp({ error: "JSON parse hatası: " + String(e) }, 400); }
 
     const MERCHANT_ID   = cleanSecret(Deno.env.get("PAYTR_MERCHANT_ID")   ?? body.merchant_id ?? "");
     const MERCHANT_KEY  = cleanSecret(Deno.env.get("PAYTR_MERCHANT_KEY")  ?? "");
     const MERCHANT_SALT = cleanSecret(Deno.env.get("PAYTR_MERCHANT_SALT") ?? "");
 
-    console.error("[v6] MERCHANT_ID:", MERCHANT_ID);
-    console.error("[v6] KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
-    console.error("[v6] KEY preview:", MERCHANT_KEY.substring(0, 2) + "..." + MERCHANT_KEY.substring(MERCHANT_KEY.length - 2));
-    console.error("[v6] SALT preview:", MERCHANT_SALT.substring(0, 2) + "..." + MERCHANT_SALT.substring(MERCHANT_SALT.length - 2));
+    console.error("[v7] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
 
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
-      return jsonResp({
-        error: "PayTR credentials eksik.",
-        debug: { hasMerchantId: !!MERCHANT_ID, hasMerchantKey: !!MERCHANT_KEY, hasMerchantSalt: !!MERCHANT_SALT }
-      }, 503);
+      return jsonResp({ error: "PayTR credentials eksik." }, 503);
     }
 
     const merchant_oid    = body.merchant_oid ?? "";
@@ -112,29 +88,16 @@ Deno.serve(async (req: Request) => {
                 || req.headers.get("x-real-ip")
                 || "1.2.3.4";
 
-    // ─── HASH (PHP ile birebir aynı) ───
+    // ─── HASH — PayTR Node.js resmi örneğiyle birebir aynı ───
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount
                   + user_basket + no_installment + max_installment + currency + test_mode;
-    const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    console.error("[v6] hash_str length:", hashStr.length);
-    console.error("[v6] hash_str (full):", hashStr);
-    console.error("[v6] paytr_token:", paytrToken);
+    const paytrToken = paytrHmac(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    const debugInfo = {
-      merchant_id: MERCHANT_ID,
-      key_len: MERCHANT_KEY.length,
-      salt_len: MERCHANT_SALT.length,
-      user_ip: userIp,
-      merchant_oid, email, email_original: rawEmail, payment_amount,
-      user_basket_len: user_basket.length,
-      user_basket_decoded: (() => { try { return atob(user_basket); } catch (_e) { return "DECODE_FAIL"; } })(),
-      no_installment, max_installment, currency, test_mode,
-      hash_str_preview: hashStr.substring(0, 120) + "...",
-      token_preview: paytrToken.substring(0, 20) + "...",
-    };
+    console.error("[v7] hash_str:", hashStr.substring(0, 80) + "...");
+    console.error("[v7] paytr_token:", paytrToken);
 
-    // ─── PayTR API POST — FormData (multipart/form-data, PHP curl ile aynı) ───
+    // ─── PayTR API POST (FormData — PHP curl uyumlu) ───
     const formData = new FormData();
     formData.append("merchant_id", MERCHANT_ID);
     formData.append("user_ip", userIp);
@@ -159,41 +122,42 @@ Deno.serve(async (req: Request) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
     const notifyUrl = Deno.env.get("PAYTR_NOTIFY_URL")
                    || (SUPABASE_URL ? SUPABASE_URL + "/functions/v1/paytr-webhook" : "");
-    if (notifyUrl) {
-      formData.append("merchant_notify_url", notifyUrl);
-    }
+    if (notifyUrl) formData.append("merchant_notify_url", notifyUrl);
 
-    console.error("[v6] Sending to PayTR (FormData multipart)...");
+    console.error("[v7] Sending to PayTR...");
 
     const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
       method: "POST",
-      body: formData, // multipart/form-data — Content-Type otomatik set edilir
+      body: formData,
     });
 
     const resText = await res.text();
-    console.error("[v6] PayTR response status:", res.status, "body:", resText.substring(0, 500));
+    console.error("[v7] PayTR response:", res.status, resText.substring(0, 300));
 
     let data: Record<string, string>;
-    try {
-      data = JSON.parse(resText);
-    } catch (_e) {
-      return jsonResp({ error: "PayTR API JSON parse hatası", paytrResponse: resText.substring(0, 300) }, 502);
-    }
+    try { data = JSON.parse(resText); }
+    catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200) }, 502); }
 
     if (data.status === "success") {
-      console.error("[v6] BAŞARILI!");
+      console.error("[v7] BAŞARILI! Token alındı.");
       return jsonResp({ token: data.token }, 200);
     }
 
-    console.error("[v6] BAŞARISIZ:", data.reason);
+    console.error("[v7] BAŞARISIZ:", data.reason);
     return jsonResp({
       error: data.reason || "Token alınamadı",
-      debug: debugInfo,
+      debug: {
+        merchant_id: MERCHANT_ID, key_len: MERCHANT_KEY.length, salt_len: MERCHANT_SALT.length,
+        user_ip: userIp, merchant_oid, email, payment_amount,
+        user_basket_len: user_basket.length, no_installment, max_installment, currency, test_mode,
+        hash_str_preview: hashStr.substring(0, 120) + "...",
+        token_preview: paytrToken.substring(0, 20) + "...",
+      },
       paytr_response: data,
     }, 400);
 
   } catch (err) {
-    console.error("[v6] EXCEPTION:", String(err));
+    console.error("[v7] EXCEPTION:", String(err));
     return jsonResp({ error: String(err) }, 500);
   }
 });
