@@ -1086,9 +1086,17 @@ window.submitSpPayment = async function() {
 };
 
 // ────────────────────────────────────────────────────────
-// PayTR FIX: initiatePayTRPayment — doğrudan fetch ile Edge Function çağrısı
+// PayTR FIX v2: initiatePayTRPayment — doğrudan fetch ile Edge Function çağrısı
 // sb.functions.invoke JWT doğrulaması yüzünden başarısız olabiliyor.
 // Doğrudan fetch kullanarak bu sorunu bypass ediyoruz.
+//
+// v2 Düzeltmeler:
+// - user_basket fiyat formatı: kuruş değil TL cinsinden string ("1500.00" gibi)
+//   PayTR PHP örneği: array("Ürün", "18.00", 1) — fiyat TL cinsinden
+// - user_basket base64 encoding: PHP base64_encode(json_encode()) ile birebir uyumlu
+// - Türkçe karakter temizliği: basket desc'ten Türkçe karakterler ASCII'ye çevrilir
+// - user_name 60 karakter limiti (PayTR limiti)
+// - Debug logları eklendi
 // ────────────────────────────────────────────────────────
 
 window.initiatePayTRPayment = async function(amt, desc) {
@@ -1105,20 +1113,45 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
     UIUtils.setLoading(true);
     try {
-        // PayTR: merchant_oid sadece alfanumerik olmalı, özel karakter kabul etmez
+        // PayTR: merchant_oid sadece alfanumerik olmalı, max 64 karakter
         var orderId = 'PAY' + a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now();
         var amtKurus = Math.round(amt * 100);
 
-        // user_basket: PayTR Base64 encode bekler
-        var basketRaw = JSON.stringify([[desc || 'Aidat', String(amtKurus), 1]]);
-        var userBasket = btoa(unescape(encodeURIComponent(basketRaw)));
+        // ─── user_basket: PayTR Base64 encode bekler ───
+        // KRİTİK: PayTR dokümantasyonundaki PHP/Node.js örneklerinde
+        // basket fiyatı TL CİNSİNDEN STRİNG olarak verilir: "18.00", "33.25"
+        // Kuruş değil! payment_amount kuruş ama basket fiyatı TL.
+        var amtTL = amt.toFixed(2); // TL cinsinden: "1500.00"
+        var basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, function(ch) {
+            // Türkçe → ASCII dönüşümü (base64 uyumluluğu için)
+            var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            return map[ch] || ch;
+        });
+        var basketArr = [[basketDesc, amtTL, 1]];
+        var basketJson = JSON.stringify(basketArr);
+        // PHP'nin base64_encode(json_encode()) ile birebir aynı sonucu üretir
+        // çünkü json_encode ASCII çıktı verir, base64_encode byte-level çalışır
+        var userBasket = btoa(basketJson);
+
+        console.log('PayTR basket debug:', {
+            amtTL: amtTL,
+            amtKurus: amtKurus,
+            basketJson: basketJson,
+            userBasketB64: userBasket.substring(0, 40) + '...'
+        });
+
+        // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
+        var userName = (a.fn + ' ' + a.ln).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
+            var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            return map[ch] || ch;
+        });
 
         var requestBody = {
             merchant_id: s.paytrMerchantId,
             merchant_oid: orderId,
             email: a.em || (a.tc + '@veli.local'),
             payment_amount: String(amtKurus),
-            user_name: (a.fn + ' ' + a.ln).substring(0, 25),
+            user_name: userName,
             user_address: 'Turkiye',
             user_phone: a.pph || a.ph || '05000000000',
             merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok&oid=' + orderId,
@@ -1136,6 +1169,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
         var supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
 
         console.log('PayTR: Edge Function çağrılıyor...', orderId);
+        console.log('PayTR: request body (özet):', {
+            merchant_oid: orderId,
+            payment_amount: requestBody.payment_amount,
+            email: requestBody.email,
+            user_basket_len: userBasket.length,
+            currency: requestBody.currency,
+            test_mode: requestBody.test_mode
+        });
 
         var response = await fetch(supabaseUrl + '/functions/v1/paytr-token', {
             method: 'POST',
@@ -1149,11 +1190,13 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
         console.log('PayTR: Edge Function response status:', response.status);
 
+        var textResp = await response.text();
+        console.log('PayTR: Edge Function raw response:', textResp.substring(0, 500));
+
         var tokenData;
         try {
-            tokenData = await response.json();
+            tokenData = JSON.parse(textResp);
         } catch(jsonErr) {
-            var textResp = await response.text();
             console.error('PayTR: Response JSON parse hatası, raw:', textResp);
             throw new Error('Edge Function yanıt parse hatası: ' + textResp.substring(0, 200));
         }
@@ -1197,4 +1240,4 @@ window.initiatePayTRPayment = async function(amt, desc) {
     }
 };
 
-console.log('✅ PayTR initiatePayTRPayment override yüklendi (direct fetch + oid fix)');
+console.log('✅ PayTR initiatePayTRPayment v2 override yüklendi (basket TL fix + direct fetch)');
