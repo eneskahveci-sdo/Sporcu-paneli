@@ -27,7 +27,7 @@ async function paytrHmac(data: string, key: string): Promise<string> {
     false, ["sign"],
   );
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return btoa(Array.from(new Uint8Array(sig), (b) => String.fromCharCode(b)).join(""));
 }
 
 function cleanSecret(val: string): string {
