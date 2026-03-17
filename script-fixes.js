@@ -1,16 +1,13 @@
 // ═══════════════════════════════════════════════════════════
-// HATA DÜZELTMELERİ V9 — script.js'den SONRA yüklenir
+// HATA DÜZELTMELERİ V10 — script.js'den SONRA yüklenir
 //
-// V9 DEĞİŞİKLİKLER:
-// - DB.mappers safety guard (script.js yüklenmezse crash önlenir)
-// - WA kartı duplicate guard (settings her açılışta tekrar eklenmiyor)
-// - loadBranchData hook → loadCashTransfers otomatik tetiklenir
-// - sendBulkWhatsApp try/catch (döngü hatası tüm gönderimi durdurmaz)
-// - saveWhatsAppSettings try/catch + window.DB null guard
-// - V8 özellikleri korundu
+// V10 DEĞİŞİKLİKLER:
+// - PayTR initiatePayTRPayment v4: email .local fix, TL basket, detaylı debug
+// - PayTR Edge Function v5 ile uyumlu
+// - V9 özellikleri korundu
 // ═══════════════════════════════════════════════════════════
 
-console.log('script-fixes.js V9 yukleniyor...');
+console.log('script-fixes.js V10 yukleniyor...');
 
 // ────────────────────────────────────────────────────────
 // 0) KRİTİK FIX: spTab() — data-tab attribute bazlı eşleştirme
@@ -1086,12 +1083,12 @@ window.submitSpPayment = async function() {
 };
 
 // ────────────────────────────────────────────────────────
-// PayTR FIX v3: initiatePayTRPayment — doğrudan fetch ile Edge Function çağrısı
-// v3 Düzeltmeler:
-// - merchant_oid: UUID özel karakter sorununu tamamen önlemek için crypto.randomUUID kullanıldı
-// - user_basket fiyat: PayTR API'si kuruş (integer) bekliyor — TL değil, payment_amount ile tutarlı
-// - Türkçe karakter temizliği korundu (basket + user_name)
-// - test_mode: Supabase secret'tan okunuyor, default '1' (test)
+// PayTR FIX v4: initiatePayTRPayment — email fix + detaylı hata mesajları
+// v4 Düzeltmeler:
+// - Email: .local domain kullanılmıyor, fallback email kullanılıyor
+// - user_basket: TL cinsinden fiyat (PayTR resmi dokümanına uygun)
+// - Hata durumunda PayTR debug bilgisi console'a yazılır
+// - Adım adım debug logları
 // ────────────────────────────────────────────────────────
 
 window.initiatePayTRPayment = async function(amt, desc) {
@@ -1109,30 +1106,24 @@ window.initiatePayTRPayment = async function(amt, desc) {
     UIUtils.setLoading(true);
     try {
         // PayTR: merchant_oid sadece alfanumerik olmalı, max 64 karakter
-        // v3 FIX: crypto.randomUUID ile tamamen unique, tireler kaldırılıyor
         var orderId = 'PAY' + (typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID().replace(/-/g, '').slice(0, 20)
             : a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now());
         var amtKurus = Math.round(amt * 100);
 
         // ─── user_basket: PayTR Base64 encode bekler ───
-        // v3 FIX: payment_amount ile tutarlı → basket fiyatı da KURUŞ (integer string)
-        // Yeni PayTR API: hem payment_amount hem basket kuruş cinsinden
+        // PayTR resmi doküman: basket fiyatları TL cinsinden string
+        // Örnek: [["Sample Product 1", "18.00", 1]]
         var basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, function(ch) {
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
             return map[ch] || ch;
         });
         var amtTL = amt.toFixed(2); // TL cinsinden: "2500.00"
-        var basketArr = [[basketDesc, amtTL, 1]]; // PayTR basket: TL cinsinden
+        var basketArr = [[basketDesc, amtTL, 1]];
         var basketJson = JSON.stringify(basketArr);
         var userBasket = btoa(basketJson);
 
-        console.log('PayTR basket debug:', {
-            amtTL: (amtKurus / 100).toFixed(2),
-            amtKurus: amtKurus,
-            basketJson: basketJson,
-            userBasketB64: userBasket.substring(0, 40) + '...'
-        });
+        console.log('[PayTR v4] basket:', { amtTL: amtTL, amtKurus: amtKurus, basketJson: basketJson });
 
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
         var userName = (a.fn + ' ' + a.ln).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
@@ -1140,10 +1131,16 @@ window.initiatePayTRPayment = async function(amt, desc) {
             return map[ch] || ch;
         });
 
+        // v4 FIX: Email — .local domain PayTR tarafından reddedilebilir
+        var email = a.em;
+        if (!email || email.indexOf('@') === -1 || email.endsWith('.local')) {
+            email = 'musteri@dragosakademi.com';
+        }
+
         var requestBody = {
             merchant_id: s.paytrMerchantId,
             merchant_oid: orderId,
-            email: a.em || (a.tc + '@veli.local'),
+            email: email,
             payment_amount: String(amtKurus),
             user_name: userName,
             user_address: 'Turkiye',
@@ -1158,12 +1155,12 @@ window.initiatePayTRPayment = async function(amt, desc) {
             lang: 'tr'
         };
 
-        // Doğrudan fetch ile Edge Function çağır (JWT sorununu bypass eder)
+        // Doğrudan fetch ile Edge Function çağır
         var supabaseUrl = 'https://wfarbydojxtufnkjuhtc.supabase.co';
         var supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
 
-        console.log('PayTR: Edge Function çağrılıyor...', orderId);
-        console.log('PayTR: request body (özet):', {
+        console.log('[PayTR v4] Edge Function çağrılıyor:', orderId);
+        console.log('[PayTR v4] İstek özeti:', {
             merchant_oid: orderId,
             payment_amount: requestBody.payment_amount,
             email: requestBody.email,
@@ -1182,26 +1179,34 @@ window.initiatePayTRPayment = async function(amt, desc) {
             body: JSON.stringify(requestBody)
         });
 
-        console.log('PayTR: Edge Function response status:', response.status);
+        console.log('[PayTR v4] Response status:', response.status);
 
         var textResp = await response.text();
-        console.log('PayTR: Edge Function raw response:', textResp.substring(0, 500));
+        console.log('[PayTR v4] Raw response:', textResp.substring(0, 500));
 
         var tokenData;
         try {
             tokenData = JSON.parse(textResp);
         } catch(jsonErr) {
-            console.error('PayTR: Response JSON parse hatası, raw:', textResp);
-            throw new Error('Edge Function yanıt parse hatası: ' + textResp.substring(0, 200));
+            console.error('[PayTR v4] Response JSON parse hatası:', textResp);
+            throw new Error('Edge Function yanıt parse hatası');
         }
 
-        console.log('PayTR: Edge Function response data:', tokenData);
+        console.log('[PayTR v4] Parsed response:', tokenData);
 
         if (!response.ok || !tokenData || !tokenData.token) {
-            var errMsg = tokenData && tokenData.error ? tokenData.error : 
+            var errMsg = tokenData && tokenData.error ? tokenData.error :
                          tokenData && tokenData.msg ? tokenData.msg :
                          'Token alınamadı (HTTP ' + response.status + ')';
-            console.error('PayTR token hatası:', errMsg, tokenData);
+
+            // v4: Debug bilgisini console'a yaz
+            if (tokenData && tokenData.debug) {
+                console.error('[PayTR v4] Debug info:', JSON.stringify(tokenData.debug, null, 2));
+            }
+            if (tokenData && tokenData.paytr_response) {
+                console.error('[PayTR v4] PayTR response:', JSON.stringify(tokenData.paytr_response, null, 2));
+            }
+
             throw new Error(errMsg);
         }
 
@@ -1223,21 +1228,21 @@ window.initiatePayTRPayment = async function(amt, desc) {
         await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
         AppState.data.payments.push(pendingPay);
 
-        // postMessage listener için orderId'yi kaydet (fallback)
+        // postMessage listener için orderId'yi kaydet
         AppState._paytrCurrentOrderId = orderId;
 
         // PayTR iframe aç
         showPayTRModal(tokenData.token, orderId);
 
     } catch (e) {
-        console.error('PayTR error:', e);
+        console.error('[PayTR v4] Error:', e);
         toast('PayTR hatası: ' + e.message, 'e');
     } finally {
         UIUtils.setLoading(false);
     }
 };
 
-console.log('✅ PayTR initiatePayTRPayment v3 override yüklendi (randomUUID orderId + kuruş basket)');
+console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
 
 // ────────────────────────────────────────────────────────
 // PayTR FIX v3: postMessage listener
