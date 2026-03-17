@@ -1211,7 +1211,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
             // Kullanıcıya daha anlaşılır hata mesajı göster
             var userMsg = 'Ödeme sistemi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
             if (errMsg.indexOf('paytr_token') !== -1) {
-                userMsg = 'Ödeme token doğrulaması başarısız. PayTR ayarlarını (Merchant Key/Salt) kontrol edin.';
+                userMsg = 'Ödeme token doğrulaması başarısız. Lütfen sistem yöneticinize başvurun (PayTR Key/Salt ayarları kontrol edilmeli).';
             } else if (errMsg.indexOf('credentials eksik') !== -1 || errMsg.indexOf('Secrets') !== -1) {
                 userMsg = 'PayTR API anahtarları tanımlı değil. Ayarlar > PayTR bölümünden yapılandırın.';
             }

@@ -35,7 +35,7 @@ async function paytrHmac(data: string, key: string): Promise<string> {
 // Supabase secret'lardan gelen değerlerdeki tırnak, BOM ve boşluk karakterlerini temizler
 function cleanSecret(val: string): string {
   return val
-    .replace(/^["']+|["']+$/g, "")
+    .replace(/^["']|["']$/g, "")
     .replace(/[\s\u200B-\u200D\uFEFF\u00A0\r\n\t]/g, "");
 }
 
