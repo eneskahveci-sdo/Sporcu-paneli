@@ -1086,17 +1086,12 @@ window.submitSpPayment = async function() {
 };
 
 // ────────────────────────────────────────────────────────
-// PayTR FIX v2: initiatePayTRPayment — doğrudan fetch ile Edge Function çağrısı
-// sb.functions.invoke JWT doğrulaması yüzünden başarısız olabiliyor.
-// Doğrudan fetch kullanarak bu sorunu bypass ediyoruz.
-//
-// v2 Düzeltmeler:
-// - user_basket fiyat formatı: kuruş değil TL cinsinden string ("1500.00" gibi)
-//   PayTR PHP örneği: array("Ürün", "18.00", 1) — fiyat TL cinsinden
-// - user_basket base64 encoding: PHP base64_encode(json_encode()) ile birebir uyumlu
-// - Türkçe karakter temizliği: basket desc'ten Türkçe karakterler ASCII'ye çevrilir
-// - user_name 60 karakter limiti (PayTR limiti)
-// - Debug logları eklendi
+// PayTR FIX v3: initiatePayTRPayment — doğrudan fetch ile Edge Function çağrısı
+// v3 Düzeltmeler:
+// - merchant_oid: UUID özel karakter sorununu tamamen önlemek için crypto.randomUUID kullanıldı
+// - user_basket fiyat: PayTR API'si kuruş (integer) bekliyor — TL değil, payment_amount ile tutarlı
+// - Türkçe karakter temizliği korundu (basket + user_name)
+// - test_mode: Supabase secret'tan okunuyor, default '1' (test)
 // ────────────────────────────────────────────────────────
 
 window.initiatePayTRPayment = async function(amt, desc) {
@@ -1114,23 +1109,21 @@ window.initiatePayTRPayment = async function(amt, desc) {
     UIUtils.setLoading(true);
     try {
         // PayTR: merchant_oid sadece alfanumerik olmalı, max 64 karakter
-        var orderId = 'PAY' + a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now();
+        // v3 FIX: crypto.randomUUID ile tamamen unique, tireler kaldırılıyor
+        var orderId = 'PAY' + (typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID().replace(/-/g, '').slice(0, 20)
+            : a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now());
         var amtKurus = Math.round(amt * 100);
 
         // ─── user_basket: PayTR Base64 encode bekler ───
-        // KRİTİK: PayTR dokümantasyonundaki PHP/Node.js örneklerinde
-        // basket fiyatı TL CİNSİNDEN STRİNG olarak verilir: "18.00", "33.25"
-        // Kuruş değil! payment_amount kuruş ama basket fiyatı TL.
-        var amtTL = amt.toFixed(2); // TL cinsinden: "1500.00"
+        // v3 FIX: payment_amount ile tutarlı → basket fiyatı da KURUŞ (integer string)
+        // Yeni PayTR API: hem payment_amount hem basket kuruş cinsinden
         var basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, function(ch) {
-            // Türkçe → ASCII dönüşümü (base64 uyumluluğu için)
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
             return map[ch] || ch;
         });
-        var basketArr = [[basketDesc, amtTL, 1]];
+        var basketArr = [[basketDesc, String(amtKurus), 1]]; // kuruş cinsinden
         var basketJson = JSON.stringify(basketArr);
-        // PHP'nin base64_encode(json_encode()) ile birebir aynı sonucu üretir
-        // çünkü json_encode ASCII çıktı verir, base64_encode byte-level çalışır
         var userBasket = btoa(basketJson);
 
         console.log('PayTR basket debug:', {
@@ -1229,6 +1222,9 @@ window.initiatePayTRPayment = async function(amt, desc) {
         await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
         AppState.data.payments.push(pendingPay);
 
+        // postMessage listener için orderId'yi kaydet (fallback)
+        AppState._paytrCurrentOrderId = orderId;
+
         // PayTR iframe aç
         showPayTRModal(tokenData.token, orderId);
 
@@ -1240,4 +1236,47 @@ window.initiatePayTRPayment = async function(amt, desc) {
     }
 };
 
-console.log('✅ PayTR initiatePayTRPayment v2 override yüklendi (basket TL fix + direct fetch)');
+console.log('✅ PayTR initiatePayTRPayment v3 override yüklendi (randomUUID orderId + kuruş basket)');
+
+// ────────────────────────────────────────────────────────
+// PayTR FIX v3: postMessage listener
+// PayTR iframe ödeme sonrası window.postMessage ile bildirim gönderiyor.
+// Orijinal kodda bu dinlenmiyordu → ödeme tamamlansa da frontend'de
+// "pending" kalıyordu. Webhook DB'yi güncelliyor ama UI yansımıyordu.
+// ────────────────────────────────────────────────────────
+(function installPayTRMessageListener() {
+    // Daha önce eklenmiş mi kontrol et (double-load guard)
+    if (window.__paytrMessageListenerInstalled) return;
+    window.__paytrMessageListenerInstalled = true;
+
+    window.addEventListener('message', async function(event) {
+        // Güvenlik: sadece PayTR'dan gelen mesajları kabul et
+        if (!event.origin || !event.origin.includes('paytr.com')) return;
+
+        var data = event.data;
+        if (!data) return;
+
+        // PayTR mesaj formatı: { status: 'success'|'failed', merchant_oid: '...' }
+        // veya string olarak gelebilir
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch(e) { return; }
+        }
+
+        var orderId = data.merchant_oid || AppState._paytrCurrentOrderId;
+        var status  = data.status; // 'success' veya 'failed'
+
+        if (!orderId || !status) return;
+
+        console.log('[PayTR postMessage]', status, orderId);
+
+        // Modal'ı kapat
+        if (typeof closeModal === 'function') closeModal();
+
+        // handlePayTRCallback ile senkronize et (varsa)
+        if (typeof window.handlePayTRCallback === 'function') {
+            await window.handlePayTRCallback(orderId, status === 'success' ? 'success' : 'fail');
+        }
+    });
+
+    console.log('✅ PayTR postMessage listener kuruldu');
+})();
