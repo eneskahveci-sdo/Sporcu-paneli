@@ -1,7 +1,8 @@
-// PayTR Token Edge Function v7
+// PayTR Token Edge Function v8
+// v8: FormData (multipart/form-data) yerine URLSearchParams (x-www-form-urlencoded) kullanılıyor
+//     PayTR API multipart/form-data ile gönderilen alanları parse edemiyordu
+//     "paytr_token gonderilmedi veya gecersiz" hatasının kök nedeni buydu
 // v7: Deno'nun node:crypto compat katmanı ile HMAC hesaplama
-// Web Crypto API (crypto.subtle) yerine Node.js uyumlu createHmac kullanılıyor
-// Bu, PayTR'nin PHP/Node.js örnekleriyle birebir aynı davranışı garanti eder
 
 import { createHmac } from "node:crypto";
 
@@ -55,7 +56,7 @@ Deno.serve(async (req: Request) => {
     const MERCHANT_KEY  = cleanSecret(Deno.env.get("PAYTR_MERCHANT_KEY")  ?? "");
     const MERCHANT_SALT = cleanSecret(Deno.env.get("PAYTR_MERCHANT_SALT") ?? "");
 
-    console.error("[v7] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
+    console.error("[v8] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
 
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
       return jsonResp({ error: "PayTR credentials eksik." }, 503);
@@ -94,11 +95,13 @@ Deno.serve(async (req: Request) => {
 
     const paytrToken = paytrHmac(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    console.error("[v7] hash_str:", hashStr.substring(0, 80) + "...");
-    console.error("[v7] paytr_token:", paytrToken);
+    console.error("[v8] hash_str:", hashStr.substring(0, 80) + "...");
+    console.error("[v8] paytr_token:", paytrToken);
 
-    // ─── PayTR API POST (FormData — PHP curl uyumlu) ───
-    const formData = new FormData();
+    // ─── PayTR API POST (URLSearchParams — application/x-www-form-urlencoded) ───
+    // PayTR PHP örnekleri http_build_query / string CURLOPT_POSTFIELDS kullanır
+    // FormData (multipart/form-data) gönderildiğinde PayTR alanları parse edemiyor
+    const formData = new URLSearchParams();
     formData.append("merchant_id", MERCHANT_ID);
     formData.append("user_ip", userIp);
     formData.append("merchant_oid", merchant_oid);
@@ -124,7 +127,7 @@ Deno.serve(async (req: Request) => {
                    || (SUPABASE_URL ? SUPABASE_URL + "/functions/v1/paytr-webhook" : "");
     if (notifyUrl) formData.append("merchant_notify_url", notifyUrl);
 
-    console.error("[v7] Sending to PayTR...");
+    console.error("[v8] Sending to PayTR...");
 
     const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
       method: "POST",
@@ -132,18 +135,18 @@ Deno.serve(async (req: Request) => {
     });
 
     const resText = await res.text();
-    console.error("[v7] PayTR response:", res.status, resText.substring(0, 300));
+    console.error("[v8] PayTR response:", res.status, resText.substring(0, 300));
 
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
     catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200) }, 502); }
 
     if (data.status === "success") {
-      console.error("[v7] BAŞARILI! Token alındı.");
+      console.error("[v8] BAŞARILI! Token alındı.");
       return jsonResp({ token: data.token }, 200);
     }
 
-    console.error("[v7] BAŞARISIZ:", data.reason);
+    console.error("[v8] BAŞARISIZ:", data.reason);
     return jsonResp({
       error: data.reason || "Token alınamadı",
       debug: {
@@ -157,7 +160,7 @@ Deno.serve(async (req: Request) => {
     }, 400);
 
   } catch (err) {
-    console.error("[v7] EXCEPTION:", String(err));
+    console.error("[v8] EXCEPTION:", String(err));
     return jsonResp({ error: String(err) }, 500);
   }
 });
