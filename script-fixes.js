@@ -1116,7 +1116,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         // Örnek: [["Sample Product 1", "18.00", 1]]
         var basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, function(ch) {
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
-            return map[ch] || ch;
+            return map[ch] || '';
         });
         var amtTL = amt.toFixed(2); // TL cinsinden: "2500.00"
         var basketArr = [[basketDesc, amtTL, 1]];
@@ -1128,7 +1128,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
         var userName = (a.fn + ' ' + a.ln).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
-            return map[ch] || ch;
+            return map[ch] || '';
         });
 
         // v4 FIX: Email — .local domain PayTR tarafından reddedilebilir
