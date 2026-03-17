@@ -1,6 +1,5 @@
-// PayTR Token Edge Function v3
-// v3: Tüm loglar console.error ile (Supabase sadece error seviyesini gösteriyor)
-// v3: Hata response'una debug bilgileri ekleniyor
+// PayTR Token Edge Function v4
+// v4: Gelişmiş debug + email sanitize + key/salt whitespace temizleme
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -33,14 +32,26 @@ async function hmacSha256Base64(data: string, key: string): Promise<string> {
   return btoa(binary);
 }
 
+// Görünmez unicode karakterleri de temizler
+function cleanSecret(val: string): string {
+  return val.replace(/[\s\u200B-\u200D\uFEFF\u00A0]/g, "").trim();
+}
+
+// Email sanitize: geçersiz email yerine güvenli fallback
+function sanitizeEmail(email: string): string {
+  if (!email) return "musteri@dragosakademi.com";
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (emailRegex.test(email)) return email;
+  // .local veya geçersiz domain varsa fallback
+  return "musteri@dragosakademi.com";
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
   if (req.method !== "POST") return jsonResp({ error: "Method not allowed" }, 405);
 
   try {
     const rawBody = await req.text();
-    console.error("[v3] Raw body length:", rawBody.length);
-
     if (!rawBody || rawBody.length === 0) {
       return jsonResp({ error: "Request body bos geldi." }, 400);
     }
@@ -52,43 +63,40 @@ Deno.serve(async (req: Request) => {
       return jsonResp({ error: "JSON parse hatasi: " + String(parseErr) }, 400);
     }
 
-    const MERCHANT_ID = (Deno.env.get("PAYTR_MERCHANT_ID") ?? body.merchant_id ?? "").trim();
-    const MERCHANT_KEY = (Deno.env.get("PAYTR_MERCHANT_KEY") ?? "").trim();
-    const MERCHANT_SALT = (Deno.env.get("PAYTR_MERCHANT_SALT") ?? "").trim();
+    // v4: cleanSecret ile görünmez karakterleri de temizle
+    const MERCHANT_ID   = cleanSecret(Deno.env.get("PAYTR_MERCHANT_ID")   ?? body.merchant_id ?? "");
+    const MERCHANT_KEY  = cleanSecret(Deno.env.get("PAYTR_MERCHANT_KEY")  ?? "");
+    const MERCHANT_SALT = cleanSecret(Deno.env.get("PAYTR_MERCHANT_SALT") ?? "");
 
-    console.error("[v3] MERCHANT_ID:", MERCHANT_ID, "len:", MERCHANT_ID.length);
-    console.error("[v3] MERCHANT_KEY len:", MERCHANT_KEY.length, "MERCHANT_SALT len:", MERCHANT_SALT.length);
+    console.error("[v4] MERCHANT_ID:", MERCHANT_ID, "len:", MERCHANT_ID.length);
+    console.error("[v4] KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
 
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
-      return jsonResp({
-        error: "PayTR credentials eksik.",
-        debug: {
-          hasMerchantId: !!MERCHANT_ID,
-          hasMerchantKey: !!MERCHANT_KEY,
-          hasMerchantSalt: !!MERCHANT_SALT,
-          idLen: MERCHANT_ID.length,
-          keyLen: MERCHANT_KEY.length,
-          saltLen: MERCHANT_SALT.length,
-        }
-      }, 503);
+      return jsonResp({ error: "PayTR credentials eksik.", debug: {
+        hasMerchantId: !!MERCHANT_ID, hasMerchantKey: !!MERCHANT_KEY, hasMerchantSalt: !!MERCHANT_SALT,
+        idLen: MERCHANT_ID.length, keyLen: MERCHANT_KEY.length, saltLen: MERCHANT_SALT.length,
+      }}, 503);
     }
 
-    const merchant_oid = body.merchant_oid ?? "";
-    const email = body.email ?? "";
-    const payment_amount = String(body.payment_amount ?? "");
-    const user_name = body.user_name ?? "";
-    const user_address = body.user_address ?? "Turkiye";
-    const user_phone = body.user_phone ?? "05000000000";
+    const merchant_oid    = body.merchant_oid ?? "";
+    const rawEmail        = body.email ?? "";
+    const email           = sanitizeEmail(rawEmail); // v4: geçersiz email sanitize
+    const payment_amount  = String(body.payment_amount ?? "");
+    const user_name       = body.user_name ?? "";
+    const user_address    = body.user_address ?? "Turkiye";
+    const user_phone      = body.user_phone ?? "05000000000";
     const merchant_ok_url = body.merchant_ok_url ?? "";
     const merchant_fail_url = body.merchant_fail_url ?? "";
-    const user_basket = body.user_basket ?? "";
-    const currency = body.currency ?? "TL";
-    const test_mode = body.test_mode ?? "1";
-    const no_installment = body.no_installment ?? "1";
+    const user_basket     = body.user_basket ?? "";
+    const currency        = body.currency ?? "TL";
+    const test_mode       = body.test_mode ?? "1";
+    const no_installment  = body.no_installment ?? "1";
     const max_installment = body.max_installment ?? "0";
-    const lang = body.lang ?? "tr";
+    const lang            = body.lang ?? "tr";
 
-    const required: Record<string, string> = { merchant_oid, email, payment_amount, user_name, user_basket, merchant_ok_url, merchant_fail_url };
+    const required: Record<string, string> = {
+      merchant_oid, email, payment_amount, user_name, user_basket, merchant_ok_url, merchant_fail_url
+    };
     for (const [k, v] of Object.entries(required)) {
       if (!v) return jsonResp({ error: "Zorunlu alan eksik: " + k }, 400);
     }
@@ -97,31 +105,23 @@ Deno.serve(async (req: Request) => {
       || req.headers.get("x-real-ip")?.trim()
       || "1.1.1.1";
 
-    // Hash hesaplama
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode;
     const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    // Debug bilgileri - hepsi console.error ile (Supabase bunları gösterir)
     const debugInfo = {
       merchant_id: MERCHANT_ID,
-      merchant_id_len: MERCHANT_ID.length,
       key_len: MERCHANT_KEY.length,
       salt_len: MERCHANT_SALT.length,
       user_ip: userIp,
-      merchant_oid: merchant_oid,
-      email: email,
-      payment_amount: payment_amount,
-      user_basket_b64_len: user_basket.length,
+      merchant_oid,
+      email,
+      email_original: rawEmail,
+      payment_amount,
       user_basket_decoded: (() => { try { return atob(user_basket); } catch (_e) { return "DECODE_FAIL"; } })(),
-      no_installment: no_installment,
-      max_installment: max_installment,
-      currency: currency,
-      test_mode: test_mode,
-      hash_str_len: hashStr.length,
-      paytr_token: paytrToken,
+      no_installment, max_installment, currency, test_mode,
     };
 
-    console.error("[v3] HASH DEBUG:", JSON.stringify(debugInfo));
+    console.error("[v4] DEBUG:", JSON.stringify(debugInfo));
 
     const formData = new URLSearchParams();
     formData.append("merchant_id", MERCHANT_ID);
@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const resText = await res.text();
-    console.error("[v3] PayTR API status:", res.status, "body:", resText.substring(0, 500));
+    console.error("[v4] PayTR API status:", res.status, "body:", resText.substring(0, 500));
 
     let data: Record<string, string>;
     try {
@@ -161,12 +161,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (data.status === "success") {
-      console.error("[v3] BASARILI! Token alindi.");
+      console.error("[v4] BASARILI! Token alindi.");
       return jsonResp({ token: data.token }, 200);
     }
 
-    // HATA DURUMU: debug bilgilerini response'a ekle
-    console.error("[v3] BASARISIZ:", data.reason);
+    console.error("[v4] BASARISIZ:", data.reason);
     return jsonResp({
       error: data.reason || "Token alinamadi",
       debug: debugInfo,
@@ -174,7 +173,7 @@ Deno.serve(async (req: Request) => {
     }, 400);
 
   } catch (err) {
-    console.error("[v3] EXCEPTION:", String(err));
+    console.error("[v4] EXCEPTION:", String(err));
     return jsonResp({ error: String(err) }, 500);
   }
 });
