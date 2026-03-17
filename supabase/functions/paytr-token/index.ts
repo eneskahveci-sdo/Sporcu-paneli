@@ -1,10 +1,8 @@
-// PayTR Token Edge Function v9
+// PayTR Token Edge Function v10
+// v10: node:crypto yerine native Web Crypto API kullanılıyor (paytr-webhook ile tutarlı)
+//      Deno compat katmanı bypass edilerek doğrudan platform API'si kullanılıyor
 // v9: fetch'e explicit Content-Type header ve body.toString() eklendi
-//     Deno runtime'ında URLSearchParams body otomatik Content-Type set etmeyebiliyordu
 // v8: FormData (multipart/form-data) yerine URLSearchParams (x-www-form-urlencoded) kullanılıyor
-// v7: Deno'nun node:crypto compat katmanı ile HMAC hesaplama
-
-import { createHmac } from "node:crypto";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -19,10 +17,17 @@ function jsonResp(body: Record<string, unknown>, status: number) {
   });
 }
 
-// PayTR Node.js resmi örnek:
-// crypto.createHmac('sha256', merchant_key).update(hash_str + merchant_salt).digest('base64')
-function paytrHmac(data: string, key: string): string {
-  return createHmac("sha256", key).update(data).digest("base64");
+// PayTR HMAC — Web Crypto API (paytr-webhook ile aynı yöntem)
+// PHP: base64_encode(hash_hmac('sha256', $data, $key, true))
+async function paytrHmac(data: string, key: string): Promise<string> {
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw", enc.encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false, ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
 function cleanSecret(val: string): string {
@@ -56,7 +61,7 @@ Deno.serve(async (req: Request) => {
     const MERCHANT_KEY  = cleanSecret(Deno.env.get("PAYTR_MERCHANT_KEY")  ?? "");
     const MERCHANT_SALT = cleanSecret(Deno.env.get("PAYTR_MERCHANT_SALT") ?? "");
 
-    console.error("[v9] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
+    console.error("[v10] MERCHANT_ID:", MERCHANT_ID, "KEY len:", MERCHANT_KEY.length, "SALT len:", MERCHANT_SALT.length);
 
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
       return jsonResp({ error: "PayTR credentials eksik." }, 503);
@@ -89,14 +94,17 @@ Deno.serve(async (req: Request) => {
                 || req.headers.get("x-real-ip")
                 || "1.2.3.4";
 
-    // ─── HASH — PayTR Node.js resmi örneğiyle birebir aynı ───
+    // ─── HASH — PayTR resmi PHP örneğiyle birebir aynı ───
+    // PHP: $hash_str = $merchant_id.$user_ip.$merchant_oid.$email.$payment_amount
+    //       .$user_basket.$no_installment.$max_installment.$currency.$test_mode;
+    // PHP: $paytr_token = base64_encode(hash_hmac('sha256',$hash_str.$merchant_salt,$merchant_key,true));
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount
                   + user_basket + no_installment + max_installment + currency + test_mode;
 
-    const paytrToken = paytrHmac(hashStr + MERCHANT_SALT, MERCHANT_KEY);
+    const paytrToken = await paytrHmac(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    console.error("[v9] hash_str:", hashStr.substring(0, 80) + "...");
-    console.error("[v9] paytr_token:", paytrToken);
+    console.error("[v10] hash_str:", hashStr.substring(0, 80) + "...");
+    console.error("[v10] paytr_token:", paytrToken);
 
     // ─── PayTR API POST (URLSearchParams — application/x-www-form-urlencoded) ───
     // PayTR PHP örnekleri http_build_query / string CURLOPT_POSTFIELDS kullanır
@@ -122,12 +130,12 @@ Deno.serve(async (req: Request) => {
     formData.append("test_mode", test_mode);
     formData.append("lang", lang);
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+    const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
     const notifyUrl = Deno.env.get("PAYTR_NOTIFY_URL")
                    || (SUPABASE_URL ? SUPABASE_URL + "/functions/v1/paytr-webhook" : "");
     if (notifyUrl) formData.append("merchant_notify_url", notifyUrl);
 
-    console.error("[v9] Sending to PayTR...");
+    console.error("[v10] Sending to PayTR, notify_url:", notifyUrl || "(yok)");
 
     const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
       method: "POST",
@@ -138,18 +146,18 @@ Deno.serve(async (req: Request) => {
     });
 
     const resText = await res.text();
-    console.error("[v9] PayTR response:", res.status, resText.substring(0, 300));
+    console.error("[v10] PayTR response:", res.status, resText.substring(0, 300));
 
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
     catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200) }, 502); }
 
     if (data.status === "success") {
-      console.error("[v9] BAŞARILI! Token alındı.");
+      console.error("[v10] BAŞARILI! Token alındı.");
       return jsonResp({ token: data.token }, 200);
     }
 
-    console.error("[v9] BAŞARISIZ:", data.reason);
+    console.error("[v10] BAŞARISIZ:", data.reason);
     return jsonResp({
       error: data.reason || "Token alınamadı",
       debug: {
@@ -163,7 +171,7 @@ Deno.serve(async (req: Request) => {
     }, 400);
 
   } catch (err) {
-    console.error("[v9] EXCEPTION:", String(err));
+    console.error("[v10] EXCEPTION:", String(err));
     return jsonResp({ error: String(err) }, 500);
   }
 });

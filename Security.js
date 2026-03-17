@@ -327,7 +327,7 @@ function _securityDoNormalLogin(role) {
 
             // AppState yoksa oluştur
             if (!window.AppState) {
-                console.warn('⚠️ AppState yoktu, oluşturuluyor...');
+                console.log('AppState yoktu, oluşturuluyor...');
                 window.AppState = {
                     sb: sb,
                     currentUser: null,

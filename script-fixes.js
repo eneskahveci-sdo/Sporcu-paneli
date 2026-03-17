@@ -1199,15 +1199,20 @@ window.initiatePayTRPayment = async function(amt, desc) {
                          tokenData && tokenData.msg ? tokenData.msg :
                          'Token alınamadı (HTTP ' + response.status + ')';
 
-            // v4: Debug bilgisini console'a yaz
+            // Debug bilgisini console'a yaz (sadece geliştirici için)
             if (tokenData && tokenData.debug) {
-                console.error('[PayTR v4] Debug info:', JSON.stringify(tokenData.debug, null, 2));
+                console.error('[PayTR] Debug info:', JSON.stringify(tokenData.debug, null, 2));
             }
             if (tokenData && tokenData.paytr_response) {
-                console.error('[PayTR v4] PayTR response:', JSON.stringify(tokenData.paytr_response, null, 2));
+                console.error('[PayTR] PayTR response:', JSON.stringify(tokenData.paytr_response, null, 2));
             }
 
-            throw new Error(errMsg);
+            // Kullanıcıya daha anlaşılır hata mesajı göster
+            var userMsg = 'Ödeme sistemi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+            if (errMsg.indexOf('paytr_token') !== -1) {
+                userMsg = 'Ödeme yapılandırma hatası. Lütfen yöneticiye başvurun.';
+            }
+            throw new Error(userMsg);
         }
 
         // Bekleyen ödeme kaydı oluştur
