@@ -1,9 +1,6 @@
-// PayTR Token Edge Function v2
-// Düzeltmeler:
-// - Credential'lar trim ediliyor (başında/sonunda boşluk/newline olabilir)
-// - Detaylı hash debug loglama (PayTR hash aracıyla karşılaştırma için)
-// - user_name 60 karakter limiti
-// - HMAC-SHA256 → Base64 (Deno Web Crypto API)
+// PayTR Token Edge Function v3
+// v3: Tüm loglar console.error ile (Supabase sadece error seviyesini gösteriyor)
+// v3: Hata response'una debug bilgileri ekleniyor
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -18,8 +15,6 @@ function jsonResp(body: Record<string, unknown>, status: number) {
   });
 }
 
-// PHP: base64_encode(hash_hmac('sha256', $data, $key, true))
-// Bu fonksiyon bire bir aynı sonucu üretir.
 async function hmacSha256Base64(data: string, key: string): Promise<string> {
   const enc = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey(
@@ -44,7 +39,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const rawBody = await req.text();
-    console.log("Raw body length:", rawBody.length);
+    console.error("[v3] Raw body length:", rawBody.length);
 
     if (!rawBody || rawBody.length === 0) {
       return jsonResp({ error: "Request body bos geldi." }, 400);
@@ -54,25 +49,28 @@ Deno.serve(async (req: Request) => {
     try {
       body = JSON.parse(rawBody);
     } catch (parseErr) {
-      return jsonResp({ error: "JSON parse hatasi: " + String(parseErr), raw: rawBody.substring(0, 200) }, 400);
+      return jsonResp({ error: "JSON parse hatasi: " + String(parseErr) }, 400);
     }
 
-    // KRİTİK: .trim() ile baştaki/sondaki boşluk/newline temizleniyor
-    // Supabase Dashboard'dan secret eklerken yanlışlıkla boşluk eklenebilir
     const MERCHANT_ID = (Deno.env.get("PAYTR_MERCHANT_ID") ?? body.merchant_id ?? "").trim();
     const MERCHANT_KEY = (Deno.env.get("PAYTR_MERCHANT_KEY") ?? "").trim();
     const MERCHANT_SALT = (Deno.env.get("PAYTR_MERCHANT_SALT") ?? "").trim();
 
+    console.error("[v3] MERCHANT_ID:", MERCHANT_ID, "len:", MERCHANT_ID.length);
+    console.error("[v3] MERCHANT_KEY len:", MERCHANT_KEY.length, "MERCHANT_SALT len:", MERCHANT_SALT.length);
+
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
-      console.error("PayTR credentials eksik!", {
-        hasMerchantId: !!MERCHANT_ID,
-        hasMerchantKey: !!MERCHANT_KEY,
-        hasMerchantSalt: !!MERCHANT_SALT,
-        merchantIdLen: MERCHANT_ID.length,
-        merchantKeyLen: MERCHANT_KEY.length,
-        merchantSaltLen: MERCHANT_SALT.length,
-      });
-      return jsonResp({ error: "PayTR credentials eksik." }, 503);
+      return jsonResp({
+        error: "PayTR credentials eksik.",
+        debug: {
+          hasMerchantId: !!MERCHANT_ID,
+          hasMerchantKey: !!MERCHANT_KEY,
+          hasMerchantSalt: !!MERCHANT_SALT,
+          idLen: MERCHANT_ID.length,
+          keyLen: MERCHANT_KEY.length,
+          saltLen: MERCHANT_SALT.length,
+        }
+      }, 503);
     }
 
     const merchant_oid = body.merchant_oid ?? "";
@@ -95,40 +93,35 @@ Deno.serve(async (req: Request) => {
       if (!v) return jsonResp({ error: "Zorunlu alan eksik: " + k }, 400);
     }
 
-    // user_ip: x-forwarded-for'dan al, yoksa x-real-ip dene
     const userIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
       || req.headers.get("x-real-ip")?.trim()
       || "1.1.1.1";
 
-    // ─── PayTR Hash Hesaplama ───
-    // PHP referans:
-    //   $hash_str = $merchant_id . $user_ip . $merchant_oid . $email . $payment_amount
-    //             . $user_basket . $no_installment . $max_installment . $currency . $test_mode;
-    //   $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . $merchant_salt, $merchant_key, true));
+    // Hash hesaplama
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode;
-
     const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
 
-    // ─── DETAYLI DEBUG LOG ───
-    console.log("=== PAYTR HASH DEBUG v2 ===");
-    console.log("MERCHANT_ID:", MERCHANT_ID, "(len:" + MERCHANT_ID.length + ")");
-    console.log("userIp:", userIp);
-    console.log("merchant_oid:", merchant_oid);
-    console.log("email:", email);
-    console.log("payment_amount:", payment_amount);
-    console.log("user_basket (first 60):", user_basket.substring(0, 60));
-    console.log("user_basket (decoded):", (() => { try { return atob(user_basket); } catch(_e) { return "DECODE_FAIL"; } })());
-    console.log("no_installment:", no_installment);
-    console.log("max_installment:", max_installment);
-    console.log("currency:", currency);
-    console.log("test_mode:", test_mode);
-    console.log("MERCHANT_KEY length:", MERCHANT_KEY.length);
-    console.log("MERCHANT_SALT length:", MERCHANT_SALT.length);
-    console.log("hashStr length:", hashStr.length);
-    console.log("hashStr+SALT length:", (hashStr + MERCHANT_SALT).length);
-    console.log("paytr_token (first 20):", paytrToken.substring(0, 20));
-    console.log("paytr_token (full):", paytrToken);
-    console.log("=== END HASH DEBUG ===");
+    // Debug bilgileri - hepsi console.error ile (Supabase bunları gösterir)
+    const debugInfo = {
+      merchant_id: MERCHANT_ID,
+      merchant_id_len: MERCHANT_ID.length,
+      key_len: MERCHANT_KEY.length,
+      salt_len: MERCHANT_SALT.length,
+      user_ip: userIp,
+      merchant_oid: merchant_oid,
+      email: email,
+      payment_amount: payment_amount,
+      user_basket_b64_len: user_basket.length,
+      user_basket_decoded: (() => { try { return atob(user_basket); } catch (_e) { return "DECODE_FAIL"; } })(),
+      no_installment: no_installment,
+      max_installment: max_installment,
+      currency: currency,
+      test_mode: test_mode,
+      hash_str_len: hashStr.length,
+      paytr_token: paytrToken,
+    };
+
+    console.error("[v3] HASH DEBUG:", JSON.stringify(debugInfo));
 
     const formData = new URLSearchParams();
     formData.append("merchant_id", MERCHANT_ID);
@@ -151,8 +144,6 @@ Deno.serve(async (req: Request) => {
     formData.append("test_mode", test_mode);
     formData.append("lang", lang);
 
-    console.log("PayTR API cagrilacak, form keys:", [...formData.keys()].join(", "));
-
     const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -160,24 +151,30 @@ Deno.serve(async (req: Request) => {
     });
 
     const resText = await res.text();
-    console.log("PayTR API response status:", res.status, "body:", resText.substring(0, 500));
+    console.error("[v3] PayTR API status:", res.status, "body:", resText.substring(0, 500));
 
     let data: Record<string, string>;
     try {
       data = JSON.parse(resText);
     } catch (_e) {
-      return jsonResp({ error: "PayTR API JSON parse hatasi", paytrStatus: res.status, paytrResponse: resText.substring(0, 300) }, 502);
+      return jsonResp({ error: "PayTR API JSON parse hatasi", paytrResponse: resText.substring(0, 300) }, 502);
     }
 
     if (data.status === "success") {
-      console.log("PayTR token BASARILI! Token length:", data.token?.length);
+      console.error("[v3] BASARILI! Token alindi.");
       return jsonResp({ token: data.token }, 200);
     }
 
-    console.error("PayTR token BASARISIZ:", data.reason, data);
-    return jsonResp({ error: data.reason || "Token alinamadi", detail: data }, 400);
+    // HATA DURUMU: debug bilgilerini response'a ekle
+    console.error("[v3] BASARISIZ:", data.reason);
+    return jsonResp({
+      error: data.reason || "Token alinamadi",
+      debug: debugInfo,
+      paytr_response: data,
+    }, 400);
+
   } catch (err) {
-    console.error("paytr-token error:", err);
+    console.error("[v3] EXCEPTION:", String(err));
     return jsonResp({ error: String(err) }, 500);
   }
 });
