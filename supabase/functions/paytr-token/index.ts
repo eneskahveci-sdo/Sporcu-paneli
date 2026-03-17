@@ -101,9 +101,7 @@ Deno.serve(async (req: Request) => {
       if (!v) return jsonResp({ error: "Zorunlu alan eksik: " + k }, 400);
     }
 
-    const userIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-      || req.headers.get("x-real-ip")?.trim()
-      || "1.1.1.1";
+    const userIp = "1.2.3.4"; // PayTR test: sabit IP
 
     const hashStr = MERCHANT_ID + userIp + merchant_oid + email + payment_amount + user_basket + no_installment + max_installment + currency + test_mode;
     const paytrToken = await hmacSha256Base64(hashStr + MERCHANT_SALT, MERCHANT_KEY);
