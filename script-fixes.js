@@ -1207,13 +1207,19 @@ window.initiatePayTRPayment = async function(amt, desc) {
             if (tokenData && tokenData.paytr_response) {
                 console.error('[PayTR] PayTR response:', JSON.stringify(tokenData.paytr_response, null, 2));
             }
+            if (tokenData && tokenData.troubleshooting) {
+                console.error('[PayTR] Çözüm önerileri:');
+                tokenData.troubleshooting.forEach(function(t) { console.error('  → ' + t); });
+            }
 
             // Kullanıcıya daha anlaşılır hata mesajı göster
             var userMsg = 'Ödeme sistemi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
             if (errMsg.indexOf('paytr_token') !== -1) {
-                userMsg = 'Ödeme token doğrulaması başarısız. Lütfen sistem yöneticinize başvurun (PayTR Key/Salt ayarları kontrol edilmeli).';
+                userMsg = 'Ödeme token doğrulaması başarısız. PayTR Merchant Key ve Salt ayarlarını kontrol edin. Supabase Secrets\'ta PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT değerlerinin PayTR panelindeki değerlerle birebir aynı olduğundan emin olun.';
             } else if (errMsg.indexOf('credentials eksik') !== -1 || errMsg.indexOf('Secrets') !== -1) {
-                userMsg = 'PayTR API anahtarları tanımlı değil. Ayarlar > PayTR bölümünden yapılandırın.';
+                userMsg = 'PayTR API anahtarları tanımlı değil. Supabase Secrets\'ta PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT tanımlanmalı.';
+            } else if (errMsg.indexOf('notify_url') !== -1) {
+                userMsg = 'PayTR bildirim URL\'si oluşturulamadı. SUPABASE_URL veya PAYTR_NOTIFY_URL ayarını kontrol edin.';
             }
             throw new Error(userMsg);
         }
