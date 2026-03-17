@@ -28,7 +28,20 @@ const StorageManager = {
         try {
             if (!this.isAvailable()) return null;
             const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : null;
+            if (!item) return null;
+
+            // Try base64 decode first (data may be encoded by ui-improvements.js patch)
+            try {
+                const decoded = decodeURIComponent(escape(atob(item)));
+                return JSON.parse(decoded);
+            } catch (_) {
+                // Not base64 — try plain JSON
+                try {
+                    return JSON.parse(item);
+                } catch (_2) {
+                    return null;
+                }
+            }
         } catch (e) {
             console.warn('Storage get error:', e);
             return null;
