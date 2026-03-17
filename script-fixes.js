@@ -1122,7 +1122,8 @@ window.initiatePayTRPayment = async function(amt, desc) {
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
             return map[ch] || ch;
         });
-        var basketArr = [[basketDesc, String(amtKurus), 1]]; // kuruş cinsinden
+        var amtTL = amt.toFixed(2); // TL cinsinden: "2500.00"
+        var basketArr = [[basketDesc, amtTL, 1]]; // PayTR basket: TL cinsinden
         var basketJson = JSON.stringify(basketArr);
         var userBasket = btoa(basketJson);
 
