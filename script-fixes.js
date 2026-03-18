@@ -10,6 +10,29 @@
 console.log('script-fixes.js V10 yukleniyor...');
 
 // ────────────────────────────────────────────────────────
+// CROSS-ORIGIN "Script error." FILTRESİ
+// Tarayıcılar, farklı origin'den yüklenen script hatalarını
+// güvenlik nedeniyle "Script error." olarak maskeler.
+// Bu maskelenmiş hatalar bilgi içermez ve kullanıcıya
+// gereksiz toast bildirimi gösterilmesini engelliyoruz.
+// ────────────────────────────────────────────────────────
+(function() {
+    var _origOnerror = window.onerror;
+    window.onerror = function(msg, url, line, col, error) {
+        // Cross-origin script hataları: msg="Script error.", url="", line=0, col=0, error=null
+        if (msg === 'Script error.' && !url && line === 0 && col === 0 && !error) {
+            // Sadece debug için log, toast gösterme
+            console.warn('[CrossOrigin] Maskelenmiş cross-origin hatası engellendi');
+            return true; // Hatanın yayılmasını durdur
+        }
+        if (typeof _origOnerror === 'function') {
+            return _origOnerror.apply(this, arguments);
+        }
+        return false;
+    };
+})();
+
+// ────────────────────────────────────────────────────────
 // 0) KRİTİK FIX: spTab() — data-tab attribute bazlı eşleştirme
 //    Orijinal spTab textContent ile eşleştiriyordu, i18n bozuyordu
 // ────────────────────────────────────────────────────────
