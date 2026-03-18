@@ -1567,7 +1567,7 @@ console.log('✅ H2: showLegal dinamik override aktif');
             var html = _origPgAthletes.apply(this, arguments);
             // Render edilen HTML'deki TC numaralarını maskele
             // Not: FormatUtils.escape ile çıkan TC değerlerini replace et
-            return html.replace(/\b(\d{3})\d{4}(\d{2})\b/g, function(match, p1, p2) {
+            return html.replace(/\b(\d{3})\d{6}(\d{2})\b/g, function(match, p1, p2) {
                 if (match.length === 11) return p1 + '****' + p2;
                 return match;
             });

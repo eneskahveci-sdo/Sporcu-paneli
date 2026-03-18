@@ -9,6 +9,8 @@ jobs:
   migrate-and-deploy:
     name: Migrate DB + Deploy Supabase Edge Functions
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
