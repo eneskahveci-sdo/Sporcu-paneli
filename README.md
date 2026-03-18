@@ -1,4 +1,5 @@
-# Dragos Futbol Akademisi — Sporcu Paneli
+# Dragos Futbol Akademisi — Sporcu 
+Paneli
 
 Sporcu kayıt, ödeme takibi, yoklama ve yönetim sistemi. Supabase + Vercel üzerinde çalışan tek sayfa PWA.
 
@@ -120,4 +121,5 @@ Her push ve pull request'te `.github/workflows/ci.yml` otomatik olarak:
 ## Lisans
 
 MIT
+
 
