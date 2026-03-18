@@ -136,6 +136,28 @@ self.addEventListener('fetch', function(event) {
     );
 });
 
+// T2: Supabase GET istekleri için network-first, offline'da cache
+self.addEventListener('fetch', function(event) {
+    var url = event.request.url;
+    if (url.indexOf('supabase.co') !== -1 && event.request.method === 'GET') {
+        event.respondWith(
+            fetch(event.request.clone())
+                .then(function(resp) {
+                    if (resp && resp.status === 200) {
+                        var clone = resp.clone();
+                        caches.open('dragos-supabase-v1').then(function(cache) {
+                            cache.put(event.request, clone);
+                        });
+                    }
+                    return resp;
+                })
+                .catch(function() {
+                    return caches.match(event.request);
+                })
+        );
+    }
+});
+
 self.addEventListener('push', function(event) {
     if (!event.data) return;
     var data = event.data.json();
