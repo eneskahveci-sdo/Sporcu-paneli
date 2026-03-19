@@ -1533,66 +1533,6 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
     console.log('✅ T2: Offline banner aktif');
 })();
 
-// ── T3: SUPABASE REALTIME ────────────────────────────────────────────────
-(function() {
-    var _realtimeInited = false;
-
-    function _initRealtime() {
-        if (_realtimeInited) return;
-        var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-        if (!sb || !AppState || !AppState.currentOrgId) return;
-        _realtimeInited = true;
-
-        // Ödemeler
-        sb.channel('rt-payments')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, function(payload) {
-                if (!AppState.data) return;
-                AppState.data.payments = AppState.data.payments || [];
-                var ev = payload.eventType;
-                var row = payload.new || payload.old;
-                if (!row) return;
-                var mapped = (DB && DB.mappers && DB.mappers.toPayment) ? DB.mappers.toPayment(row) : row;
-                if (ev === 'INSERT') {
-                    if (!AppState.data.payments.find(function(x) { return x.id === mapped.id; }))
-                        AppState.data.payments.push(mapped);
-                } else if (ev === 'UPDATE') {
-                    var i = AppState.data.payments.findIndex(function(x) { return x.id === mapped.id; });
-                    if (i >= 0) AppState.data.payments[i] = mapped;
-                } else if (ev === 'DELETE') {
-                    AppState.data.payments = AppState.data.payments.filter(function(x) { return x.id !== (payload.old && payload.old.id); });
-                }
-                if (AppState.currentPage === 'payments') {
-                    try { if (typeof go === 'function') go('payments'); } catch(e) {}
-                }
-            })
-            .subscribe();
-
-        // Ön kayıtlar
-        sb.channel('rt-onkayit')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'on_kayitlar' }, function(payload) {
-                AppState.data.onKayitlar = AppState.data.onKayitlar || [];
-                if (!AppState.data.onKayitlar.find(function(x) { return x.id === payload.new.id; })) {
-                    var r = payload.new;
-                    AppState.data.onKayitlar.unshift({ id: r.id, studentName: r.student_name || '', fn: r.fn || '', ln: r.ln || '', bd: r.bd || '', tc: r.tc || '', clsId: r.cls_id || '', className: r.class_name || '', parentName: r.parent_name || '', parentPhone: r.parent_phone || '', status: r.status || 'new', createdAt: r.created_at || '', orgId: r.org_id || '', branchId: r.branch_id || '' });
-                }
-                // Badge güncelle
-                var newCount = AppState.data.onKayitlar.filter(function(x) { return x.status === 'new'; }).length;
-                document.querySelectorAll('[data-badge="onkayit"]').forEach(function(el) { el.textContent = newCount; });
-            })
-            .subscribe();
-
-        console.log('✅ T3: Realtime subscriptions aktif');
-    }
-
-    // Login sonrası AppState dolunca başlat
-    var _rtInterval = setInterval(function() {
-        if (AppState && AppState.currentOrgId && typeof getSupabase === 'function' && getSupabase()) {
-            clearInterval(_rtInterval);
-            setTimeout(_initRealtime, 1500);
-        }
-    }, 2000);
-})();
-
 // ── H2: showLegal OVERRIDE — Dinamik KVKK/Kullanım Şartları metni ────────
 window.showLegal = function(type) {
     var s = (AppState && AppState.data && AppState.data.settings) || {};
