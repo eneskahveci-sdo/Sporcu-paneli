@@ -1,1054 +1,820 @@
-# 🔧 Dragos Futbol Akademisi — Geliştirme & Hukuki Uyum Kılavuzu V3
+# Geliştirme Görevi — Dragos Futbol Akademisi
 
-> **ALTIN KURAL:** `script.js` hiçbir koşulda değiştirilmez. Tüm değişiklikler `script-fixes.js` sonuna monkey-patch olarak eklenir. Mevcut çalışan PayTR, SMS, WhatsApp, Excel, PDF, QR, PWA dahil hiçbir fonksiyon bozulmaz.
+## 10 Özellik — Tek Prompt
 
----
+### KRİTİK KURAL
 
-## MEVCUT ÇALIŞAN SİSTEM — DOKUNMA
+**`script.js` dosyasına kesinlikle dokunma.** Tüm değişiklikler `script-fixes.js` ve `index.html` dosyalarına yapılacak. `script-fixes.js` zaten `pgAccountingV8`, `editPay`, `__renderAthletes` gibi override’lar ile aynı pattern’i kullanıyor — yeni eklemeler de aynı şekilde yapılacak.
 
-- ✅ PayTR iFrame ödeme (test_mode: '1', v12 edge function)
-- ✅ Security.js v5.0 — doNormalLogin, 15dk session timeout
-- ✅ NetGSM SMS, WhatsApp Business API
-- ✅ Excel import/export, PDF makbuz, QR yoklama
-- ✅ Supabase Edge Functions: paytr-token, paytr-webhook, send-sms
-- ✅ KVKK overlay (showLegal), Kullanım Şartları overlay
-- ✅ Ön kayıt formu (showOnKayitForm, submitOnKayit)
-- ✅ GitHub Actions CI/CD
+### ÖNEMLİ TEKNİK NOTLAR
 
----
+- `go()` sayfaları `main.innerHTML = pages[page]()` ile render ediyor. `innerHTML` ile eklenen `<script>` tagları tarayıcı tarafından çalıştırılmaz. Chart ve Calendar başlatma kodu `registerGoHook('after', ...)` ile yapılacak.
+- `script-fixes.js` en sona ekleme yapıldığında `script.js`’teki tüm fonksiyonlar zaten tanımlı olduğundan `typeof` kontrolüne gerek yok.
+- `generateReceipt`, `printProfile` zaten çalışıyor — dokunma.
+- `buildBarChart`, `buildDonutChart` SVG fonksiyonları korunuyor — Chart.js bunların yanına ekleniyor.
 
-## BÖLÜM 1 — TEKNİK GELİŞTİRMELER
+-----
 
----
+## GELİŞTİRME 1 — Sporcu Listesine Canlı Arama
 
-### DEĞİŞİKLİK T1 — Sunucu Bağlantı Hatası Otomatik Yeniden Bağlanma
+**Dosya:** `script-fixes.js`
 
-**Dosya:** `script-fixes.js` (sona ekle)
+**Bul:** `__renderAthletes` fonksiyonu içindeki arama input’u. İçinde `onchange` geçen şu kısım:
 
-**Sorun:** Supabase bağlantısı kopunca kullanıcı ne yapacağını bilmiyor, sayfa donuyor.
+```
+onchange=\"AppState.filters.athletes.q=this.value;go(\\'athletes\\')\"
+```
 
-**Çözüm:** Global fetch interceptor + otomatik retry + kullanıcı dostu banner.
+`onchange` kelimesini `oninput` ile değiştir. Başka hiçbir şeye dokunma.
 
-**Dikkat:** `window.fetch` override yaparken mevcut `Security.js` ve `init.js` fetch çağrılarını bozmamak için sadece `supabase.co` URL'lerini yakala.
+**Neden güvenli:** Sadece event tipi değişiyor. Filtre altyapısı aynen çalışıyor.
+
+-----
+
+## GELİŞTİRME 2 — Yoklama Geçmişi Görünümü
+
+**Dosya:** `script-fixes.js`
+
+`script-fixes.js`‘in en sonuna (tüm kodun altına) şu override’ı ekle:
 
 ```javascript
-// ── T1: SUNUCU BAĞLANTI HATASI — Otomatik yeniden bağlanma ──────────────
-(function() {
-    var _failCount = 0;
-    var _reconnectTimer = null;
-    var _MAX_FAILS = 3;
-    var _connected = true;
+// ── YOKLAMA GEÇMİŞİ OVERRIDE ──────────────────────────────
+var _origPgAttendance = typeof pgAttendance === 'function' ? pgAttendance : null;
+window.pgAttendanceV2 = function() {
+    var base = _origPgAttendance ? _origPgAttendance() : '';
 
-    var _origFetch = window.fetch;
-    window.fetch = function(url, opts) {
-        return _origFetch.apply(this, arguments)
-            .then(function(resp) {
-                if (typeof url === 'string' && url.indexOf('supabase.co') !== -1 && resp.ok) {
-                    if (!_connected) { _connected = true; _failCount = 0; _hideConnBanner(); }
-                }
-                return resp;
-            })
-            .catch(function(err) {
-                if (typeof url === 'string' && url.indexOf('supabase.co') !== -1) {
-                    _failCount++;
-                    if (_failCount >= _MAX_FAILS && _connected) {
-                        _connected = false;
-                        _showConnBanner();
-                        _startReconnect();
-                    }
-                }
-                throw err;
+    var atcls = AppState.ui.atcls || '';
+    var allDates = Object.keys(AppState.data.attendance).filter(function(d) {
+        var dayData = AppState.data.attendance[d];
+        var list = AppState.data.athletes.filter(function(a) {
+            return a.st === 'active' && (!atcls || a.clsId === atcls);
+        });
+        return list.some(function(a) { return dayData[a.id]; });
+    }).sort().reverse().slice(0, 10);
+
+    var historyHtml = '<div class="card mt3">'
+        + '<div class="tw6 tsm mb2">📅 Son 10 Günlük Geçmiş</div>'
+        + (allDates.length === 0
+            ? '<p class="tm ts" style="text-align:center;padding:16px">Henüz kayıtlı yoklama yok.</p>'
+            : allDates.map(function(d) {
+                var dayData = AppState.data.attendance[d];
+                var list = AppState.data.athletes.filter(function(a) {
+                    return a.st === 'active' && (!atcls || a.clsId === atcls);
+                });
+                var p = list.filter(function(a) { return dayData[a.id] === 'P'; }).length;
+                var ab = list.filter(function(a) { return dayData[a.id] === 'A'; }).length;
+                var ex = list.filter(function(a) { return dayData[a.id] === 'E'; }).length;
+                var total = list.length;
+                var rate = total > 0 ? Math.round((p / total) * 100) : 0;
+                return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">'
+                    + '<div style="min-width:90px;font-size:13px;color:var(--text2)">' + (typeof DateUtils !== 'undefined' ? DateUtils.format(d) : d) + '</div>'
+                    + '<div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">'
+                    + '<div style="width:' + rate + '%;height:100%;background:var(--green);border-radius:4px"></div></div>'
+                    + '<div style="font-size:12px;min-width:120px;text-align:right">'
+                    + '<span style="color:var(--green)">✅' + p + '</span> '
+                    + '<span style="color:var(--red)">❌' + ab + '</span> '
+                    + '<span style="color:var(--yellow)">🔵' + ex + '</span> '
+                    + '<span style="color:var(--text3);margin-left:4px">%' + rate + '</span></div></div>';
+            }).join(''))
+        + '</div>';
+
+    return base + historyHtml;
+};
+
+// go() pages objesini güncelle
+window.registerGoHook('before', function(page) {
+    if (page === 'attendance' && typeof window.pgAttendanceV2 === 'function') {
+        var orig = window.go;
+        // pages objesi go() içinde local tanımlı, hook ile müdahale edemeyiz
+        // Bunun yerine after hook ile DOM'a ekle
+    }
+});
+
+window.registerGoHook('after', function(page) {
+    if (page === 'attendance' && typeof window.pgAttendanceV2 === 'function') {
+        var main = document.getElementById('main');
+        if (!main) return;
+        // Geçmiş bloğu zaten render edildi mi?
+        if (main.querySelector('.mt3')) return;
+        var atcls = AppState.ui.atcls || '';
+        var allDates = Object.keys(AppState.data.attendance).filter(function(d) {
+            var dayData = AppState.data.attendance[d];
+            var list = AppState.data.athletes.filter(function(a) {
+                return a.st === 'active' && (!atcls || a.clsId === atcls);
             });
-    };
+            return list.some(function(a) { return dayData[a.id]; });
+        }).sort().reverse().slice(0, 10);
 
-    function _showConnBanner() {
-        if (document.getElementById('_conn-banner')) return;
-        var b = document.createElement('div');
-        b.id = '_conn-banner';
-        b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:#c0392b;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)';
-        b.innerHTML = '🔌 Sunucu bağlantısı kesildi — yeniden bağlanılıyor...<button onclick="location.reload()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:8px">Sayfayı Yenile</button>';
-        document.body.prepend(b);
-    }
+        if (allDates.length === 0) return;
 
-    function _hideConnBanner() {
-        var b = document.getElementById('_conn-banner');
-        if (!b) return;
-        b.style.background = '#27ae60';
-        b.innerHTML = '✅ Bağlantı yeniden kuruldu!';
-        setTimeout(function() { if (b.parentNode) b.parentNode.removeChild(b); }, 2500);
-    }
-
-    function _startReconnect() {
-        if (_reconnectTimer) return;
-        var attempt = 0;
-        var delays = [3000, 5000, 10000, 15000, 30000];
-        function _try() {
-            attempt++;
-            var delay = delays[Math.min(attempt - 1, delays.length - 1)];
-            _reconnectTimer = setTimeout(function() {
-                _reconnectTimer = null;
-                var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-                if (!sb) { _try(); return; }
-                sb.from('settings').select('id').limit(1)
-                    .then(function(r) {
-                        if (!r.error) { _connected = true; _failCount = 0; _hideConnBanner(); }
-                        else _try();
-                    })
-                    .catch(function() { _try(); });
-            }, delay);
-        }
-        _try();
-    }
-    console.log('✅ T1: Bağlantı hatası handler aktif');
-})();
-```
-
----
-
-### DEĞİŞİKLİK T2 — Offline Mod Banner + Service Worker Cache
-
-**Dosya:** `script-fixes.js` (sona ekle) + `sw.js` (güncelle)
-
-**Sorun:** İnternet kesilince beyaz ekran, PWA çevrimdışı çalışmıyor.
-
-**script-fixes.js'e ekle:**
-
-```javascript
-// ── T2: OFFLINE MOD BANNER ───────────────────────────────────────────────
-(function() {
-    function _showOffline() {
-        if (document.getElementById('_offline-banner')) return;
-        var b = document.createElement('div');
-        b.id = '_offline-banner';
-        b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99997;background:#e67e22;color:#fff;text-align:center;padding:8px;font-size:12px;font-weight:600';
-        b.textContent = '📵 İnternet bağlantısı yok — veriler önbellekten gösteriliyor';
-        document.body.appendChild(b);
-    }
-    function _hideOffline() {
-        var b = document.getElementById('_offline-banner');
-        if (!b) return;
-        b.style.background = '#27ae60';
-        b.textContent = '✅ İnternet bağlantısı yeniden kuruldu';
-        setTimeout(function() { if (b.parentNode) b.parentNode.removeChild(b); }, 2000);
-    }
-    window.addEventListener('offline', _showOffline);
-    window.addEventListener('online', _hideOffline);
-    if (!navigator.onLine) _showOffline();
-    console.log('✅ T2: Offline banner aktif');
-})();
-```
-
-**sw.js içinde mevcut fetch handler'ı bul ve SONA şunu ekle:**
-
-```javascript
-// T2: Supabase GET istekleri için network-first, offline'da cache
-self.addEventListener('fetch', function(event) {
-    var url = event.request.url;
-    if (url.indexOf('supabase.co') !== -1 && event.request.method === 'GET') {
-        event.respondWith(
-            fetch(event.request.clone())
-                .then(function(resp) {
-                    if (resp && resp.status === 200) {
-                        var clone = resp.clone();
-                        caches.open('dragos-supabase-v1').then(function(cache) {
-                            cache.put(event.request, clone);
-                        });
-                    }
-                    return resp;
-                })
-                .catch(function() {
-                    return caches.match(event.request);
-                })
-        );
+        var div = document.createElement('div');
+        div.className = 'card mt3';
+        div.innerHTML = '<div class="tw6 tsm mb2">📅 Son 10 Günlük Geçmiş</div>'
+            + allDates.map(function(d) {
+                var dayData = AppState.data.attendance[d];
+                var list = AppState.data.athletes.filter(function(a) {
+                    return a.st === 'active' && (!atcls || a.clsId === atcls);
+                });
+                var p = list.filter(function(a) { return dayData[a.id] === 'P'; }).length;
+                var ab = list.filter(function(a) { return dayData[a.id] === 'A'; }).length;
+                var ex = list.filter(function(a) { return dayData[a.id] === 'E'; }).length;
+                var total = list.length;
+                var rate = total > 0 ? Math.round((p / total) * 100) : 0;
+                return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">'
+                    + '<div style="min-width:90px;font-size:13px;color:var(--text2)">' + DateUtils.format(d) + '</div>'
+                    + '<div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">'
+                    + '<div style="width:' + rate + '%;height:100%;background:var(--green);border-radius:4px"></div></div>'
+                    + '<div style="font-size:12px;min-width:120px;text-align:right">'
+                    + '<span style="color:var(--green)">✅' + p + '</span> '
+                    + '<span style="color:var(--red)">❌' + ab + '</span> '
+                    + '<span style="color:var(--yellow)">🔵' + ex + '</span> '
+                    + '<span style="color:var(--text3);margin-left:4px">%' + rate + '</span></div></div>';
+            }).join('');
+        main.appendChild(div);
     }
 });
 ```
 
----
+**Neden güvenli:** `registerGoHook('after', ...)` DOM’a yazıldıktan sonra tetiklenir. `appendChild` ile ekler — mevcut içeriğe dokunmaz. `script.js`’e hiç dokunulmaz.
 
-### DEĞİŞİKLİK T3 — Supabase Realtime
+-----
 
-**Dosya:** `script-fixes.js` (sona ekle)
+## GELİŞTİRME 3 — Finans Raporuna Tarih Filtresi
 
-**Sorun:** Ödemeler ve ön kayıtlar sayfa yenilemeden güncellenmiyor.
+**Dosya:** `script-fixes.js`
 
-**Dikkat:** Realtime subscription login sonrası başlatılmalı. `AppState.currentOrgId` dolmadan subscribe edilmemeli.
+**Bul:** `pgAccountingV8` fonksiyonunu. Fonksiyonun en başına (`var now = new Date();` satırından önce) şu satırları ekle:
 
 ```javascript
-// ── T3: SUPABASE REALTIME ────────────────────────────────────────────────
-(function() {
-    var _realtimeInited = false;
-
-    function _initRealtime() {
-        if (_realtimeInited) return;
-        var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-        if (!sb || !AppState || !AppState.currentOrgId) return;
-        _realtimeInited = true;
-
-        // Ödemeler
-        sb.channel('rt-payments')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, function(payload) {
-                if (!AppState.data) return;
-                AppState.data.payments = AppState.data.payments || [];
-                var ev = payload.eventType;
-                var row = payload.new || payload.old;
-                if (!row) return;
-                var mapped = (DB && DB.mappers && DB.mappers.toPayment) ? DB.mappers.toPayment(row) : row;
-                if (ev === 'INSERT') {
-                    if (!AppState.data.payments.find(function(x) { return x.id === mapped.id; }))
-                        AppState.data.payments.push(mapped);
-                } else if (ev === 'UPDATE') {
-                    var i = AppState.data.payments.findIndex(function(x) { return x.id === mapped.id; });
-                    if (i >= 0) AppState.data.payments[i] = mapped;
-                } else if (ev === 'DELETE') {
-                    AppState.data.payments = AppState.data.payments.filter(function(x) { return x.id !== (payload.old && payload.old.id); });
-                }
-                if (AppState.currentPage === 'payments') {
-                    try { if (typeof go === 'function') go('payments'); } catch(e) {}
-                }
-            })
-            .subscribe();
-
-        // Ön kayıtlar
-        sb.channel('rt-onkayit')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'on_kayitlar' }, function(payload) {
-                AppState.data.onKayitlar = AppState.data.onKayitlar || [];
-                if (!AppState.data.onKayitlar.find(function(x) { return x.id === payload.new.id; })) {
-                    var r = payload.new;
-                    AppState.data.onKayitlar.unshift({ id: r.id, studentName: r.student_name || '', fn: r.fn || '', ln: r.ln || '', bd: r.bd || '', tc: r.tc || '', clsId: r.cls_id || '', className: r.class_name || '', parentName: r.parent_name || '', parentPhone: r.parent_phone || '', status: r.status || 'new', createdAt: r.created_at || '', orgId: r.org_id || '', branchId: r.branch_id || '' });
-                }
-                // Badge güncelle
-                var newCount = AppState.data.onKayitlar.filter(function(x) { return x.status === 'new'; }).length;
-                document.querySelectorAll('[data-badge="onkayit"]').forEach(function(el) { el.textContent = newCount; });
-            })
-            .subscribe();
-
-        console.log('✅ T3: Realtime subscriptions aktif');
-    }
-
-    // Login sonrası AppState dolunca başlat
-    var _rtInterval = setInterval(function() {
-        if (AppState && AppState.currentOrgId && typeof getSupabase === 'function' && getSupabase()) {
-            clearInterval(_rtInterval);
-            setTimeout(_initRealtime, 1500);
-        }
-    }, 2000);
-})();
+if (!AppState.ui.accFilter) AppState.ui.accFilter = 'month';
+var accFilter = AppState.ui.accFilter;
 ```
 
----
+`getBranchIncomeDistribution` ve `getExpenseCategoryDistribution` çağrılarından önce, fonksiyonun içine şu yardımcı fonksiyonu ekle:
 
-### DEĞİŞİKLİK T4 — Vercel Analytics
-
-**Dosya:** `vercel.json` (güncelle)
-
-Mevcut `vercel.json` içeriğini şununla değiştir. CSP'ye analytics domain eklendi, `analytics: true` eklendi:
-
-```json
-{
-  "analytics": true,
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://esm.sh https://vitals.vercel-insights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://www.paytr.com https://graph.facebook.com https://vitals.vercel-insights.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; frame-src https://www.paytr.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'" }
-      ]
-    }
-  ]
+```javascript
+function isInPeriod(dateStr) {
+    if (!dateStr) return false;
+    if (accFilter === 'all') return true;
+    var d = new Date(dateStr);
+    var now2 = new Date();
+    if (accFilter === 'month') return d.getFullYear() === now2.getFullYear() && d.getMonth() === now2.getMonth();
+    if (accFilter === 'quarter') { var q = new Date(now2); q.setMonth(q.getMonth() - 3); return d >= q; }
+    if (accFilter === 'year') return d.getFullYear() === now2.getFullYear();
+    return true;
 }
 ```
 
----
-
-## BÖLÜM 2 — HUKUKİ UYUM (KVKK)
-
-Tüm hukuki değişiklikler `script-fixes.js` üzerinden yapılır. Ayrıca Supabase'de 2 yeni tablo ve `settings` tablosuna yeni alanlar gerekir.
-
----
-
-### ADIM H0 — Supabase SQL (Önce Çalıştır)
-
-Supabase Dashboard → SQL Editor'de çalıştır:
-
-```sql
--- deletion_requests tablosu (veri silme talepleri)
-CREATE TABLE IF NOT EXISTS deletion_requests (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    athlete_id TEXT,
-    athlete_name TEXT,
-    athlete_tc TEXT,
-    reason TEXT,
-    status TEXT DEFAULT 'pending', -- pending | completed | rejected
-    requested_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
-    org_id TEXT,
-    branch_id TEXT
-);
-ALTER TABLE deletion_requests ENABLE ROW LEVEL SECURITY;
-GRANT SELECT, INSERT ON deletion_requests TO anon;
-GRANT ALL ON deletion_requests TO authenticated, service_role;
-CREATE POLICY "delreq_insert_anon" ON deletion_requests FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "delreq_select_auth" ON deletion_requests FOR SELECT TO authenticated USING (true);
-CREATE POLICY "delreq_update_auth" ON deletion_requests FOR UPDATE TO authenticated USING (true);
-
--- settings tablosuna hukuki alanlar ekle
-ALTER TABLE settings
-    ADD COLUMN IF NOT EXISTS kvkk_text TEXT,
-    ADD COLUMN IF NOT EXISTS terms_text TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_name TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_address TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_phone TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_email TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_tax_no TEXT,
-    ADD COLUMN IF NOT EXISTS data_retention_years INTEGER DEFAULT 5,
-    ADD COLUMN IF NOT EXISTS breach_procedure TEXT,
-    ADD COLUMN IF NOT EXISTS cookie_banner_enabled BOOLEAN DEFAULT true;
-
--- on_kayitlar tablosuna rıza alanları ekle
-ALTER TABLE on_kayitlar
-    ADD COLUMN IF NOT EXISTS kvkk_consent BOOLEAN DEFAULT false,
-    ADD COLUMN IF NOT EXISTS consent_date DATE;
-```
-
----
-
-### DEĞİŞİKLİK H1 — settings Mapper Genişletme
-
-**Dosya:** `script-fixes.js` (sona ekle)
-
-`script.js`'deki `DB.mappers.toSettings` ve `fromSettings`'i genişlet:
+`pgAccountingV8`‘in return ettiği HTML string’inin **en başına** (kasa kartlarından önce) şu filtre barını ekle:
 
 ```javascript
-// ── H1: SETTINGS MAPPER — Hukuki alanlar ────────────────────────────────
-(function() {
-    var _origToSettings = DB.mappers.toSettings.bind(DB.mappers);
-    DB.mappers.toSettings = function(r) {
-        var base = _origToSettings(r);
-        base.kvkkText             = r.kvkk_text             || '';
-        base.termsText            = r.terms_text            || '';
-        base.dataControllerName   = r.data_controller_name  || '';
-        base.dataControllerAddr   = r.data_controller_address || '';
-        base.dataControllerPhone  = r.data_controller_phone || '';
-        base.dataControllerEmail  = r.data_controller_email || '';
-        base.dataControllerTaxNo  = r.data_controller_tax_no || '';
-        base.dataRetentionYears   = r.data_retention_years  || 5;
-        base.breachProcedure      = r.breach_procedure      || '';
-        base.cookieBannerEnabled  = r.cookie_banner_enabled !== false;
-        return base;
-    };
-
-    var _origFromSettings = DB.mappers.fromSettings.bind(DB.mappers);
-    DB.mappers.fromSettings = function(s) {
-        var base = _origFromSettings(s);
-        base.kvkk_text              = s.kvkkText            || '';
-        base.terms_text             = s.termsText           || '';
-        base.data_controller_name   = s.dataControllerName  || '';
-        base.data_controller_address= s.dataControllerAddr  || '';
-        base.data_controller_phone  = s.dataControllerPhone || '';
-        base.data_controller_email  = s.dataControllerEmail || '';
-        base.data_controller_tax_no = s.dataControllerTaxNo || '';
-        base.data_retention_years   = s.dataRetentionYears  || 5;
-        base.breach_procedure       = s.breachProcedure     || '';
-        base.cookie_banner_enabled  = s.cookieBannerEnabled !== false;
-        return base;
-    };
-    console.log('✅ H1: Settings mapper genişletildi');
-})();
+'<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">'
++ '<span class="tw6 tsm">Dönem:</span>'
++ '<button class="btn btn-sm ' + (accFilter==='month'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'month\';go(\'accounting\')">Bu Ay</button>'
++ '<button class="btn btn-sm ' + (accFilter==='quarter'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'quarter\';go(\'accounting\')">Son 3 Ay</button>'
++ '<button class="btn btn-sm ' + (accFilter==='year'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'year\';go(\'accounting\')">Bu Yıl</button>'
++ '<button class="btn btn-sm ' + (accFilter==='all'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'all\';go(\'accounting\')">Tümü</button>'
++ '</div>'
 ```
 
----
+`getBranchIncomeDistribution` ve `getExpenseCategoryDistribution` fonksiyonlarının içindeki `.filter` zincirlerine `.filter(function(p){ return isInPeriod(p.dt); })` ekle — sadece bu iki fonksiyon içinde, başka yerde değil.
 
-### DEĞİŞİKLİK H2 — showLegal Override (Supabase'den Metin)
+**Neden güvenli:** `AppState.ui` dinamik property kabul eder. `pgAccountingV8` zaten `go('accounting')` ile yenileniyor. `script.js`’e dokunulmaz.
 
-**Dosya:** `script-fixes.js` (sona ekle)
+-----
 
-Mevcut `showLegal` sabit metin yerine `settings`'ten dinamik metin gösterir:
+## GELİŞTİRME 4 — Dashboard Dinamik Özet
 
-```javascript
-// ── H2: showLegal OVERRIDE — Dinamik KVKK/Kullanım Şartları metni ────────
-window.showLegal = function(type) {
-    var s = (AppState && AppState.data && AppState.data.settings) || {};
-    var ctrl = s.dataControllerName || 'Dragos Futbol Akademisi';
-    var addr = s.dataControllerAddr || '';
-    var phone = s.dataControllerPhone || '';
-    var email = s.dataControllerEmail || '';
-    var years = s.dataRetentionYears || 5;
+**Dosya:** `script-fixes.js`
 
-    var defaultKvkk = '<div style="line-height:1.8;font-size:13px;color:var(--text2);max-height:60vh;overflow-y:auto;padding-right:8px">'
-        + '<p><b>VERİ SORUMLUSU:</b> ' + FormatUtils.escape(ctrl) + '</p>'
-        + (addr ? '<p><b>Adres:</b> ' + FormatUtils.escape(addr) + '</p>' : '')
-        + (phone ? '<p><b>Telefon:</b> ' + FormatUtils.escape(phone) + '</p>' : '')
-        + (email ? '<p><b>E-posta:</b> ' + FormatUtils.escape(email) + '</p>' : '')
-        + '<p style="margin-top:12px"><b>İŞLENEN KİŞİSEL VERİLER:</b> Ad-soyad, TC kimlik numarası, doğum tarihi, telefon numarası, e-posta, veli bilgileri, ödeme kayıtları, yoklama verileri.</p>'
-        + '<p><b>İŞLEME AMACI:</b> Sporcu kayıt ve takibi, aidat tahsilatı, devam takibi, veli bildirimleri.</p>'
-        + '<p><b>SAKLAMA SÜRESİ:</b> Aktif sporcu verileri üyelik süresince, pasif sporcu verileri üyelik sona erişinden itibaren ' + years + ' yıl saklanır.</p>'
-        + '<p><b>ÜÇÜNCÜ TARAFLARLA PAYLAŞIM:</b> Ödeme işlemleri PayTR Bilişim Hizmetleri A.Ş. altyapısı üzerinden gerçekleştirilir — kart bilgileri tarafımızca saklanmaz. SMS bildirimleri NetGSM altyapısı üzerinden iletilir.</p>'
-        + '<p><b>VERİ DEPOLAMA:</b> Verileriniz Supabase (Frankfurt, AB) sunucularında saklanır. Yurt dışı aktarım KVKK Madde 9 kapsamında açık rızanıza dayalıdır.</p>'
-        + '<p style="margin-top:12px"><b>HAKLARINIZ (KVKK Madde 11):</b></p>'
-        + '<ul style="margin-left:16px;margin-top:4px">'
-        + '<li>Verilerinizin işlenip işlenmediğini öğrenme</li>'
-        + '<li>İşlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme</li>'
-        + '<li>Yurt içi veya yurt dışında aktarıldığı üçüncü kişileri öğrenme</li>'
-        + '<li>Eksik veya yanlış işlenmiş verilerin düzeltilmesini isteme</li>'
-        + '<li>KVKK Madde 7 çerçevesinde silinmesini veya yok edilmesini isteme</li>'
-        + '<li>İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz etme</li>'
-        + '</ul>'
-        + '<p style="margin-top:12px">Veri silme talebiniz için sporcu profilinizden "Verilerimi Sil" butonunu kullanabilir veya <b>' + FormatUtils.escape(email || ctrl) + '</b> adresine yazabilirsiniz. Talepler 30 gün içinde yanıtlanır.</p>'
-        + '</div>';
-
-    var defaultTerms = '<div style="line-height:1.8;font-size:13px;color:var(--text2);max-height:60vh;overflow-y:auto;padding-right:8px">'
-        + '<p><b>' + FormatUtils.escape(ctrl) + '</b> sporcu yönetim sistemini kullanarak aşağıdaki şartları kabul etmiş sayılırsınız.</p>'
-        + '<p><b>1. HİZMET KAPSAMI:</b> Bu sistem sporcu kayıt, yoklama takibi ve aidat yönetimi amacıyla kullanılır.</p>'
-        + '<p><b>2. GİZLİLİK:</b> Sisteme giriş bilgilerinizi kimseyle paylaşmayınız. Hesabınızdan yapılan işlemlerden sorumlusunuz.</p>'
-        + '<p><b>3. ÖDEME:</b> Online ödemeler PayTR güvenli ödeme altyapısı üzerinden gerçekleştirilir.</p>'
-        + '<p><b>4. VERİ DOĞRULUĞU:</b> Girdiğiniz bilgilerin doğruluğundan siz sorumlusunuz.</p>'
-        + '<p><b>5. DEĞİŞİKLİKLER:</b> Kullanım şartları önceden bildirilmeksizin güncellenebilir.</p>'
-        + '</div>';
-
-    var kvkkBody  = s.kvkkText  || defaultKvkk;
-    var termsBody = s.termsText || defaultTerms;
-    var title = type === 'kvkk' ? 'KVKK Aydınlatma Metni' : 'Kullanım Şartları';
-    var body  = type === 'kvkk' ? kvkkBody : termsBody;
-
-    // Bağımsız overlay (Security.js modal'larıyla çakışmasın)
-    var existing = document.getElementById('_legal-overlay');
-    if (existing) existing.parentNode.removeChild(existing);
-    var ov = document.createElement('div');
-    ov.id = '_legal-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
-    ov.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">'
-        + '<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
-        + '<div style="font-weight:700;font-size:16px">' + title + '</div>'
-        + '<button onclick="var o=document.getElementById(\'_legal-overlay\');if(o)o.parentNode.removeChild(o)" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--text);font-size:16px">✕</button>'
-        + '</div>'
-        + '<div style="padding:20px;overflow-y:auto;flex:1">' + body + '</div>'
-        + '</div>';
-    document.body.appendChild(ov);
-};
-console.log('✅ H2: showLegal dinamik override aktif');
-```
-
----
-
-### DEĞİŞİKLİK H3 — TC Kimlik Maskeleme
-
-**Dosya:** `script-fixes.js` (sona ekle)
-
-Athletes listesinde TC tam görünüyor. Sadece görüntüleme katmanında maskele, DB'de tam kalsın:
+`script-fixes.js`‘in en sonuna şu override’ı ekle:
 
 ```javascript
-// ── H3: TC KİMLİK MASKELEME ──────────────────────────────────────────────
-// Yönetici athletes listesinde TC maskelenir: 12345678901 → 12345****01
-// Profil detayı açıkken tam TC gösterilir (zaten modal içinde)
-(function() {
-    window._maskTC = function(tc) {
-        if (!tc || tc.length < 6) return tc || '-';
-        return tc.substring(0, 3) + '****' + tc.substring(tc.length - 2);
-    };
-    // pgAthletes override — TC sütununu maskele
-    var _origPgAthletes = window.pgAthletes;
-    if (typeof _origPgAthletes === 'function') {
-        window.pgAthletes = function() {
-            var html = _origPgAthletes.apply(this, arguments);
-            // Render edilen HTML'deki TC numaralarını maskele
-            // Not: FormatUtils.escape ile çıkan TC değerlerini replace et
-            return html.replace(/\b(\d{3})\d{4}(\d{2})\b/g, function(match, p1, p2) {
-                if (match.length === 11) return p1 + '****' + p2;
-                return match;
-            });
-        };
-    }
-    console.log('✅ H3: TC maskeleme aktif');
-})();
-```
+// ── DASHBOARD OVERRIDE ─────────────────────────────────────
+var _origPgDashboard = typeof pgDashboard === 'function' ? pgDashboard : null;
 
----
-
-### DEĞİŞİKLİK H4 — Ön Kayıt Formuna KVKK Rızası
-
-**Dosya:** `script-fixes.js` (sona ekle)
-
-`showOnKayitForm` ve `submitOnKayit` override — checkbox ekle, DB'ye kaydet:
-
-```javascript
-// ── H4: ÖN KAYIT KVKK RIZASI ─────────────────────────────────────────────
-var _origShowOnKayitForm = window.showOnKayitForm;
-window.showOnKayitForm = function() {
-    _origShowOnKayitForm && _origShowOnKayitForm.apply(this, arguments);
-    // Form render edildikten sonra KVKK checkbox ekle
-    setTimeout(function() {
-        var formBody = document.querySelector('#onkayit-modal [style*="overflow-y:auto"]');
-        if (!formBody || document.getElementById('ok-kvkk-consent')) return;
-        var div = document.createElement('div');
-        div.style.cssText = 'margin-top:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)';
-        div.innerHTML = '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;line-height:1.5">'
-            + '<input type="checkbox" id="ok-kvkk-consent" style="margin-top:2px;width:18px;height:18px;flex-shrink:0"/>'
-            + '<span><b>KVKK Onayı *</b> — '
-            + '<a href="#" onclick="showLegal(\'kvkk\');return false;" style="color:var(--blue2)">Kişisel Verilerin Korunması Kanunu Aydınlatma Metni</a>\'ni okudum ve kişisel verilerimin işlenmesine <b>açık rıza</b> veriyorum.</span>'
-            + '</label>';
-        formBody.appendChild(div);
-    }, 100);
-};
-
-var _origSubmitOnKayit = window.submitOnKayit;
-window.submitOnKayit = async function() {
-    var consent = document.getElementById('ok-kvkk-consent');
-    if (consent && !consent.checked) {
-        toast('KVKK onayı zorunludur. Lütfen aydınlatma metnini okuyup onaylayın.', 'e');
-        return;
-    }
-    // Orijinal submit'i çalıştır
-    await _origSubmitOnKayit.apply(this, arguments);
-    // Onay tarihini DB'ye güncelle
-    try {
-        var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-        if (!sb) return;
-        // Son eklenen kaydı bul ve consent güncelle
-        var last = AppState.data.onKayitlar && AppState.data.onKayitlar[0];
-        if (last && last.id) {
-            await sb.from('on_kayitlar').update({
-                kvkk_consent: true,
-                consent_date: DateUtils.today()
-            }).eq('id', last.id);
-        }
-    } catch(e) { console.warn('Consent update:', e.message); }
-};
-console.log('✅ H4: Ön kayıt KVKK rızası aktif');
-```
-
----
-
-### DEĞİŞİKLİK H5 — Çerez/localStorage Bildirimi
-
-**Dosya:** `script-fixes.js` (sona ekle)
-
-```javascript
-// ── H5: ÇEREZ BİLDİRİMİ ─────────────────────────────────────────────────
-(function() {
-    var COOKIE_KEY = 'dragos_cookie_consent';
-    if (localStorage.getItem(COOKIE_KEY)) return; // Zaten onaylandı
-
-    function _showCookieBanner() {
-        if (document.getElementById('_cookie-banner')) return;
-        var b = document.createElement('div');
-        b.id = '_cookie-banner';
-        b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99996;background:var(--bg2);border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 -2px 12px rgba(0,0,0,.15)';
-        b.innerHTML = '<span style="font-size:12px;color:var(--text2);flex:1;min-width:200px">🍪 Bu site oturum yönetimi ve tercih saklama amacıyla yerel depolama (localStorage) kullanmaktadır. '
-            + '<a href="#" onclick="showLegal(\'kvkk\');return false;" style="color:var(--blue2)">KVKK Aydınlatma Metni</a></span>'
-            + '<div style="display:flex;gap:8px;flex-shrink:0">'
-            + '<button onclick="_acceptCookies()" style="background:var(--blue2);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Tamam, Anladım</button>'
-            + '</div>';
-        document.body.appendChild(b);
-    }
-
-    window._acceptCookies = function() {
-        localStorage.setItem(COOKIE_KEY, '1');
-        var b = document.getElementById('_cookie-banner');
-        if (b) b.parentNode.removeChild(b);
-    };
-
-    // Sayfa hazır olunca göster
-    if (document.readyState === 'complete') {
-        setTimeout(_showCookieBanner, 1500);
-    } else {
-        window.addEventListener('load', function() { setTimeout(_showCookieBanner, 1500); });
-    }
-    console.log('✅ H5: Çerez bildirimi aktif');
-})();
-```
-
----
-
-### DEĞİŞİKLİK H6 — Veri Silme Talebi (Sporcu Profili)
-
-**Dosya:** `script-fixes.js` (sona ekle)
-
-Sporcu `spProfil` sayfasına "Verilerimi Sil" butonu ekle:
-
-```javascript
-// ── H6: VERİ SİLME TALEBİ ───────────────────────────────────────────────
-var _origSpProfil = window.spProfil;
-window.spProfil = function() {
-    var html = typeof _origSpProfil === 'function' ? _origSpProfil.apply(this, arguments) : '';
-    var deleteBtn = '<div class="card mb3" style="border-left:3px solid #e74c3c">'
-        + '<div class="tw6 ts mb1" style="color:#e74c3c">⚠️ Veri Silme Talebi</div>'
-        + '<p class="tm ts mb2">KVKK Madde 11 kapsamında kişisel verilerinizin silinmesini talep edebilirsiniz. Talebiniz 30 gün içinde yanıtlanır.</p>'
-        + '<button class="btn" style="background:#e74c3c;color:#fff;border:none" onclick="submitDeletionRequest()">Verilerimi Silmesini Talep Et</button>'
-        + '</div>';
-    // Sayfanın sonuna ekle
-    return html.replace(/<\/div>\s*$/, '') + deleteBtn + '</div>';
-};
-
-window.submitDeletionRequest = async function() {
-    var a = AppState.currentSporcu;
-    if (!a) { toast('Sporcu bilgisi bulunamadı', 'e'); return; }
-    var confirmed = confirm('Kişisel verilerinizin silinmesi talebi oluşturulacak. Devam etmek istiyor musunuz?');
-    if (!confirmed) return;
-    try {
-        var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-        if (!sb) { toast('Bağlantı hatası', 'e'); return; }
-        await sb.from('deletion_requests').insert({
-            athlete_id:   a.id,
-            athlete_name: (a.fn || '') + ' ' + (a.ln || ''),
-            athlete_tc:   a.tc || '',
-            reason:       'Sporcu talebi — KVKK Madde 11',
-            status:       'pending',
-            org_id:       AppState.currentOrgId || '',
-            branch_id:    AppState.currentBranchId || ''
+window.pgDashboardV2 = function() {
+    // Antrenör paneli
+    var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
+    if (isCoach) {
+        var coachRecord = AppState.data.coaches.find(function(c) { return c.id === AppState.currentUser.id; })
+            || AppState.data.coaches.find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
+            || null;
+        var myClassIds = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
+        var myAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active' && myClassIds.indexOf(a.clsId) > -1; });
+        var todayAtt = AppState.data.attendance[DateUtils.today()] || {};
+        var presentToday = myAthletes.filter(function(a) { return todayAtt[a.id] === 'P'; }).length;
+        var absentToday  = myAthletes.filter(function(a) { return todayAtt[a.id] === 'A'; }).length;
+        var notEntered   = myAthletes.filter(function(a) { return !todayAtt[a.id]; }).length;
+        var lowAtt = myAthletes.filter(function(a) {
+            var stats = getAttendanceStats(a.id);
+            return stats.total > 5 && stats.rate < 50;
         });
-        toast('✅ Silme talebiniz alındı. 30 gün içinde yanıtlanacaktır.', 'g');
-    } catch(e) {
-        toast('Talep gönderilemedi: ' + e.message, 'e');
+        var myClasses = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; });
+
+        return '<div class="ph"><div class="stit">🏃 Antrenör Paneli</div></div>'
+            + '<div class="g3 mb3">'
+            + '<div class="card stat-card stat-g"><div class="stat-icon">👥</div><div class="stat-val">' + myAthletes.length + '</div><div class="stat-lbl">Gruptaki Sporcu</div></div>'
+            + '<div class="card stat-card stat-b"><div class="stat-icon">✅</div><div class="stat-val">' + presentToday + '</div><div class="stat-lbl">Bugün Gelen</div></div>'
+            + '<div class="card stat-card stat-r"><div class="stat-icon">❌</div><div class="stat-val">' + absentToday + '</div><div class="stat-lbl">Bugün Gelmedi</div></div>'
+            + '</div>'
+            + (notEntered > 0 ? '<div class="al al-y mb3">⚠️ ' + notEntered + ' sporcu için yoklama girilmedi. <button class="btn btn-sm bp" onclick="go(\'attendance\')" style="margin-left:8px">Yoklamaya Git →</button></div>' : '')
+            + (lowAtt.length > 0
+                ? '<div class="card mb3" style="border-left:4px solid var(--red)"><div class="tw6 tsm mb2">⚠️ Devamsızlık Riski (%50 altı)</div>'
+                    + lowAtt.map(function(a) {
+                        var stats = getAttendanceStats(a.id);
+                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'
+                            + '<span class="tw6 tsm">' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</span>'
+                            + '<span class="badge badge-red">%' + stats.rate + ' devam</span></div>';
+                    }).join('')
+                    + '</div>'
+                : '<div class="al al-g mb3">✅ Tüm sporcular düzenli devam ediyor.</div>')
+            + '<div class="card"><div class="tw6 tsm mb2">📋 Grubum</div>'
+            + myClasses.map(function(cls) {
+                var cnt = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length;
+                return '<div class="ts mb1">🏫 ' + FormatUtils.escape(cls.name) + ' — ' + cnt + ' sporcu</div>';
+            }).join('')
+            + '</div>';
     }
+
+    // Yönetici paneli — orijinal + özet
+    var base = _origPgDashboard ? _origPgDashboard() : '';
+    var todayStr = DateUtils.today();
+    var attToday = AppState.data.attendance[todayStr] || {};
+    var activeAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active'; });
+    var todayPresent = activeAthletes.filter(function(a) { return attToday[a.id] === 'P'; }).length;
+    var todayAbsent  = activeAthletes.filter(function(a) { return attToday[a.id] === 'A'; }).length;
+    var attEntered   = activeAthletes.filter(function(a) { return attToday[a.id]; }).length;
+    var overdueList  = AppState.data.payments.filter(function(p) { return p.st === 'overdue'; });
+    var overdueNames = overdueList.slice(0, 3).map(function(p) {
+        var a = AppState.data.athletes.find(function(x) { return x.id === p.aid; });
+        return a ? a.fn + ' ' + a.ln : null;
+    }).filter(Boolean);
+    var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    var newThisWeek = AppState.data.athletes.filter(function(a) { return a.rd && new Date(a.rd) >= weekAgo; }).length;
+
+    var ozet = '<div class="card mb3" style="border-left:4px solid var(--blue2)">'
+        + '<div class="tw6 tsm mb3">📋 Bugünün Özeti — ' + DateUtils.format(todayStr) + '</div>'
+        + '<div class="g3" style="margin-bottom:12px">'
+        + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--green)">' + todayPresent + '</div><div style="font-size:12px;color:var(--text2)">Bugün Var</div></div>'
+        + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--red)">' + todayAbsent + '</div><div style="font-size:12px;color:var(--text2)">Bugün Yok</div></div>'
+        + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--blue2)">' + attEntered + '/' + activeAthletes.length + '</div><div style="font-size:12px;color:var(--text2)">Girilen</div></div>'
+        + '</div>'
+        + (attEntered === 0 ? '<div class="al al-y" style="font-size:13px">⚠️ Bugün henüz yoklama girilmedi.</div>' : '')
+        + (overdueList.length > 0 ? '<div class="al al-r mt2" style="font-size:13px">🔴 ' + overdueList.length + ' gecikmiş ödeme — ' + overdueNames.join(', ') + (overdueNames.length < overdueList.length ? ' ve diğerleri' : '') + '</div>' : '')
+        + (newThisWeek > 0 ? '<div class="al al-g mt2" style="font-size:13px">🆕 Bu hafta ' + newThisWeek + ' yeni sporcu kaydı.</div>' : '')
+        + '</div>';
+
+    // Otomatik uyarılar
+    var alerts = buildAutoAlerts ? buildAutoAlerts() : [];
+    var alertHtml = alerts.length > 0
+        ? '<div class="card mb3"><div class="tw6 tsm mb2">🔔 Otomatik Uyarılar</div>'
+            + alerts.map(function(a) {
+                return '<div class="al al-' + (a.type==='danger'?'r':a.type==='warning'?'y':'b') + ' mb2" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="' + a.action + '">'
+                    + '<span>' + a.icon + '</span><span style="flex:1;font-size:13px">' + FormatUtils.escape(a.msg) + '</span><span style="font-size:11px;color:var(--text3)">→</span></div>';
+            }).join('')
+            + '</div>'
+        : '';
+
+    // Özeti ve uyarıları orijinal dashboard'un başına ekle
+    // "ph" div'inden sonra, stat kartlarından önce
+    return base.replace('<div class="g4 mb3">', ozet + alertHtml + '<div class="g4 mb3">');
 };
-console.log('✅ H6: Veri silme talebi aktif');
+
+// go() pages tablosuna bağla
+window.registerGoHook('before', function(page, params) {
+    if (page === 'dashboard') {
+        if (typeof window.pgDashboardV2 === 'function') {
+            var origGo = window.go;
+            // pages objesi go() içinde local — doğrudan override edemeyiz
+            // after hook ile ekstra içerik ekleyeceğiz
+        }
+    }
+});
 ```
 
----
-
-### DEĞİŞİKLİK H7 — Admin Ayarlar: Hukuki Gereksinimler Kartı
-
-**Dosya:** `script-fixes.js` (sona ekle)
-
-`pgSettings` override — sonuna sekmeli "Hukuki Gereksinimler" kartı ekle:
+**Bunun yerine** `registerGoHook('after', ...)` ile dashboard render edildikten sonra özet kartı DOM’a ekle:
 
 ```javascript
-// ── H7: ADMIN AYARLAR — HUKUKİ GEREKSİNİMLER KARTI ─────────────────────
-var _origPgSettings = window.pgSettings;
-window.pgSettings = function() {
-    var base = typeof _origPgSettings === 'function' ? _origPgSettings.apply(this, arguments) : '';
-    var s = (AppState && AppState.data && AppState.data.settings) || {};
+// ── DASHBOARD AFTER HOOK — Özet Kartı ──────────────────────
+window.registerGoHook('after', function(page) {
+    if (page !== 'dashboard') return;
+    if (AppState.currentUser && AppState.currentUser.role === 'coach') return; // Antrenör için farklı
 
-    var legalCard = `
-    <div class="card mb3" style="border-left:4px solid #8e44ad">
-        <div class="tw6 tsm mb3">⚖️ Hukuki Gereksinimler (KVKK)</div>
+    var main = document.getElementById('main');
+    if (!main) return;
+    if (main.querySelector('#dash-ozet')) return; // Zaten eklendi
 
-        <!-- Sekmeler -->
-        <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap" id="legal-tabs">
-            <button onclick="showLegalTab('metinler')"   class="btn btn-sm" id="ltab-metinler"   style="background:var(--blue2);color:#fff">📄 Metinler</button>
-            <button onclick="showLegalTab('sorumluluk')" class="btn btn-sm" id="ltab-sorumluluk">🏢 Veri Sorumlusu</button>
-            <button onclick="showLegalTab('silme')"      class="btn btn-sm" id="ltab-silme">🗑 Silme Talepleri</button>
-            <button onclick="showLegalTab('riza')"       class="btn btn-sm" id="ltab-riza">✅ Rıza Yönetimi</button>
-        </div>
+    var todayStr = DateUtils.today();
+    var attToday = AppState.data.attendance[todayStr] || {};
+    var activeAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active'; });
+    var todayPresent = activeAthletes.filter(function(a) { return attToday[a.id] === 'P'; }).length;
+    var todayAbsent  = activeAthletes.filter(function(a) { return attToday[a.id] === 'A'; }).length;
+    var attEntered   = activeAthletes.filter(function(a) { return attToday[a.id]; }).length;
+    var overdueList  = AppState.data.payments.filter(function(p) { return p.st === 'overdue'; });
+    var overdueNames = overdueList.slice(0, 3).map(function(p) {
+        var a = AppState.data.athletes.find(function(x) { return x.id === p.aid; });
+        return a ? a.fn + ' ' + a.ln : null;
+    }).filter(Boolean);
+    var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    var newThisWeek = AppState.data.athletes.filter(function(a) { return a.rd && new Date(a.rd) >= weekAgo; }).length;
 
-        <!-- Metinler -->
-        <div id="ltab-content-metinler">
-            <p class="ts tm mb2">Bu alanlar boş bırakılırsa varsayılan KVKK metni kullanılır. Avukatınızdan aldığınız güncel metni buraya yapıştırın.</p>
-            <div class="fgr mb2">
-                <label>KVKK Aydınlatma Metni (HTML destekler)</label>
-                <textarea id="s-kvkk-text" rows="8" style="width:100%;font-size:12px;font-family:monospace;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text1);resize:vertical">${FormatUtils.escape(s.kvkkText || '')}</textarea>
-            </div>
-            <div class="fgr mb3">
-                <label>Kullanım Şartları (HTML destekler)</label>
-                <textarea id="s-terms-text" rows="6" style="width:100%;font-size:12px;font-family:monospace;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text1);resize:vertical">${FormatUtils.escape(s.termsText || '')}</textarea>
-            </div>
-            <div class="fgr mb3">
-                <label>Veri Saklama Süresi (yıl) — Pasif sporcu verileri için</label>
-                <input id="s-retention-years" type="number" min="1" max="10" value="${s.dataRetentionYears || 5}" style="max-width:120px"/>
-                <div class="ts tm mt1">KVKK metninde otomatik kullanılır.</div>
-            </div>
-            <button class="btn bp" onclick="saveLegalTexts()">💾 Metinleri Kaydet</button>
-            <div id="legal-texts-msg" style="margin-top:8px;font-size:13px"></div>
-        </div>
+    var div = document.createElement('div');
+    div.id = 'dash-ozet';
+    div.className = 'card mb3';
+    div.style.borderLeft = '4px solid var(--blue2)';
+    div.innerHTML = '<div class="tw6 tsm mb3">📋 Bugünün Özeti — ' + DateUtils.format(todayStr) + '</div>'
+        + '<div class="g3" style="margin-bottom:12px">'
+        + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--green)">' + todayPresent + '</div><div style="font-size:12px;color:var(--text2)">Bugün Var</div></div>'
+        + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--red)">' + todayAbsent + '</div><div style="font-size:12px;color:var(--text2)">Bugün Yok</div></div>'
+        + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--blue2)">' + attEntered + '/' + activeAthletes.length + '</div><div style="font-size:12px;color:var(--text2)">Girilen</div></div>'
+        + '</div>'
+        + (attEntered === 0 ? '<div class="al al-y" style="font-size:13px">⚠️ Bugün henüz yoklama girilmedi.</div>' : '')
+        + (overdueList.length > 0 ? '<div class="al al-r mt2" style="font-size:13px">🔴 ' + overdueList.length + ' gecikmiş ödeme — ' + overdueNames.join(', ') + (overdueNames.length < overdueList.length ? ' ve diğerleri' : '') + '</div>' : '')
+        + (newThisWeek > 0 ? '<div class="al al-g mt2" style="font-size:13px">🆕 Bu hafta ' + newThisWeek + ' yeni sporcu kaydı.</div>' : '');
 
-        <!-- Veri Sorumlusu -->
-        <div id="ltab-content-sorumluluk" style="display:none">
-            <p class="ts tm mb2">KVKK kapsamında veri sorumlusu bilgileri. Aydınlatma metninde otomatik kullanılır.</p>
-            <div class="g21 mb2">
-                <div class="fgr"><label>Kurum / Şirket Adı</label><input id="s-ctrl-name" value="${FormatUtils.escape(s.dataControllerName || '')}"/></div>
-                <div class="fgr"><label>Vergi No / TC</label><input id="s-ctrl-taxno" value="${FormatUtils.escape(s.dataControllerTaxNo || '')}"/></div>
-            </div>
-            <div class="fgr mb2"><label>Adres</label><input id="s-ctrl-addr" value="${FormatUtils.escape(s.dataControllerAddr || '')}"/></div>
-            <div class="g21 mb2">
-                <div class="fgr"><label>Telefon</label><input id="s-ctrl-phone" value="${FormatUtils.escape(s.dataControllerPhone || '')}"/></div>
-                <div class="fgr"><label>E-posta</label><input id="s-ctrl-email" type="email" value="${FormatUtils.escape(s.dataControllerEmail || '')}"/></div>
-            </div>
-            <div class="fgr mb3">
-                <label>Veri İhlali Prosedürü (iç belge — 72 saat KVKK bildirimi için)</label>
-                <textarea id="s-breach" rows="4" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--text1);resize:vertical">${FormatUtils.escape(s.breachProcedure || '')}</textarea>
-            </div>
-            <button class="btn bp" onclick="saveLegalController()">💾 Kaydet</button>
-            <div id="legal-ctrl-msg" style="margin-top:8px;font-size:13px"></div>
-        </div>
+    // Stat kartlarından (g4 mb3) önce ekle
+    var statGrid = main.querySelector('.g4.mb3');
+    if (statGrid) {
+        main.insertBefore(div, statGrid);
+    } else {
+        var ph = main.querySelector('.ph');
+        if (ph && ph.nextSibling) main.insertBefore(div, ph.nextSibling);
+        else main.appendChild(div);
+    }
+});
 
-        <!-- Silme Talepleri -->
-        <div id="ltab-content-silme" style="display:none">
-            <div id="deletion-requests-list"><button class="btn bs btn-sm" onclick="loadDeletionRequests()" style="width:100%">Talepleri Yükle</button></div>
-        </div>
+// ── ANTRENÖR DASHBOARD AFTER HOOK ──────────────────────────
+window.registerGoHook('after', function(page) {
+    if (page !== 'dashboard') return;
+    if (!AppState.currentUser || AppState.currentUser.role !== 'coach') return;
 
-        <!-- Rıza Yönetimi -->
-        <div id="ltab-content-riza" style="display:none">
-            <div id="consent-stats"><button class="btn bs btn-sm" onclick="loadConsentStats()" style="width:100%">Rıza İstatistiklerini Yükle</button></div>
-        </div>
-    </div>`;
+    var main = document.getElementById('main');
+    if (!main || main.querySelector('#coach-panel')) return;
 
-    return base + legalCard;
-};
+    var coachRecord = AppState.data.coaches.find(function(c) { return c.id === AppState.currentUser.id; })
+        || AppState.data.coaches.find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
+        || null;
+    var myClassIds = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
+    var myAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active' && myClassIds.indexOf(a.clsId) > -1; });
+    var todayAtt = AppState.data.attendance[DateUtils.today()] || {};
+    var presentToday = myAthletes.filter(function(a) { return todayAtt[a.id] === 'P'; }).length;
+    var absentToday  = myAthletes.filter(function(a) { return todayAtt[a.id] === 'A'; }).length;
+    var notEntered   = myAthletes.filter(function(a) { return !todayAtt[a.id]; }).length;
+    var lowAtt = myAthletes.filter(function(a) {
+        var stats = getAttendanceStats(a.id);
+        return stats.total > 5 && stats.rate < 50;
+    });
+    var myClasses = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; });
 
-// Sekme değiştirme
-window.showLegalTab = function(tab) {
-    ['metinler','sorumluluk','silme','riza'].forEach(function(t) {
-        var content = document.getElementById('ltab-content-' + t);
-        var btn = document.getElementById('ltab-' + t);
-        if (content) content.style.display = t === tab ? '' : 'none';
-        if (btn) {
-            btn.style.background = t === tab ? 'var(--blue2)' : '';
-            btn.style.color = t === tab ? '#fff' : '';
+    main.innerHTML = '<div class="ph"><div class="stit">🏃 Antrenör Paneli</div></div>'
+        + '<div class="g3 mb3" id="coach-panel">'
+        + '<div class="card stat-card stat-g"><div class="stat-icon">👥</div><div class="stat-val">' + myAthletes.length + '</div><div class="stat-lbl">Gruptaki Sporcu</div></div>'
+        + '<div class="card stat-card stat-b"><div class="stat-icon">✅</div><div class="stat-val">' + presentToday + '</div><div class="stat-lbl">Bugün Gelen</div></div>'
+        + '<div class="card stat-card stat-r"><div class="stat-icon">❌</div><div class="stat-val">' + absentToday + '</div><div class="stat-lbl">Bugün Gelmedi</div></div>'
+        + '</div>'
+        + (notEntered > 0 ? '<div class="al al-y mb3">⚠️ ' + notEntered + ' sporcu için yoklama girilmedi. <button class="btn btn-sm bp" onclick="go(\'attendance\')" style="margin-left:8px">Yoklamaya Git →</button></div>' : '')
+        + (lowAtt.length > 0
+            ? '<div class="card mb3" style="border-left:4px solid var(--red)"><div class="tw6 tsm mb2">⚠️ Devamsızlık Riski</div>'
+                + lowAtt.map(function(a) { var s = getAttendanceStats(a.id); return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span class="tw6 tsm">' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</span><span class="badge badge-red">%' + s.rate + '</span></div>'; }).join('')
+                + '</div>'
+            : '<div class="al al-g mb3">✅ Tüm sporcular düzenli devam ediyor.</div>')
+        + '<div class="card"><div class="tw6 tsm mb2">📋 Grubum</div>'
+        + myClasses.map(function(cls) { var cnt = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length; return '<div class="ts mb1">🏫 ' + FormatUtils.escape(cls.name) + ' — ' + cnt + ' sporcu</div>'; }).join('')
+        + '</div>';
+});
+```
+
+-----
+
+## GELİŞTİRME 5 — Otomatik Bildirim Kuralları
+
+**Dosya:** `script-fixes.js`
+
+En sona şu fonksiyonu ekle:
+
+```javascript
+// ── OTOMATİK UYARILAR ──────────────────────────────────────
+function buildAutoAlerts() {
+    var alerts = [];
+    var today = DateUtils.today();
+
+    var dueTodayList = AppState.data.payments.filter(function(p) {
+        return (p.st === 'pending' || p.st === 'overdue') && p.dt === today;
+    });
+    if (dueTodayList.length > 0) {
+        alerts.push({ type: 'warning', icon: '📅', msg: 'Bugün vadesi gelen ' + dueTodayList.length + ' ödeme var.', action: "go('payments')" });
+    }
+
+    var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    var weekAgoStr = weekAgo.toISOString().split('T')[0];
+    var recentDates = Object.keys(AppState.data.attendance).filter(function(d) { return d >= weekAgoStr; });
+    var noAttClasses = AppState.data.classes.filter(function(cls) {
+        return !recentDates.some(function(d) {
+            return Object.keys(AppState.data.attendance[d] || {}).some(function(aid) {
+                var a = AppState.data.athletes.find(function(x) { return x.id === aid; });
+                return a && a.clsId === cls.id;
+            });
+        });
+    });
+    if (noAttClasses.length > 0) {
+        alerts.push({ type: 'info', icon: '📋', msg: noAttClasses.map(function(c) { return c.name; }).join(', ') + ' grubunda 7+ gündür yoklama girilmedi.', action: "go('attendance')" });
+    }
+
+    var riskAthletes = AppState.data.athletes.filter(function(a) {
+        if (a.st !== 'active') return false;
+        var stats = getAttendanceStats(a.id);
+        return stats.total > 5 && stats.rate < 30;
+    });
+    if (riskAthletes.length > 0) {
+        alerts.push({ type: 'danger', icon: '⚠️', msg: riskAthletes.length + ' sporcu %30 altında devam oranıyla risk altında.', action: "go('athletes')" });
+    }
+
+    AppState.data.autoAlerts = alerts;
+    if (typeof refreshNotifBadges === 'function') refreshNotifBadges();
+    return alerts;
+}
+window.buildAutoAlerts = buildAutoAlerts;
+```
+
+Geliştirme 4’teki dashboard `after` hook’u içinde `buildAutoAlerts()` çağrısı zaten var — ayrıca bir şey ekleme.
+
+`loadBranchData` tamamlandıktan sonra `buildAutoAlerts` çalışsın. `script-fixes.js` en sonuna şunu ekle:
+
+```javascript
+window.registerGoHook('after', function(page) {
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role === 'admin') {
+        if (typeof buildAutoAlerts === 'function') buildAutoAlerts();
+    }
+});
+```
+
+-----
+
+## GELİŞTİRME 6 — Veli Portalına Antrenör İletişim Kartı
+
+**Dosya:** `script-fixes.js`
+
+`script-fixes.js`‘in en sonuna şu after hook’u ekle:
+
+```javascript
+// ── VELİ PROFİL — ANTRENÖR İLETİŞİM KARTI ─────────────────
+window.registerGoHook('after', function(page) {
+    if (page !== 'dashboard' && page !== 'athleteProfile') return;
+    // Sporcu portalı için sp-content'e bak
+    var spContent = document.getElementById('sp-content');
+    if (!spContent || spContent.querySelector('#coach-contact-card')) return;
+
+    var a = AppState.currentSporcu;
+    if (!a) return;
+    var cls = AppState.data.classes.find(function(c) { return c.id === a.clsId; });
+    var coach = cls ? AppState.data.coaches.find(function(c) { return c.id === cls.coachId; }) : null;
+    if (!coach || !coach.ph) return;
+
+    var card = document.createElement('div');
+    card.id = 'coach-contact-card';
+    card.className = 'info-card';
+    card.innerHTML = '<div class="info-card-title">📞 Antrenörümle İletişim</div>'
+        + '<div class="info-row"><span class="info-label">Antrenör</span><span class="info-value tw6">' + FormatUtils.escape(coach.fn + ' ' + coach.ln) + '</span></div>'
+        + (coach.ph ? '<div class="info-row"><span class="info-label">Telefon</span><a href="tel:' + FormatUtils.escape(coach.ph) + '" class="info-value tb">' + FormatUtils.escape(coach.ph) + '</a></div>' : '')
+        + (coach.ph ? '<div class="mt2"><a href="https://wa.me/90' + coach.ph.replace(/\D/g,'').slice(-10) + '" target="_blank" rel="noopener" class="btn w100" style="background:#25d366;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">💬 WhatsApp ile Yaz</a></div>' : '');
+
+    var sidebar = spContent.querySelector('.profile-sidebar');
+    if (sidebar) sidebar.appendChild(card);
+});
+```
+
+**Neden güvenli:** `AppState.currentSporcu` null kontrolü var. `coach.ph` null ise kart gösterilmez. `querySelector('#coach-contact-card')` ile iki kez eklenmesi önlenir.
+
+-----
+
+## GELİŞTİRME 7 — Aktif / Pasif Sporcu Sekme Ayrımı
+
+**Dosya:** `script-fixes.js`
+
+**Bul:** `__renderAthletes` fonksiyonunu. Fonksiyonun en başına şu satırları ekle:
+
+```javascript
+if (f.st === undefined || f.st === null || f.st === '') {
+    f.st = 'active';
+    AppState.filters.athletes.st = 'active';
+}
+var totalActive   = AppState.data.athletes.filter(function(a){ return a.st === 'active'; }).length;
+var totalInactive = AppState.data.athletes.filter(function(a){ return a.st === 'inactive'; }).length;
+var currentTab    = f.st;
+```
+
+Return edilen HTML string’inin başındaki `<div class="ph">...</div>` bloğunun hemen arkasına (filtre satırından önce) şu sekme barını ekle:
+
+```javascript
++ '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border)">'
++ '<button onclick="AppState.filters.athletes.st=\'active\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='active'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">✅ Aktif <span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalActive + '</span></button>'
++ '<button onclick="AppState.filters.athletes.st=\'inactive\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='inactive'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">📦 Pasif <span style="background:var(--text3);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalInactive + '</span></button>'
++ '<button onclick="AppState.filters.athletes.st=\'\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab===\'\'?\'3px solid var(--blue2);color:var(--blue2)':\'3px solid transparent;color:var(--text2)\') + \';margin-bottom:-2px\">👥 Tümü</button>'
++ '</div>'
+```
+
+**Ardından** filtre satırındaki durum `<select>` dropdown’ını bul — içinde `Tüm Durumlar`, `Aktif`, `Pasif` geçen `<select>` bloğu. Bu bloğu string’den çıkar. `onchange="AppState.filters.athletes.st=` ile başlayıp `</select>'` ile biten kısım.
+
+-----
+
+## GELİŞTİRME 8 — Chart.js Entegrasyonu
+
+### Adım 1: CDN
+
+**Dosya:** `index.html`
+
+Module scriptlerden önce:
+
+```html
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
+```
+
+### Adım 2: Fonksiyonlar ve Hook
+
+**Dosya:** `script-fixes.js` — en sona ekle:
+
+```javascript
+// ── CHART.JS ───────────────────────────────────────────────
+function initDashboardChart() {
+    if (!window.Chart) { setTimeout(initDashboardChart, 300); return; }
+    var ctx = document.getElementById('dash-chart');
+    if (!ctx) return;
+    if (ctx._ci) { ctx._ci.destroy(); }
+    var months = [], incomes = [], expenses = [];
+    for (var i = 5; i >= 0; i--) {
+        var d = new Date(); d.setMonth(d.getMonth() - i);
+        var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+        months.push(['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()]);
+        var inc = 0, exp = 0;
+        AppState.data.payments.forEach(function(p) {
+            if (p.st==='completed' && p.dt && p.dt.startsWith(ym)) { if(p.ty==='income') inc+=(p.amt||0); else exp+=(p.amt||0); }
+        });
+        incomes.push(inc); expenses.push(exp);
+    }
+    ctx._ci = new Chart(ctx, {
+        type: 'line',
+        data: { labels: months, datasets: [
+            { label: 'Gelir', data: incomes, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', tension: 0.4, fill: true },
+            { label: 'Gider', data: expenses, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.4, fill: true }
+        ]},
+        options: { responsive: true,
+            plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                y: { ticks: { color: '#94a3b8', font: { size: 10 }, callback: function(v){ return '₺'+(v>=1000?(v/1000).toFixed(0)+'K':v); } }, grid: { color: 'rgba(148,163,184,0.1)' } }
+            }
         }
     });
-};
+}
 
-// Metinleri kaydet
-window.saveLegalTexts = async function() {
-    var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-    var msg = document.getElementById('legal-texts-msg');
-    if (!sb) { if (msg) msg.textContent = '❌ Bağlantı hatası'; return; }
-    var updates = {
-        kvkkText:           document.getElementById('s-kvkk-text')?.value || '',
-        termsText:          document.getElementById('s-terms-text')?.value || '',
-        dataRetentionYears: parseInt(document.getElementById('s-retention-years')?.value) || 5
-    };
-    Object.assign(AppState.data.settings, updates);
-    await DB.upsert('settings', DB.mappers.fromSettings(AppState.data.settings));
-    if (msg) { msg.textContent = '✅ Metinler kaydedildi'; setTimeout(function() { msg.textContent = ''; }, 3000); }
-};
-
-// Veri sorumlusu kaydet
-window.saveLegalController = async function() {
-    var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-    var msg = document.getElementById('legal-ctrl-msg');
-    if (!sb) { if (msg) msg.textContent = '❌ Bağlantı hatası'; return; }
-    var updates = {
-        dataControllerName:  document.getElementById('s-ctrl-name')?.value?.trim()  || '',
-        dataControllerAddr:  document.getElementById('s-ctrl-addr')?.value?.trim()  || '',
-        dataControllerPhone: document.getElementById('s-ctrl-phone')?.value?.trim() || '',
-        dataControllerEmail: document.getElementById('s-ctrl-email')?.value?.trim() || '',
-        dataControllerTaxNo: document.getElementById('s-ctrl-taxno')?.value?.trim() || '',
-        breachProcedure:     document.getElementById('s-breach')?.value             || ''
-    };
-    Object.assign(AppState.data.settings, updates);
-    await DB.upsert('settings', DB.mappers.fromSettings(AppState.data.settings));
-    if (msg) { msg.textContent = '✅ Kaydedildi'; setTimeout(function() { msg.textContent = ''; }, 3000); }
-};
-
-// Silme taleplerini yükle
-window.loadDeletionRequests = async function() {
-    var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-    var el = document.getElementById('deletion-requests-list');
-    if (!sb || !el) return;
-    el.innerHTML = '<p class="ts tm">Yükleniyor...</p>';
-    var res = await sb.from('deletion_requests').select('*').order('requested_at', { ascending: false });
-    if (res.error || !res.data || !res.data.length) {
-        el.innerHTML = '<p class="ts tm">Bekleyen silme talebi yok.</p>'; return;
-    }
-    var rows = res.data.map(function(r) {
-        var statusBadge = r.status === 'pending'
-            ? '<span class="bg bg-y">Bekliyor</span>'
-            : r.status === 'completed'
-            ? '<span class="bg bg-g">Tamamlandı</span>'
-            : '<span class="bg bg-r">Reddedildi</span>';
-        var date = r.requested_at ? r.requested_at.substring(0, 10) : '-';
-        return '<tr><td>' + FormatUtils.escape(r.athlete_name || '-') + '</td>'
-            + '<td class="ts">' + window._maskTC(r.athlete_tc) + '</td>'
-            + '<td class="ts">' + date + '</td>'
-            + '<td>' + statusBadge + '</td>'
-            + '<td>'
-            + (r.status === 'pending' ? '<button class="btn btn-xs bg-g" onclick="completeDeletionRequest(\'' + r.id + '\',\'' + (r.athlete_id || '') + '\')">Onayla & Sil</button> ' : '')
-            + (r.status === 'pending' ? '<button class="btn btn-xs bd" onclick="rejectDeletionRequest(\'' + r.id + '\')">Reddet</button>' : '')
-            + '</td></tr>';
-    }).join('');
-    el.innerHTML = '<div class="tw" style="overflow-x:auto"><table><thead><tr><th>Sporcu</th><th>TC</th><th>Tarih</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-};
-
-window.completeDeletionRequest = function(reqId, athleteId) {
-    confirm2('Veri Silme', 'Sporcu verileri kalıcı olarak silinecek. Emin misiniz?', async function() {
-        var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-        if (!sb) return;
-        if (athleteId) await sb.from('athletes').delete().eq('id', athleteId);
-        await sb.from('deletion_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', reqId);
-        toast('✅ Sporcu verileri silindi', 'g');
-        loadDeletionRequests();
+function initBranchChart() {
+    if (!window.Chart) { setTimeout(initBranchChart, 300); return; }
+    var ctx = document.getElementById('branch-chart');
+    if (!ctx) return;
+    if (ctx._ci) { ctx._ci.destroy(); }
+    var bd = typeof getBranchIncomeDistribution === 'function' ? getBranchIncomeDistribution() : [];
+    if (!bd.length) return;
+    ctx._ci = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: bd.map(function(d){return d.name;}), datasets: [{ data: bd.map(function(d){return d.value;}), backgroundColor: ['#3b82f6','#22c55e','#ef4444','#eab308','#f97316','#a855f7'], borderWidth: 0 }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } }, tooltip: { callbacks: { label: function(c){ return c.label+': ₺'+Number(c.raw).toLocaleString('tr-TR'); } } } }, cutout: '60%' }
     });
-};
+}
 
-window.rejectDeletionRequest = async function(reqId) {
-    var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-    if (!sb) return;
-    await sb.from('deletion_requests').update({ status: 'rejected' }).eq('id', reqId);
-    toast('Talep reddedildi', 'w');
-    loadDeletionRequests();
-};
-
-// Rıza istatistikleri
-window.loadConsentStats = async function() {
-    var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-    var el = document.getElementById('consent-stats');
-    if (!sb || !el) return;
-    el.innerHTML = '<p class="ts tm">Yükleniyor...</p>';
-    var res = await sb.from('on_kayitlar').select('kvkk_consent, consent_date').order('created_at', { ascending: false });
-    if (res.error) { el.innerHTML = '<p class="ts tm">Veri alınamadı.</p>'; return; }
-    var total = res.data.length;
-    var approved = res.data.filter(function(r) { return r.kvkk_consent; }).length;
-    el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
-        + '<div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center"><div class="ts tm">Toplam Başvuru</div><div style="font-size:24px;font-weight:700">' + total + '</div></div>'
-        + '<div style="background:var(--bg3);border-radius:8px;padding:12px;text-align:center"><div class="ts tm">KVKK Onaylı</div><div style="font-size:24px;font-weight:700;color:var(--green)">' + approved + '</div></div>'
-        + '</div>'
-        + '<p class="ts tm">' + (total - approved) + ' başvuruda KVKK onayı eksik (eski kayıtlar).</p>';
-};
-
-console.log('✅ H7: Admin hukuki gereksinimler kartı aktif');
+window.registerGoHook('after', function(page) {
+    if (page === 'dashboard') setTimeout(initDashboardChart, 150);
+    if (page === 'accounting') setTimeout(initBranchChart, 150);
+});
 ```
 
----
+### Adım 3: Canvas’ları HTML’e ekle
 
-## BÖLÜM 3 — UYGULAMA SIRASI
+**Dosya:** `script-fixes.js`
 
-Sırayla uygula. Her adımdan sonra test et.
+`pgAccountingV8` içindeki branş dağılımı satırını bul:
 
-### Adım 1 — Supabase SQL (Önce)
-- [ ] `deletion_requests` tablosu oluştur
-- [ ] `settings` tablosuna hukuki alanlar ekle
-- [ ] `on_kayitlar` tablosuna `kvkk_consent`, `consent_date` ekle
-
-### Adım 2 — vercel.json
-- [ ] `"analytics": true` ekle
-- [ ] CSP'ye `vitals.vercel-insights.com` ekle
-
-### Adım 3 — script-fixes.js (SONA ekle, sırayla)
-- [ ] H1: Settings mapper genişletme
-- [ ] T1: Bağlantı hatası handler
-- [ ] T2: Offline banner
-- [ ] T3: Realtime subscriptions
-- [ ] H2: showLegal override
-- [ ] H3: TC maskeleme
-- [ ] H4: Ön kayıt KVKK rızası
-- [ ] H5: Çerez bildirimi
-- [ ] H6: Veri silme talebi
-- [ ] H7: Admin hukuki gereksinimler kartı
-
-### Adım 4 — sw.js
-- [ ] Supabase GET için network-first cache ekle
-
-### Adım 5 — Test
-- [ ] PayTR ödeme çalışıyor mu? (kritik)
-- [ ] Ön kayıt formunda KVKK checkbox var mı?
-- [ ] Checkbox işaretlenmeden form gönderilemiyor mu?
-- [ ] Ayarlar → Hukuki kart açılıyor mu?
-- [ ] KVKK metni settings'ten geliyor mu?
-- [ ] TC listede maskeli görünüyor mu?
-- [ ] Sporcu profilinde "Verilerimi Sil" butonu var mı?
-- [ ] Silme talebi admin panelinde görünüyor mu?
-- [ ] Bağlantı kesilince banner çıkıyor mu?
-- [ ] Çerez bildirimi ilk girişte görünüyor mu?
-
----
-
-## DOKUNULMAYACAK DOSYALAR
-
-| Dosya | Neden |
-|-------|-------|
-| `script.js` | Ana kaynak — asla değiştirilmez |
-| `Security.js` | Giriş güvenliği — çalışıyor |
-| `supabase/functions/paytr-token/index.ts` | PayTR çalışıyor |
-| `supabase/functions/paytr-webhook/index.ts` | Webhook çalışıyor |
-| `supabase/functions/send-sms/index.ts` | SMS çalışıyor |
-| `ui-improvements.js` | Çalışıyor |
-| `init.js` | Supabase başlatıcı |
-| `style.css` | Stiller |
-
-## DEĞİŞTİRİLECEK / EKLENECEK DOSYALAR
-
-| Dosya | İşlem |
-|-------|-------|
-| `script-fixes.js` | 10 yeni blok — SONA ekle |
-| `vercel.json` | analytics + CSP güncelle |
-| `sw.js` | Network-first cache ekle |
-| Supabase SQL | 2 yeni tablo + settings alanları |
-
----
-
-## BÖLÜM 4 — SUPABASE MİGRASYON SİSTEMİ
-
-Bu bölüm Supabase DB değişikliklerini GitHub Actions üzerinden otomatik uygular. Manuel SQL çalıştırmaya gerek kalmaz.
-
----
-
-### ADIM M1 — Migration Dosyası Oluştur
-
-**Dosya:** `supabase/migrations/002_kvkk_legal.sql` (YENİ OLUŞTUR)
-
-```sql
--- ================================================================
--- Migration 002: KVKK Hukuki Uyum
--- Tarih: 2026-03-18
--- Açıklama: deletion_requests tablosu + settings/on_kayitlar güncelleme
--- ================================================================
-
--- 1. deletion_requests tablosu
-CREATE TABLE IF NOT EXISTS deletion_requests (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    athlete_id TEXT,
-    athlete_name TEXT,
-    athlete_tc TEXT,
-    reason TEXT,
-    status TEXT DEFAULT 'pending',
-    requested_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
-    org_id TEXT,
-    branch_id TEXT
-);
-
-ALTER TABLE deletion_requests ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='deletion_requests' AND policyname='delreq_insert_anon') THEN
-        CREATE POLICY "delreq_insert_anon" ON deletion_requests FOR INSERT TO anon WITH CHECK (true);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='deletion_requests' AND policyname='delreq_select_auth') THEN
-        CREATE POLICY "delreq_select_auth" ON deletion_requests FOR SELECT TO authenticated USING (true);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='deletion_requests' AND policyname='delreq_update_auth') THEN
-        CREATE POLICY "delreq_update_auth" ON deletion_requests FOR UPDATE TO authenticated USING (true);
-    END IF;
-END $$;
-
-GRANT SELECT, INSERT ON deletion_requests TO anon;
-GRANT ALL ON deletion_requests TO authenticated, service_role;
-
--- 2. settings tablosuna hukuki alanlar
-ALTER TABLE settings
-    ADD COLUMN IF NOT EXISTS kvkk_text TEXT,
-    ADD COLUMN IF NOT EXISTS terms_text TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_name TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_address TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_phone TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_email TEXT,
-    ADD COLUMN IF NOT EXISTS data_controller_tax_no TEXT,
-    ADD COLUMN IF NOT EXISTS data_retention_years INTEGER DEFAULT 5,
-    ADD COLUMN IF NOT EXISTS breach_procedure TEXT,
-    ADD COLUMN IF NOT EXISTS cookie_banner_enabled BOOLEAN DEFAULT true;
-
--- 3. on_kayitlar tablosuna rıza alanları
-ALTER TABLE on_kayitlar
-    ADD COLUMN IF NOT EXISTS kvkk_consent BOOLEAN DEFAULT false,
-    ADD COLUMN IF NOT EXISTS consent_date DATE;
+```javascript
++ '<div class="card"><div class="tw6 tsm mb3">⚽ Branş Bazlı Gelir Dağılımı</div>' + buildDonutChart(branchDist, 200, 'Toplam Gelir') + '</div>'
 ```
 
----
+Şununla değiştir:
 
-### ADIM M2 — GitHub Actions'a Migration Adımı Ekle
-
-**Dosya:** `.github/workflows/deploy-functions.yml` (GÜNCELLE)
-
-Mevcut dosyayı şununla tamamen değiştir:
-
-```yaml
-name: Deploy Edge Functions & DB Migrations
-
-on:
-  push:
-    branches: ["main"]
-  workflow_dispatch:
-
-jobs:
-  migrate-and-deploy:
-    name: Migrate DB + Deploy Supabase Edge Functions
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Apply DB Migrations
-        run: supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Deploy paytr-token
-        run: supabase functions deploy paytr-token --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Deploy paytr-webhook
-        run: supabase functions deploy paytr-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Deploy send-sms
-        run: supabase functions deploy send-sms --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+```javascript
++ '<div class="card"><div class="tw6 tsm mb3">⚽ Branş Bazlı Gelir Dağılımı</div><canvas id="branch-chart" height="180"></canvas></div>'
 ```
 
----
+Dashboard’daki `dash-chart` canvas’ı için: `registerGoHook('after')` içinde dashboard render sonrası DOM’a canvas ekle:
 
-### ADIM M3 — supabase/config.toml Kontrolü
-
-**Dosya:** `supabase/config.toml` — mevcut içeriği koru, sadece şunu kontrol et:
-
-```toml
-[db]
-# Bu satır varsa migration sistemi çalışır
-major_version = 15
+```javascript
+window.registerGoHook('after', function(page) {
+    if (page === 'dashboard') {
+        var main = document.getElementById('main');
+        if (!main) return;
+        // Gelir/Gider kartını bul ve canvas ekle
+        var cards = main.querySelectorAll('.card');
+        cards.forEach(function(card) {
+            if (card.textContent.indexOf('Gelir/Gider') > -1 && !card.querySelector('canvas')) {
+                card.innerHTML = '<div class="tw6 tsm mb2">📈 Son 6 Ay Gelir/Gider</div><canvas id="dash-chart" height="120"></canvas>';
+                setTimeout(initDashboardChart, 150);
+            }
+        });
+    }
+    if (page === 'accounting') setTimeout(initBranchChart, 150);
+});
 ```
 
-Yoksa ekle. Dosya zaten varsa dokunma.
+**NOT:** Yukarıdaki `registerGoHook` çağrısını Geliştirme 2’deki yoklama hook’u ile **birleştir** — tek bir `registerGoHook('after', function(page){...})` içinde tüm sayfaları yönet.
 
----
+-----
 
-### Migration Akışı (Nasıl Çalışır)
+## GELİŞTİRME 9 — FullCalendar Yoklama Takvimi
 
+### Adım 1: CDN
+
+**Dosya:** `index.html`
+
+Chart.js script’inin hemen altına:
+
+```html
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.11/index.global.min.js" crossorigin="anonymous"></script>
 ```
-1. Copilot değişiklikleri yapar
-2. git push → main branch
-3. GitHub Actions tetiklenir
-4. supabase db push → migration SQL otomatik Supabase'e uygulanır
-5. Edge functions deploy edilir
-6. Vercel otomatik deploy olur (ayrı workflow)
+
+### Adım 2: Fonksiyon ve Sayfa
+
+**Dosya:** `script-fixes.js` — en sona ekle:
+
+```javascript
+// ── FULLCALENDAR ────────────────────────────────────────────
+function pgCalendar() {
+    return '<div class="ph"><div class="stit">📅 Antrenman Takvimi</div></div>'
+        + '<div class="card" style="min-height:500px"><div id="fc-calendar"></div></div>';
+}
+window.pgCalendar = pgCalendar;
+
+function initCalendarChart() {
+    if (!window.FullCalendar) { setTimeout(initCalendarChart, 300); return; }
+    var el = document.getElementById('fc-calendar');
+    if (!el) return;
+    if (el._fc) { el._fc.destroy(); el._fc = null; }
+    var events = [];
+    Object.keys(AppState.data.attendance).forEach(function(date) {
+        var dayData = AppState.data.attendance[date];
+        var p = 0, ab = 0, ex = 0;
+        Object.values(dayData).forEach(function(st) { if(st==='P') p++; else if(st==='A') ab++; else if(st==='E') ex++; });
+        var total = p + ab + ex;
+        if (!total) return;
+        var rate = Math.round((p / total) * 100);
+        events.push({ title: '✅'+p+' ❌'+ab, start: date, backgroundColor: rate>=80?'#22c55e':rate>=50?'#eab308':'#ef4444', borderColor: 'transparent', extendedProps: { present:p, absent:ab, excused:ex, rate:rate } });
+    });
+    var cal = new FullCalendar.Calendar(el, {
+        initialView: 'dayGridMonth', locale: 'tr',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+        buttonText: { today: 'Bugün', month: 'Ay', list: 'Liste' },
+        events: events,
+        eventClick: function(info) {
+            var p = info.event.extendedProps;
+            if (typeof toast === 'function') toast('✅'+p.present+' Var  ❌'+p.absent+' Yok  🔵'+p.excused+' İzinli  — %'+p.rate+' devam', 'g');
+        },
+        height: 'auto'
+    });
+    cal.render(); el._fc = cal;
+}
+
+// go() pages tablosuna calendar ekle — go() override
+(function() {
+    var _goOrig = window.go;
+    window.go = function(page, params) {
+        if (page === 'calendar') {
+            var main = document.getElementById('main');
+            if (main) {
+                AppState.ui.curPage = page;
+                document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-calendar'); });
+                document.querySelectorAll('.bni-btn').forEach(function(el) { el.classList.toggle('on', false); });
+                main.style.opacity = '0';
+                setTimeout(function() {
+                    main.innerHTML = pgCalendar();
+                    main.style.opacity = '1';
+                    setTimeout(initCalendarChart, 150);
+                }, 100);
+                if (typeof closeSide === 'function') closeSide();
+                return;
+            }
+        }
+        return _goOrig.call(window, page, params);
+    };
+})();
 ```
 
-**Not:** `supabase db push` komutu sadece yeni migration'ları uygular, eskilerini tekrar çalıştırmaz. `IF NOT EXISTS` ifadeleri sayesinde migration'lar idempotent (tekrar çalışsa da sorun çıkarmaz).
+### Adım 3: Menüye Ekle
 
----
+**Dosya:** `index.html`
 
-## BÖLÜM 5 — COP­ILOT İÇİN UYGULAMA TALİMATI
+Sidebar’da `ni-attendance` butonunun hemen arkasına:
 
-GitHub Copilot Agent Mode'da şu mesajı kullanın:
-
+```html
+<button class="ni" id="ni-calendar" onclick="go('calendar')">
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+  </svg>
+  <span>Takvim</span>
+</button>
 ```
-@workspace 
 
-prompt.md dosyasındaki tüm talimatları uygula.
+`updateBranchUI` fonksiyonu `script.js`’te — buna dokunma. Bunun yerine `script-fixes.js` en sonuna ekle:
 
-KURALLAR:
-- script.js dosyasına kesinlikle dokunma
-- Tüm JS değişiklikleri script-fixes.js dosyasının SONUNA ekle
-- Mevcut script-fixes.js içeriğini silme, sadece ekle
-- vercel.json'u Bölüm 1 T4'e göre güncelle
-- sw.js'e T2'deki cache bloğunu ekle
-- supabase/migrations/002_kvkk_legal.sql dosyasını oluştur
-- .github/workflows/deploy-functions.yml'i Bölüm 4 M2'ye göre güncelle
-- supabase/config.toml'ı kontrol et
-
-SIRA:
-1. supabase/migrations/002_kvkk_legal.sql oluştur
-2. .github/workflows/deploy-functions.yml güncelle  
-3. vercel.json güncelle
-4. sw.js güncelle
-5. script-fixes.js sonuna sırayla ekle:
-   H1 → T1 → T2 → T3 → H2 → H3 → H4 → H5 → H6 → H7
-
-Her değişiklikten önce ilgili dosyanın mevcut içeriğini oku.
-PayTR entegrasyonunu test et — bozulmamalı.
+```javascript
+// Takvim menü öğesini aktif tut
+window.registerGoHook('after', function(page) {
+    if (page === 'calendar') {
+        document.querySelectorAll('.ni').forEach(function(el) {
+            el.classList.toggle('on', el.id === 'ni-calendar');
+        });
+    }
+});
 ```
+
+-----
+
+## GELİŞTİRME 10 — Tüm After Hook’larını Birleştir
+
+**Dosya:** `script-fixes.js`
+
+Geliştirme 2, 4, 5, 6, 8’de ayrı ayrı `registerGoHook('after', ...)` çağrıları yapıldı. Bunları **tek bir hook** içinde birleştir. Tüm ayrı hook çağrılarını sil ve şunu ekle:
+
+```javascript
+// ── TEK BİRLEŞİK AFTER HOOK ────────────────────────────────
+window.registerGoHook('after', function(page) {
+
+    // Yoklama geçmişi
+    if (page === 'attendance') {
+        // Geliştirme 2 kodu buraya
+    }
+
+    // Dashboard özeti (yönetici)
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role !== 'coach') {
+        // Geliştirme 4 yönetici kodu buraya
+    }
+
+    // Dashboard (antrenör)
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role === 'coach') {
+        // Geliştirme 4 antrenör kodu buraya
+    }
+
+    // Otomatik uyarılar
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role === 'admin') {
+        if (typeof buildAutoAlerts === 'function') buildAutoAlerts();
+    }
+
+    // Veli profil antrenör kartı
+    if (typeof AppState.currentSporcu !== 'undefined' && AppState.currentSporcu) {
+        // Geliştirme 6 kodu buraya
+    }
+
+    // Chart.js
+    if (page === 'dashboard') {
+        var main = document.getElementById('main');
+        if (main) {
+            main.querySelectorAll('.card').forEach(function(card) {
+                if (card.textContent.indexOf('Gelir/Gider') > -1 && !card.querySelector('canvas')) {
+                    card.innerHTML = '<div class="tw6 tsm mb2">📈 Son 6 Ay Gelir/Gider</div><canvas id="dash-chart" height="120"></canvas>';
+                    setTimeout(initDashboardChart, 150);
+                }
+            });
+        }
+    }
+    if (page === 'accounting') setTimeout(initBranchChart, 150);
+
+    // Takvim menü aktif
+    if (page === 'calendar') {
+        document.querySelectorAll('.ni').forEach(function(el) {
+            el.classList.toggle('on', el.id === 'ni-calendar');
+        });
+    }
+});
+```
+
+-----
+
+## GENEL KURALLAR
+
+1. **`script.js`’e kesinlikle dokunma.**
+1. Tüm değişiklikler `script-fixes.js` en sonuna veya mevcut `script-fixes.js` fonksiyonları içine yapılır.
+1. `index.html`’de sadece CDN script ekleme ve sidebar menü butonu ekleme yapılır.
+1. Geliştirme 10’daki birleştirme adımını mutlaka uygula — çakışan hook’lar sorun çıkarır.
+1. Her değişiklikten sonra `?v=` numarasını artır.
+1. `go()` override sadece Geliştirme 9’da ve sadece `calendar` sayfası için yapılıyor — diğer sayfalar `_goOrig`’e devrediliyor.
+
+-----
+
+## DOKUNMA LİSTESİ
+
+- `script.js` → Kesinlikle dokunma
+- `Security.js` → Dokunma
+- `sw.js` → Dokunma
+- `vercel.json` → Dokunma (ayrı performans promptu var)
+- `supabase/` → Dokunma
+- `generateReceipt`, `_generateReceiptHTML` → Zaten çalışıyor, dokunma
+- `printProfile` → Zaten var, dokunma
+- `buildBarChart`, `buildDonutChart` → SVG korunuyor, dokunma
