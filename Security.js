@@ -1,8 +1,9 @@
 // =================================================================
-// DRAGOS AKADEMİ - GÜVENLİK KALKANI v5.0
-// TC + TC Son 6 Hane şifre ile giriş.
-// Tek RPC çağrısı (login_with_tc) — RLS ile tam uyumlu.
-// v5.0: login_with_tc entegrasyonu + oturum yönetimi düzeltmeleri
+// DRAGOS AKADEMİ - GÜVENLİK KALKANI v6.0
+// Supabase Auth (signInWithPassword) ile güvenli giriş.
+// v6.0: RPC kaldırıldı, native Supabase Auth entegrasyonu.
+//       Client-side brute-force koruması kaldırıldı (Supabase Auth
+//       sunucu tarafında brute-force koruması sağlar).
 // =================================================================
 
 // ── 0. GÖRSEL DEBUG PANELİ (iPhone için) ─────────────────────────
@@ -112,72 +113,9 @@ function getAuthClient() {
     return window.AppState && window.AppState.sb ? window.AppState.sb : null;
 }
 
-// ── 2. BRUTE FORCE KORUMASI ──────────────────────────────────────
-
-// sessionStorage kullanarak rate limit verisi sayfa yenileme sonrası korunur
-function _getRateLimitKey(tc) {
-    return 'rl_' + String(tc).slice(0, 6);
-}
-
-function _loadAttempts(key) {
-    try {
-        const raw = sessionStorage.getItem(key);
-        return raw ? JSON.parse(raw) : null;
-    } catch(e) {
-        return null;
-    }
-}
-
-function _saveAttempts(key, data) {
-    try {
-        sessionStorage.setItem(key, JSON.stringify(data));
-    } catch(e) {
-        console.warn('Rate limit: sessionStorage yazılamadı:', e);
-    }
-}
-
-function _deleteAttempts(key) {
-    try {
-        sessionStorage.removeItem(key);
-    } catch(e) {
-        console.warn('Rate limit: sessionStorage silinemedi:', e);
-    }
-}
-
-function _checkRateLimit(tc) {
-    const key = _getRateLimitKey(tc);
-    const now = Date.now();
-    const attempts = _loadAttempts(key);
-    if (!attempts) return { blocked: false };
-    const { count, firstAt, lockedUntil } = attempts;
-    if (lockedUntil && now < lockedUntil) {
-        return { blocked: true, remaining: Math.ceil((lockedUntil - now) / 1000) };
-    }
-    if (now - firstAt > 10 * 60 * 1000) {
-        _deleteAttempts(key);
-        return { blocked: false };
-    }
-    return { blocked: false, count };
-}
-
-function _recordFailedAttempt(tc) {
-    const key = _getRateLimitKey(tc);
-    const now = Date.now();
-    const attempts = _loadAttempts(key);
-    if (!attempts) {
-        _saveAttempts(key, { count: 1, firstAt: now });
-        return;
-    }
-    attempts.count++;
-    if (attempts.count >= 5) {
-        attempts.lockedUntil = now + 5 * 60 * 1000;
-    }
-    _saveAttempts(key, attempts);
-}
-
-function _clearLoginAttempts(tc) {
-    _deleteAttempts(_getRateLimitKey(tc));
-}
+// ── 2. BRUTE FORCE KORUMASI — KALDIRILDI ─────────────────────────
+// Supabase Auth sunucu tarafında brute-force koruması sağlar.
+// Client-side rate limiting artık gereksizdir.
 
 // ── 3. CSP META TAG — KALDIRILDI ─────────────────────────────────
 // CSP artık SADECE vercel.json HTTP header'ı üzerinden tanımlanıyor.
@@ -185,25 +123,18 @@ function _clearLoginAttempts(tc) {
 
 // ── 4. ANA GİRİŞ FONKSİYONU ──────────────────────────────────────
 //
-// Giriş akışı (v5.0):
-//   1. Rate limit kontrolü
-//   2. login_with_tc RPC → doğrulama + kullanıcı verisi tek seferde
+// Giriş akışı (v6.0):
+//   1. Supabase Auth signInWithPassword → güvenli oturum
+//   2. Oturum sonrası coaches/athletes tablosundan veri çek
 //   3. AppState güncelleme + UI geçişi
 //
-// Şifre mantığı:
-//   • sp_pass / coach_pass alanında özel şifre varsa onu kullan
-//   • Alan boşsa varsayılan: TC'nin son 6 hanesi
+// Her sporcu/antrenör [TC]@dragosfk.com e-posta ile Auth'a kayıtlı.
 
-console.log('🛡️ Dragos Güvenlik Kalkanı v5.0 Aktif!');
-
-// ── 4a. CLIENT-SIDE FALLBACK GİRİŞ — KALDIRILDI ──────────────────
-// Güvenlik: Client-side fallback kaldırıldı. Tüm doğrulama login_with_tc
-// RPC fonksiyonu üzerinden yapılır. RPC başarısız olursa kullanıcıya
-// hata mesajı gösterilir.
+console.log('🛡️ Dragos Güvenlik Kalkanı v6.0 Aktif!');
 
 function _securityDoNormalLogin(role) {
     return async function() {
-        console.log('🔐 Security v5.0 doNormalLogin başladı — role:', role);
+        console.log('🔐 Security v6.0 doNormalLogin başladı — role:', role);
 
         const tcInputId   = role === 'coach' ? 'lc-tc'   : 'ls-tc';
         const passInputId = role === 'coach' ? 'lc-pass'  : 'ls-pass';
@@ -232,12 +163,6 @@ function _securityDoNormalLogin(role) {
         if (!tc || !pass) { showErr('TC Kimlik No ve şifre giriniz!'); return; }
         if (tc.length !== 11) { showErr('TC Kimlik No 11 hane olmalıdır!'); return; }
 
-        const rl = _checkRateLimit(tc);
-        if (rl.blocked) {
-            showErr('Çok fazla başarısız deneme. ' + rl.remaining + ' saniye sonra tekrar deneyin.');
-            return;
-        }
-
         const btn = document.activeElement && document.activeElement.tagName === 'BUTTON'
             ? document.activeElement : null;
         const originalText = btn ? btn.innerText : 'Giriş Yap';
@@ -253,77 +178,47 @@ function _securityDoNormalLogin(role) {
             }
             console.log('✅ Supabase client hazır');
 
-            // Eski admin oturumu varsa temizle — stale JWT coach/athlete login'i engeller
-            // Sadece aktif oturum varsa signOut yap, yoksa gereksiz signOut client state bozabilir
+            // Eski oturum varsa temizle — stale JWT yeni login'i engeller
             try {
                 var _sess = await sb.auth.getSession();
                 if (_sess?.data?.session) {
-                    console.log('🔑 Mevcut admin oturumu temizleniyor...');
+                    console.log('🔑 Mevcut oturum temizleniyor...');
                     await sb.auth.signOut();
                 }
             } catch(e) { console.warn('signOut check:', e); }
 
-            // Tek RPC çağrısı: doğrulama + kullanıcı verisi
-            console.log('📡 RPC çağrılıyor: login_with_tc...');
-            var rpcResult = null;
+            // Supabase Auth ile giriş
+            const email = tc + '@dragosfk.com';
+            console.log('📡 signInWithPassword çağrılıyor...');
 
-            try {
-                const { data: rpcData, error: rpcErr } = await sb.rpc('login_with_tc', {
-                    p_tc: tc, p_pass: pass, p_role: role
-                });
+            const { data: authData, error: authError } = await sb.auth.signInWithPassword({
+                email: email,
+                password: pass
+            });
 
-                if (rpcErr) {
-                    console.error('🔴 RPC hatası:', rpcErr.code, rpcErr.message);
-                    if (rpcErr.code === 'PGRST202') {
-                        // PostgREST: login_with_tc fonksiyonu bulunamadı
-                        showErr('Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.');
-                    } else if (rpcErr.code === '42883') {
-                        // PostgreSQL: Bir fonksiyon bulunamadı (genellikle pgcrypto/digest eksik)
-                        showErr('Veritabanı fonksiyonu güncellenmeli. Yönetici RLS_POLICIES.sql betiğini Supabase SQL Editor\'de tekrar çalıştırmalıdır.');
-                    } else {
-                        showErr('Giriş servisi geçici olarak kullanılamıyor. Lütfen birkaç dakika sonra tekrar deneyin veya yöneticiyle iletişime geçin.');
-                    }
-                    return;
-                } else {
-                    // RPC sonucu string olabilir, parse et
-                    if (typeof rpcData === 'string') {
-                        try { rpcResult = JSON.parse(rpcData); }
-                        catch (parseErr) {
-                            console.error('🔴 RPC JSON parse hatası:', parseErr);
-                            showErr('Giriş servisi geçici olarak kullanılamıyor. Lütfen birkaç dakika sonra tekrar deneyin veya yöneticiyle iletişime geçin.');
-                            return;
-                        }
-                    } else if (rpcData === null || rpcData === undefined) {
-                        console.error('🔴 RPC null yanıt — fonksiyon bulunamadı veya beklenmedik yanıt');
-                        showErr('Giriş servisi yapılandırılmamış. Lütfen yöneticiyle iletişime geçin.');
-                        return;
-                    } else {
-                        rpcResult = rpcData;
-                    }
-                }
-            } catch (rpcCatchErr) {
-                console.error('🔴 RPC çağrısı başarısız:', rpcCatchErr);
-                showErr('Giriş servisi geçici olarak kullanılamıyor. Lütfen birkaç dakika sonra tekrar deneyin veya yöneticiyle iletişime geçin.');
+            if (authError) {
+                console.error('🔴 Auth hatası:', authError.message);
+                showErr('TC Kimlik No veya Şifre Hatalı');
                 return;
             }
 
-            console.log('📡 Giriş sonucu:', { ok: rpcResult?.ok, role: rpcResult?.role });
+            console.log('✅ Auth başarılı, kullanıcı verisi çekiliyor...');
 
-            if (!rpcResult || !rpcResult.ok) {
-                _recordFailedAttempt(tc);
-                const rl2 = _checkRateLimit(tc);
-                if (rl2.blocked) {
-                    showErr('5 başarısız deneme. 5 dakika bekleyin.');
-                } else {
-                    const kalan = 5 - (rl2.count || 1);
-                    const errMsg = (rpcResult && rpcResult.error) || 'TC veya şifre hatalı!';
-                    showErr(errMsg + (kalan > 0 ? ' (' + kalan + ' deneme hakkı kaldı)' : ''));
-                }
+            // Oturum açıldı, ilgili tablodan kullanıcı verisini çek
+            const tableName = role === 'coach' ? 'coaches' : 'athletes';
+            const { data: userData, error: fetchError } = await sb
+                .from(tableName)
+                .select('*')
+                .eq('tc', tc)
+                .single();
+
+            if (fetchError || !userData) {
+                console.error('🔴 Kullanıcı verisi çekilemedi:', fetchError);
+                showErr('Kullanıcı kaydı bulunamadı. Lütfen yöneticiyle iletişime geçin.');
                 return;
             }
 
             console.log('✅ Giriş doğrulandı!');
-            _clearLoginAttempts(tc);
 
             // AppState yoksa oluştur
             if (!window.AppState) {
@@ -342,7 +237,7 @@ function _securityDoNormalLogin(role) {
                 };
             }
 
-            const row = rpcResult.data;
+            const row = userData;
 
             if (role === 'coach') {
                 console.log('✅ Coach bulundu:', row.fn, row.ln);
@@ -457,6 +352,6 @@ document.addEventListener('DOMContentLoaded', function() {
         window.doNormalLogin = function(role) {
             return _securityDoNormalLogin(role)();
         };
-        console.log('🛡️ doNormalLogin override tamamlandı (v5.0)');
+        console.log('🛡️ doNormalLogin override tamamlandı (v6.0)');
     }, 200);
 }, { once: true });
