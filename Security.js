@@ -1,9 +1,10 @@
 // =================================================================
-// DRAGOS AKADEMİ - GÜVENLİK KALKANI v6.0
+// DRAGOS AKADEMİ - GÜVENLİK KALKANI v6.1
 // Supabase Auth (signInWithPassword) ile güvenli giriş.
 // v6.0: RPC kaldırıldı, native Supabase Auth entegrasyonu.
 //       Client-side brute-force koruması kaldırıldı (Supabase Auth
 //       sunucu tarafında brute-force koruması sağlar).
+// v6.1: Sporcu/antrenör girişinde Auth e-posta adayları dinamik hale getirildi.
 // =================================================================
 
 // ── 0. GÖRSEL DEBUG PANELİ (iPhone için) ─────────────────────────
@@ -128,13 +129,38 @@ function getAuthClient() {
 //   2. Oturum sonrası coaches/athletes tablosundan veri çek
 //   3. AppState güncelleme + UI geçişi
 //
-// Her sporcu/antrenör [TC]@dragosfk.com e-posta ile Auth'a kayıtlı.
+// Her sporcu/antrenör için Auth e-postası farklı olabilir:
+// önce tablodaki e-posta, sonra TC tabanlı fallback denenir.
 
-console.log('🛡️ Dragos Güvenlik Kalkanı v6.0 Aktif!');
+console.log('🛡️ Dragos Güvenlik Kalkanı v6.1 Aktif!');
+
+async function resolveAuthEmails(sb, role, tc) {
+    const tableName = role === 'coach' ? 'coaches' : 'athletes';
+    const fallback = tc + '@dragosfk.com';
+    const candidates = [];
+
+    try {
+        const { data, error } = await sb
+            .from(tableName)
+            .select('em')
+            .eq('tc', tc)
+            .maybeSingle();
+
+        if (!error && data && typeof data.em === 'string') {
+            const dbEmail = data.em.trim().toLowerCase();
+            if (dbEmail && dbEmail.includes('@')) candidates.push(dbEmail);
+        }
+    } catch (e) {
+        console.warn('email resolve warning:', e);
+    }
+
+    if (!candidates.includes(fallback)) candidates.push(fallback);
+    return candidates;
+}
 
 function _securityDoNormalLogin(role) {
     return async function() {
-        console.log('🔐 Security v6.0 doNormalLogin başladı — role:', role);
+        console.log('🔐 Security v6.1 doNormalLogin başladı — role:', role);
 
         const tcInputId   = role === 'coach' ? 'lc-tc'   : 'ls-tc';
         const passInputId = role === 'coach' ? 'lc-pass'  : 'ls-pass';
@@ -187,22 +213,34 @@ function _securityDoNormalLogin(role) {
                 }
             } catch(e) { console.warn('signOut check:', e); }
 
-            // Supabase Auth ile giriş
-            const email = tc + '@dragosfk.com';
-            console.log('📡 signInWithPassword çağrılıyor...');
+            // Supabase Auth ile giriş (önce tablodaki e-posta, sonra fallback)
+            const authEmails = await resolveAuthEmails(sb, role, tc);
+            let authData = null;
+            let authError = null;
+            let usedEmail = '';
 
-            const { data: authData, error: authError } = await sb.auth.signInWithPassword({
-                email: email,
-                password: pass
-            });
+            for (const email of authEmails) {
+                console.log('📡 signInWithPassword deneniyor:', email);
+                const { data, error } = await sb.auth.signInWithPassword({
+                    email: email,
+                    password: pass
+                });
+                if (!error) {
+                    authData = data;
+                    usedEmail = email;
+                    authError = null;
+                    break;
+                }
+                authError = error;
+            }
 
-            if (authError) {
-                console.error('🔴 Auth hatası:', authError.message);
+            if (authError || !authData?.user) {
+                console.error('🔴 Auth hatası:', authError ? authError.message : 'unknown');
                 showErr('TC Kimlik No veya Şifre Hatalı');
                 return;
             }
 
-            console.log('✅ Auth başarılı, kullanıcı verisi çekiliyor...');
+            console.log('✅ Auth başarılı, kullanıcı verisi çekiliyor... Kullanılan email:', usedEmail);
 
             // Oturum açıldı, ilgili tablodan kullanıcı verisini çek
             const tableName = role === 'coach' ? 'coaches' : 'athletes';
@@ -352,6 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
         window.doNormalLogin = function(role) {
             return _securityDoNormalLogin(role)();
         };
-        console.log('🛡️ doNormalLogin override tamamlandı (v6.0)');
+        console.log('🛡️ doNormalLogin override tamamlandı (v6.1)');
     }, 200);
 }, { once: true });
