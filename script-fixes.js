@@ -1,13 +1,14 @@
 // ═══════════════════════════════════════════════════════════
-// HATA DÜZELTMELERİ V10 — script.js'den SONRA yüklenir
+// HATA DÜZELTMELERİ V11 — script.js'den SONRA yüklenir
 //
-// V10 DEĞİŞİKLİKLER:
-// - PayTR initiatePayTRPayment v4: email .local fix, TL basket, detaylı debug
-// - PayTR Edge Function v5 ile uyumlu
-// - V9 özellikleri korundu
+// V11 DEĞİŞİKLİKLER:
+// - Geliştirme 1-10: Canlı arama, yoklama geçmişi, finans filtresi,
+//   dashboard özet, otomatik uyarılar, antrenör iletişim, aktif/pasif
+//   sekmeler, Chart.js, FullCalendar, birleşik after hook
+// - V10 özellikleri korundu
 // ═══════════════════════════════════════════════════════════
 
-console.log('script-fixes.js V10 yukleniyor...');
+console.log('script-fixes.js V11 yukleniyor...');
 
 // ────────────────────────────────────────────────────────
 // CROSS-ORIGIN "Script error." FILTRESİ
@@ -418,9 +419,21 @@ function getMonthlyData(year) {
     return months;
 }
 
+function isInPeriod(dateStr) {
+    if (!dateStr) return false;
+    var accFilter = AppState.ui.accFilter || 'month';
+    if (accFilter === 'all') return true;
+    var d = new Date(dateStr);
+    var now2 = new Date();
+    if (accFilter === 'month') return d.getFullYear() === now2.getFullYear() && d.getMonth() === now2.getMonth();
+    if (accFilter === 'quarter') { var q = new Date(now2); q.setMonth(q.getMonth() - 3); return d >= q; }
+    if (accFilter === 'year') return d.getFullYear() === now2.getFullYear();
+    return true;
+}
+
 function getBranchIncomeDistribution() {
     var dist = {};
-    AppState.data.payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).forEach(function(p) {
+    AppState.data.payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).filter(function(p){ return isInPeriod(p.dt); }).forEach(function(p) {
         if (p.aid) {
             var ath = AppState.data.athletes.find(function(a) { return a.id === p.aid; });
             var sp = ath ? (ath.sp || 'Belirtilmedi') : 'Belirtilmedi';
@@ -432,7 +445,7 @@ function getBranchIncomeDistribution() {
 
 function getExpenseCategoryDistribution() {
     var dist = {};
-    AppState.data.payments.filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).forEach(function(p) {
+    AppState.data.payments.filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).filter(function(p){ return isInPeriod(p.dt); }).forEach(function(p) {
         var cat = p.cat || 'diger';
         dist[cat] = (dist[cat] || 0) + (p.amt || 0);
     });
@@ -490,6 +503,9 @@ function changePercent(current, previous) {
 var _origPgAccounting = typeof pgAccounting === 'function' ? pgAccounting : null;
 
 window.pgAccountingV8 = function() {
+    if (!AppState.ui.accFilter) AppState.ui.accFilter = 'month';
+    var accFilter = AppState.ui.accFilter;
+
     var now = new Date();
     var thisYear = now.getFullYear();
     var thisMonth = now.getMonth();
@@ -527,6 +543,15 @@ window.pgAccountingV8 = function() {
 
     return '<div class="ph"><div class="stit">📊 Finans Raporu</div><div class="ssub">Detaylı gelir-gider analizi ve kasa takibi</div></div>'
 
+    // Dönem filtresi
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">'
+    + '<span class="tw6 tsm">Dönem:</span>'
+    + '<button class="btn btn-sm ' + (accFilter==='month'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'month\';go(\'accounting\')">Bu Ay</button>'
+    + '<button class="btn btn-sm ' + (accFilter==='quarter'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'quarter\';go(\'accounting\')">Son 3 Ay</button>'
+    + '<button class="btn btn-sm ' + (accFilter==='year'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'year\';go(\'accounting\')">Bu Yıl</button>'
+    + '<button class="btn btn-sm ' + (accFilter==='all'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'all\';go(\'accounting\')">Tümü</button>'
+    + '</div>'
+
     // Kasa & Banka Kartları
     + '<div class="g3 mb3">'
     + '<div class="card kasa-card" style="border-left:4px solid var(--green)"><div class="kasa-card-icon">🏦</div><div class="kasa-card-val tg">' + FormatUtils.currency(balances.bank) + '</div><div class="kasa-card-lbl">Banka Bakiyesi</div></div>'
@@ -555,7 +580,7 @@ window.pgAccountingV8 = function() {
 
     // Branş bazlı gelir + Gider kategorileri
     + '<div class="g2 mb3">'
-    + '<div class="card"><div class="tw6 tsm mb3">⚽ Branş Bazlı Gelir Dağılımı</div>' + buildDonutChart(branchDist, 200, 'Toplam Gelir') + '</div>'
+    + '<div class="card"><div class="tw6 tsm mb3">⚽ Branş Bazlı Gelir Dağılımı</div><canvas id="branch-chart" height="180"></canvas></div>'
     + '<div class="card"><div class="tw6 tsm mb3">📂 Gider Kategorileri</div>' + buildDonutChart(expDist.map(function(d) { return { name: d.icon + ' ' + d.name, value: d.value }; }), 200, 'Toplam Gider') + '</div>'
     + '</div>'
 
@@ -667,8 +692,16 @@ window.editPay = function(id) {
 function __renderAthletes() {
     var list = AppState.data.athletes.slice();
     var f = AppState.filters.athletes;
+    if (f.st === undefined || f.st === null || f.st === '') {
+        f.st = 'active';
+        AppState.filters.athletes.st = 'active';
+    }
+    var totalActive   = AppState.data.athletes.filter(function(a){ return a.st === 'active'; }).length;
+    var totalInactive = AppState.data.athletes.filter(function(a){ return a.st === 'inactive'; }).length;
+    var currentTab    = f.st;
+
     if (f.sp) list = list.filter(function(a) { return a.sp === f.sp; });
-    if (f.st) list = list.filter(function(a) { return a.st === f.st; });
+    if (f.st && f.st !== 'all') list = list.filter(function(a) { return a.st === f.st; });
     if (f.cls) list = list.filter(function(a) { return a.clsId === f.cls; });
     if (f.q) { var q = f.q.toLowerCase(); list = list.filter(function(a) { return (a.fn + ' ' + a.ln).toLowerCase().includes(q) || a.tc.includes(q); }); }
 
@@ -685,7 +718,12 @@ function __renderAthletes() {
     var expBtn = isAdmin ? '<div class="flex gap2 fwrap"><button class="btn bsu" onclick="importAthletesFromExcel()">📊 Excel\'den İçe Aktar</button><button class="btn bs" onclick="exportAthletes()">📤 Excel İndir</button></div>' : '';
 
     return '<div class="ph"><div class="stit">Sporcular</div></div>'
-        + '<div class="flex fjb fca mb3 fwrap gap2"><div class="flex gap2 fwrap"><select class="fs" onchange="AppState.filters.athletes.sp=this.value;go(\'athletes\')"><option value="">Tüm Branşlar</option>' + spOpts + '</select><select class="fs" onchange="AppState.filters.athletes.st=this.value;go(\'athletes\')"><option value="">Tüm Durumlar</option><option value="active"' + (f.st === 'active' ? ' selected' : '') + '>Aktif</option><option value="inactive"' + (f.st === 'inactive' ? ' selected' : '') + '>Pasif</option></select><select class="fs" onchange="AppState.filters.athletes.cls=this.value;go(\'athletes\')"><option value="">Tüm Sınıflar</option>' + clOpts + '</select></div><input class="fs" type="text" placeholder="🔍 İsim veya TC Ara..." style="max-width:250px" value="' + FormatUtils.escape(f.q) + '" onchange="AppState.filters.athletes.q=this.value;go(\'athletes\')"/></div>'
+        + '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border)">'
+        + '<button onclick="AppState.filters.athletes.st=\'active\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='active'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">✅ Aktif <span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalActive + '</span></button>'
+        + '<button onclick="AppState.filters.athletes.st=\'inactive\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='inactive'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">📦 Pasif <span style="background:var(--text3);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalInactive + '</span></button>'
+        + '<button onclick="AppState.filters.athletes.st=\'all\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='all'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">👥 Tümü</button>'
+        + '</div>'
+        + '<div class="flex fjb fca mb3 fwrap gap2"><div class="flex gap2 fwrap"><select class="fs" onchange="AppState.filters.athletes.sp=this.value;go(\'athletes\')"><option value="">Tüm Branşlar</option>' + spOpts + '</select><select class="fs" onchange="AppState.filters.athletes.cls=this.value;go(\'athletes\')"><option value="">Tüm Sınıflar</option>' + clOpts + '</select></div><input class="fs" type="text" placeholder="🔍 İsim veya TC Ara..." style="max-width:250px" value="' + FormatUtils.escape(f.q) + '" oninput="AppState.filters.athletes.q=this.value;go(\'athletes\')"/></div>'
         + '<div class="flex fjb fca mb3 gap2 fwrap">' + addBtn + expBtn + '</div>'
         + '<div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Branş</th><th>Sınıf</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' + trows + '</tbody></table></div></div>';
 }
@@ -1906,3 +1944,331 @@ window.loadConsentStats = async function() {
 };
 
 console.log('✅ H7: Admin hukuki gereksinimler kartı aktif');
+
+// ── OTOMATİK UYARILAR ──────────────────────────────────────
+function buildAutoAlerts() {
+    var alerts = [];
+    var today = DateUtils.today();
+
+    var dueTodayList = AppState.data.payments.filter(function(p) {
+        return (p.st === 'pending' || p.st === 'overdue') && p.dt === today;
+    });
+    if (dueTodayList.length > 0) {
+        alerts.push({ type: 'warning', icon: '📅', msg: 'Bugün vadesi gelen ' + dueTodayList.length + ' ödeme var.', action: "go('payments')" });
+    }
+
+    var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    var weekAgoStr = weekAgo.toISOString().split('T')[0];
+    var recentDates = Object.keys(AppState.data.attendance).filter(function(d) { return d >= weekAgoStr; });
+    var noAttClasses = AppState.data.classes.filter(function(cls) {
+        return !recentDates.some(function(d) {
+            return Object.keys(AppState.data.attendance[d] || {}).some(function(aid) {
+                var a = AppState.data.athletes.find(function(x) { return x.id === aid; });
+                return a && a.clsId === cls.id;
+            });
+        });
+    });
+    if (noAttClasses.length > 0) {
+        alerts.push({ type: 'info', icon: '📋', msg: noAttClasses.map(function(c) { return c.name; }).join(', ') + ' grubunda 7+ gündür yoklama girilmedi.', action: "go('attendance')" });
+    }
+
+    var riskAthletes = AppState.data.athletes.filter(function(a) {
+        if (a.st !== 'active') return false;
+        var stats = getAttendanceStats(a.id);
+        return stats.total > 5 && stats.rate < 30;
+    });
+    if (riskAthletes.length > 0) {
+        alerts.push({ type: 'danger', icon: '⚠️', msg: riskAthletes.length + ' sporcu %30 altında devam oranıyla risk altında.', action: "go('athletes')" });
+    }
+
+    AppState.data.autoAlerts = alerts;
+    if (typeof refreshNotifBadges === 'function') refreshNotifBadges();
+    return alerts;
+}
+window.buildAutoAlerts = buildAutoAlerts;
+
+// ── CHART.JS ───────────────────────────────────────────────
+function initDashboardChart() {
+    if (!window.Chart) { setTimeout(initDashboardChart, 300); return; }
+    var ctx = document.getElementById('dash-chart');
+    if (!ctx) return;
+    if (ctx._ci) { ctx._ci.destroy(); }
+    var months = [], incomes = [], expenses = [];
+    for (var i = 5; i >= 0; i--) {
+        var d = new Date(); d.setMonth(d.getMonth() - i);
+        var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+        months.push(['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()]);
+        var inc = 0, exp = 0;
+        AppState.data.payments.forEach(function(p) {
+            if (p.st==='completed' && p.dt && p.dt.startsWith(ym)) { if(p.ty==='income') inc+=(p.amt||0); else exp+=(p.amt||0); }
+        });
+        incomes.push(inc); expenses.push(exp);
+    }
+    ctx._ci = new Chart(ctx, {
+        type: 'line',
+        data: { labels: months, datasets: [
+            { label: 'Gelir', data: incomes, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', tension: 0.4, fill: true },
+            { label: 'Gider', data: expenses, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.4, fill: true }
+        ]},
+        options: { responsive: true,
+            plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                y: { ticks: { color: '#94a3b8', font: { size: 10 }, callback: function(v){ return '₺'+(v>=1000?(v/1000).toFixed(0)+'K':v); } }, grid: { color: 'rgba(148,163,184,0.1)' } }
+            }
+        }
+    });
+}
+
+function initBranchChart() {
+    if (!window.Chart) { setTimeout(initBranchChart, 300); return; }
+    var ctx = document.getElementById('branch-chart');
+    if (!ctx) return;
+    if (ctx._ci) { ctx._ci.destroy(); }
+    var bd = typeof getBranchIncomeDistribution === 'function' ? getBranchIncomeDistribution() : [];
+    if (!bd.length) return;
+    ctx._ci = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: bd.map(function(d){return d.name;}), datasets: [{ data: bd.map(function(d){return d.value;}), backgroundColor: ['#3b82f6','#22c55e','#ef4444','#eab308','#f97316','#a855f7'], borderWidth: 0 }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } }, tooltip: { callbacks: { label: function(c){ return c.label+': ₺'+Number(c.raw).toLocaleString('tr-TR'); } } } }, cutout: '60%' }
+    });
+}
+
+// ── FULLCALENDAR ────────────────────────────────────────────
+function pgCalendar() {
+    return '<div class="ph"><div class="stit">📅 Antrenman Takvimi</div></div>'
+        + '<div class="card" style="min-height:500px"><div id="fc-calendar"></div></div>';
+}
+window.pgCalendar = pgCalendar;
+
+function initCalendarChart() {
+    if (!window.FullCalendar) { setTimeout(initCalendarChart, 300); return; }
+    var el = document.getElementById('fc-calendar');
+    if (!el) return;
+    if (el._fc) { el._fc.destroy(); el._fc = null; }
+    var events = [];
+    Object.keys(AppState.data.attendance).forEach(function(date) {
+        var dayData = AppState.data.attendance[date];
+        var p = 0, ab = 0, ex = 0;
+        Object.values(dayData).forEach(function(st) { if(st==='P') p++; else if(st==='A') ab++; else if(st==='E') ex++; });
+        var total = p + ab + ex;
+        if (!total) return;
+        var rate = Math.round((p / total) * 100);
+        events.push({ title: '✅'+p+' ❌'+ab, start: date, backgroundColor: rate>=80?'#22c55e':rate>=50?'#eab308':'#ef4444', borderColor: 'transparent', extendedProps: { present:p, absent:ab, excused:ex, rate:rate } });
+    });
+    var cal = new FullCalendar.Calendar(el, {
+        initialView: 'dayGridMonth', locale: 'tr',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+        buttonText: { today: 'Bugün', month: 'Ay', list: 'Liste' },
+        events: events,
+        eventClick: function(info) {
+            var p = info.event.extendedProps;
+            if (typeof toast === 'function') toast('✅'+p.present+' Var  ❌'+p.absent+' Yok  🔵'+p.excused+' İzinli  — %'+p.rate+' devam', 'g');
+        },
+        height: 'auto'
+    });
+    cal.render(); el._fc = cal;
+}
+
+// go() override — sadece calendar sayfası için
+(function() {
+    var _goOrig = window.go;
+    window.go = function(page, params) {
+        if (page === 'calendar') {
+            var main = document.getElementById('main');
+            if (main) {
+                AppState.ui.curPage = page;
+                document.querySelectorAll('.ni').forEach(function(el) { el.classList.toggle('on', el.id === 'ni-calendar'); });
+                document.querySelectorAll('.bni-btn').forEach(function(el) { el.classList.toggle('on', false); });
+                main.style.opacity = '0';
+                setTimeout(function() {
+                    main.innerHTML = pgCalendar();
+                    main.style.opacity = '1';
+                    setTimeout(initCalendarChart, 150);
+                }, 100);
+                if (typeof closeSide === 'function') closeSide();
+                return;
+            }
+        }
+        return _goOrig.call(window, page, params);
+    };
+})();
+
+// ── TEK BİRLEŞİK AFTER HOOK ────────────────────────────────
+window.registerGoHook('after', function(page) {
+
+    // Yoklama geçmişi (Geliştirme 2)
+    if (page === 'attendance') {
+        var main = document.getElementById('main');
+        if (!main) return;
+        if (main.querySelector('.yoklama-gecmis')) return;
+        var atcls = AppState.ui.atcls || '';
+        var allDates = Object.keys(AppState.data.attendance).filter(function(d) {
+            var dayData = AppState.data.attendance[d];
+            var list = AppState.data.athletes.filter(function(a) {
+                return a.st === 'active' && (!atcls || a.clsId === atcls);
+            });
+            return list.some(function(a) { return dayData[a.id]; });
+        }).sort().reverse().slice(0, 10);
+
+        if (allDates.length === 0) return;
+
+        var div = document.createElement('div');
+        div.className = 'card mt3 yoklama-gecmis';
+        div.innerHTML = '<div class="tw6 tsm mb2">📅 Son 10 Günlük Geçmiş</div>'
+            + allDates.map(function(d) {
+                var dayData = AppState.data.attendance[d];
+                var list = AppState.data.athletes.filter(function(a) {
+                    return a.st === 'active' && (!atcls || a.clsId === atcls);
+                });
+                var p = list.filter(function(a) { return dayData[a.id] === 'P'; }).length;
+                var ab = list.filter(function(a) { return dayData[a.id] === 'A'; }).length;
+                var ex = list.filter(function(a) { return dayData[a.id] === 'E'; }).length;
+                var total = list.length;
+                var rate = total > 0 ? Math.round((p / total) * 100) : 0;
+                return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">'
+                    + '<div style="min-width:90px;font-size:13px;color:var(--text2)">' + DateUtils.format(d) + '</div>'
+                    + '<div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">'
+                    + '<div style="width:' + rate + '%;height:100%;background:var(--green);border-radius:4px"></div></div>'
+                    + '<div style="font-size:12px;min-width:120px;text-align:right">'
+                    + '<span style="color:var(--green)">✅' + p + '</span> '
+                    + '<span style="color:var(--red)">❌' + ab + '</span> '
+                    + '<span style="color:var(--yellow)">🔵' + ex + '</span> '
+                    + '<span style="color:var(--text3);margin-left:4px">%' + rate + '</span></div></div>';
+            }).join('');
+        main.appendChild(div);
+    }
+
+    // Dashboard özeti — yönetici (Geliştirme 4)
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role !== 'coach') {
+        var main = document.getElementById('main');
+        if (!main) return;
+        if (main.querySelector('#dash-ozet')) return;
+
+        var todayStr = DateUtils.today();
+        var attToday = AppState.data.attendance[todayStr] || {};
+        var activeAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active'; });
+        var todayPresent = activeAthletes.filter(function(a) { return attToday[a.id] === 'P'; }).length;
+        var todayAbsent  = activeAthletes.filter(function(a) { return attToday[a.id] === 'A'; }).length;
+        var attEntered   = activeAthletes.filter(function(a) { return attToday[a.id]; }).length;
+        var overdueList  = AppState.data.payments.filter(function(p) { return p.st === 'overdue'; });
+        var overdueNames = overdueList.slice(0, 3).map(function(p) {
+            var a = AppState.data.athletes.find(function(x) { return x.id === p.aid; });
+            return a ? a.fn + ' ' + a.ln : null;
+        }).filter(Boolean);
+        var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+        var newThisWeek = AppState.data.athletes.filter(function(a) { return a.rd && new Date(a.rd) >= weekAgo; }).length;
+
+        var div = document.createElement('div');
+        div.id = 'dash-ozet';
+        div.className = 'card mb3';
+        div.style.borderLeft = '4px solid var(--blue2)';
+        div.innerHTML = '<div class="tw6 tsm mb3">📋 Bugünün Özeti — ' + DateUtils.format(todayStr) + '</div>'
+            + '<div class="g3" style="margin-bottom:12px">'
+            + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--green)">' + todayPresent + '</div><div style="font-size:12px;color:var(--text2)">Bugün Var</div></div>'
+            + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--red)">' + todayAbsent + '</div><div style="font-size:12px;color:var(--text2)">Bugün Yok</div></div>'
+            + '<div style="text-align:center;padding:12px;background:var(--bg3);border-radius:10px"><div style="font-size:22px;font-weight:800;color:var(--blue2)">' + attEntered + '/' + activeAthletes.length + '</div><div style="font-size:12px;color:var(--text2)">Girilen</div></div>'
+            + '</div>'
+            + (attEntered === 0 ? '<div class="al al-y" style="font-size:13px">⚠️ Bugün henüz yoklama girilmedi.</div>' : '')
+            + (overdueList.length > 0 ? '<div class="al al-r mt2" style="font-size:13px">🔴 ' + overdueList.length + ' gecikmiş ödeme — ' + overdueNames.join(', ') + (overdueNames.length < overdueList.length ? ' ve diğerleri' : '') + '</div>' : '')
+            + (newThisWeek > 0 ? '<div class="al al-g mt2" style="font-size:13px">🆕 Bu hafta ' + newThisWeek + ' yeni sporcu kaydı.</div>' : '');
+
+        var statGrid = main.querySelector('.g4.mb3');
+        if (statGrid) {
+            main.insertBefore(div, statGrid);
+        } else {
+            var ph = main.querySelector('.ph');
+            if (ph && ph.nextSibling) main.insertBefore(div, ph.nextSibling);
+            else main.appendChild(div);
+        }
+    }
+
+    // Dashboard — antrenör paneli (Geliştirme 4)
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role === 'coach') {
+        var main = document.getElementById('main');
+        if (!main || main.querySelector('#coach-panel')) return;
+
+        var coachRecord = AppState.data.coaches.find(function(c) { return c.id === AppState.currentUser.id; })
+            || AppState.data.coaches.find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
+            || null;
+        var myClassIds = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
+        var myAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active' && myClassIds.indexOf(a.clsId) > -1; });
+        var todayAtt = AppState.data.attendance[DateUtils.today()] || {};
+        var presentToday = myAthletes.filter(function(a) { return todayAtt[a.id] === 'P'; }).length;
+        var absentToday  = myAthletes.filter(function(a) { return todayAtt[a.id] === 'A'; }).length;
+        var notEntered   = myAthletes.filter(function(a) { return !todayAtt[a.id]; }).length;
+        var lowAtt = myAthletes.filter(function(a) {
+            var stats = getAttendanceStats(a.id);
+            return stats.total > 5 && stats.rate < 50;
+        });
+        var myClasses = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; });
+
+        main.innerHTML = '<div class="ph"><div class="stit">🏃 Antrenör Paneli</div></div>'
+            + '<div class="g3 mb3" id="coach-panel">'
+            + '<div class="card stat-card stat-g"><div class="stat-icon">👥</div><div class="stat-val">' + myAthletes.length + '</div><div class="stat-lbl">Gruptaki Sporcu</div></div>'
+            + '<div class="card stat-card stat-b"><div class="stat-icon">✅</div><div class="stat-val">' + presentToday + '</div><div class="stat-lbl">Bugün Gelen</div></div>'
+            + '<div class="card stat-card stat-r"><div class="stat-icon">❌</div><div class="stat-val">' + absentToday + '</div><div class="stat-lbl">Bugün Gelmedi</div></div>'
+            + '</div>'
+            + (notEntered > 0 ? '<div class="al al-y mb3">⚠️ ' + notEntered + ' sporcu için yoklama girilmedi. <button class="btn btn-sm bp" onclick="go(\'attendance\')" style="margin-left:8px">Yoklamaya Git →</button></div>' : '')
+            + (lowAtt.length > 0
+                ? '<div class="card mb3" style="border-left:4px solid var(--red)"><div class="tw6 tsm mb2">⚠️ Devamsızlık Riski</div>'
+                    + lowAtt.map(function(a) { var s = getAttendanceStats(a.id); return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span class="tw6 tsm">' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</span><span class="badge badge-red">%' + s.rate + '</span></div>'; }).join('')
+                    + '</div>'
+                : '<div class="al al-g mb3">✅ Tüm sporcular düzenli devam ediyor.</div>')
+            + '<div class="card"><div class="tw6 tsm mb2">📋 Grubum</div>'
+            + myClasses.map(function(cls) { var cnt = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length; return '<div class="ts mb1">🏫 ' + FormatUtils.escape(cls.name) + ' — ' + cnt + ' sporcu</div>'; }).join('')
+            + '</div>';
+    }
+
+    // Otomatik uyarılar (Geliştirme 5)
+    if (page === 'dashboard' && AppState.currentUser && AppState.currentUser.role === 'admin') {
+        if (typeof buildAutoAlerts === 'function') buildAutoAlerts();
+    }
+
+    // Veli profil — antrenör iletişim kartı (Geliştirme 6)
+    if (typeof AppState.currentSporcu !== 'undefined' && AppState.currentSporcu) {
+        var spContent = document.getElementById('sp-content');
+        if (spContent && !spContent.querySelector('#coach-contact-card')) {
+            var a = AppState.currentSporcu;
+            var cls = AppState.data.classes.find(function(c) { return c.id === a.clsId; });
+            var coach = cls ? AppState.data.coaches.find(function(c) { return c.id === cls.coachId; }) : null;
+            if (coach && coach.ph) {
+                var card = document.createElement('div');
+                card.id = 'coach-contact-card';
+                card.className = 'info-card';
+                card.innerHTML = '<div class="info-card-title">📞 Antrenörümle İletişim</div>'
+                    + '<div class="info-row"><span class="info-label">Antrenör</span><span class="info-value tw6">' + FormatUtils.escape(coach.fn + ' ' + coach.ln) + '</span></div>'
+                    + (coach.ph ? '<div class="info-row"><span class="info-label">Telefon</span><a href="tel:' + FormatUtils.escape(coach.ph) + '" class="info-value tb">' + FormatUtils.escape(coach.ph) + '</a></div>' : '')
+                    + (coach.ph ? '<div class="mt2"><a href="https://wa.me/90' + coach.ph.replace(/\D/g,'').slice(-10) + '" target="_blank" rel="noopener" class="btn w100" style="background:#25d366;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">💬 WhatsApp ile Yaz</a></div>' : '');
+
+                var sidebar = spContent.querySelector('.profile-sidebar');
+                if (sidebar) sidebar.appendChild(card);
+            }
+        }
+    }
+
+    // Chart.js — Dashboard (Geliştirme 8)
+    if (page === 'dashboard') {
+        var main = document.getElementById('main');
+        if (main) {
+            main.querySelectorAll('.card').forEach(function(card) {
+                if (card.textContent.indexOf('Gelir/Gider') > -1 && !card.querySelector('canvas')) {
+                    card.innerHTML = '<div class="tw6 tsm mb2">📈 Son 6 Ay Gelir/Gider</div><canvas id="dash-chart" height="120"></canvas>';
+                    setTimeout(initDashboardChart, 150);
+                }
+            });
+        }
+    }
+
+    // Chart.js — Accounting (Geliştirme 8)
+    if (page === 'accounting') setTimeout(initBranchChart, 150);
+
+    // Takvim menü aktif (Geliştirme 9)
+    if (page === 'calendar') {
+        document.querySelectorAll('.ni').forEach(function(el) {
+            el.classList.toggle('on', el.id === 'ni-calendar');
+        });
+    }
+});
+
+console.log('✅ Geliştirme 1-10 uygulandı — script-fixes.js V11');
