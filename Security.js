@@ -213,7 +213,10 @@ function _securityDoNormalLogin(role) {
                 }
             } catch(e) { console.warn('signOut check:', e); }
 
-            // Supabase Auth ile giriş (önce tablodaki e-posta, sonra fallback)
+            const tableName = role === 'coach' ? 'coaches' : 'athletes';
+            let row = null;
+
+            // 1) Önce Auth ile giriş dene
             const authEmails = await resolveAuthEmails(sb, role, tc);
             let authData = null;
             let authError = null;
@@ -222,42 +225,69 @@ function _securityDoNormalLogin(role) {
             for (const email of authEmails) {
                 console.log('📡 signInWithPassword deneniyor:', email);
                 const { data, error } = await sb.auth.signInWithPassword({
-                    email: email,
+                    email,
                     password: pass
                 });
                 if (!error) {
                     authData = data;
-                    usedEmail = email;
                     authError = null;
+                    usedEmail = email;
                     break;
                 }
                 authError = error;
             }
 
-            if (authError || !authData?.user) {
-                console.error('🔴 Auth hatası:', authError ? authError.message : 'unknown');
-                showErr('TC Kimlik No veya Şifre Hatalı');
-                return;
+            if (!authError && authData?.user) {
+                console.log('✅ Auth giriş başarılı. Kullanılan email:', usedEmail);
+                const { data: userData, error: fetchError } = await sb
+                    .from(tableName)
+                    .select('*')
+                    .eq('tc', tc)
+                    .single();
+
+                if (fetchError || !userData) {
+                    console.error('🔴 Kullanıcı verisi çekilemedi:', fetchError);
+                    showErr('Kullanıcı kaydı bulunamadı. Lütfen yöneticiyle iletişime geçin.');
+                    return;
+                }
+                row = userData;
+            } else {
+                // 2) Auth geçici/altyapı hatası verirse RPC fallback
+                const authMsg = (authError?.message || '').toLowerCase();
+                const shouldUseRpcFallback = authMsg.includes('database error querying schema') || authMsg.includes('unexpected_failure');
+
+                if (!shouldUseRpcFallback) {
+                    if (authMsg.includes('email not confirmed') || authMsg.includes('email_not_confirmed')) {
+                        showErr('Bu hesapta e-posta doğrulaması bekleniyor. Supabase > Auth > Providers > Email bölümünde Confirm email ayarını kapatın ya da hesabı doğrulayın.');
+                    } else {
+                        showErr('TC Kimlik No veya Şifre Hatalı');
+                    }
+                    return;
+                }
+
+                console.warn('⚠️ Auth altyapı hatası, RPC fallback deneniyor...');
+                const rpcRole = role === 'coach' ? 'coach' : 'sporcu';
+                const { data: rpcData, error: rpcError } = await sb.rpc('login_with_tc', {
+                    p_tc: tc,
+                    p_pass: pass,
+                    p_role: rpcRole
+                });
+
+                if (!rpcError && rpcData?.ok && rpcData?.data) {
+                    row = rpcData.data;
+                    console.log('✅ RPC fallback ile giriş doğrulandı!');
+                } else {
+                    const rpcMsg = rpcError?.message || rpcData?.error || '';
+                    console.error('🔴 Auth hatası:', authError || 'unknown');
+                    console.error('🔴 RPC fallback hatası:', rpcError || rpcData || 'unknown');
+                    if (rpcMsg) {
+                        showErr('Giriş doğrulanamadı: ' + rpcMsg);
+                    } else {
+                        showErr('TC Kimlik No veya Şifre Hatalı');
+                    }
+                    return;
+                }
             }
-
-            console.log('✅ Auth başarılı, kullanıcı verisi çekiliyor... Kullanılan email:', usedEmail);
-
-            // Oturum açıldı, ilgili tablodan kullanıcı verisini çek
-            const tableName = role === 'coach' ? 'coaches' : 'athletes';
-            const { data: userData, error: fetchError } = await sb
-                .from(tableName)
-                .select('*')
-                .eq('tc', tc)
-                .single();
-
-            if (fetchError || !userData) {
-                console.error('🔴 Kullanıcı verisi çekilemedi:', fetchError);
-                showErr('Kullanıcı kaydı bulunamadı. Lütfen yöneticiyle iletişime geçin.');
-                return;
-            }
-
-            console.log('✅ Giriş doğrulandı!');
-
             // AppState yoksa oluştur
             if (!window.AppState) {
                 console.log('AppState yoktu, oluşturuluyor...');
@@ -275,7 +305,6 @@ function _securityDoNormalLogin(role) {
                 };
             }
 
-            const row = userData;
 
             if (role === 'coach') {
                 console.log('✅ Coach bulundu:', row.fn, row.ln);
