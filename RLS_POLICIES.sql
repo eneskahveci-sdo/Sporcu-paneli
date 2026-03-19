@@ -379,3 +379,8 @@ GRANT EXECUTE ON FUNCTION verify_user_credentials(TEXT, TEXT, TEXT) TO service_r
 --   9. Başarılı girişte plaintext şifreler otomatik SHA-256 hash'lenir.
 --      (pgcrypto yüklüyse). pgcrypto yoksa giriş çalışır, hash atlanır.
 -- ============================================================
+
+-- ── Classes Schedule Alanları ───────────────────────────
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS schedule_days jsonb DEFAULT '[]';
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS schedule_time text DEFAULT '';
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS schedule_time_end text DEFAULT '';
