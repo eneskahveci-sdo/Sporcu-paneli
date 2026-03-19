@@ -1971,6 +1971,102 @@ function pgDashboard() {
     </div>`;
 }
 
+
+async function provisionAthleteAuthUser(athlete, plainPassword) {
+    try {
+        const sb = getSupabase();
+        if (!sb || !sb.functions) {
+            return { ok: false, skipped: true, reason: 'Supabase client hazır değil' };
+        }
+
+        const tc = String(athlete?.tc || '').replace(/\D/g, '').slice(0, 11);
+        if (tc.length !== 11) {
+            return { ok: false, reason: 'Geçersiz TC' };
+        }
+
+        const rawEmail = String(athlete?.em || '').trim().toLowerCase();
+        const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : '';
+        const email = validEmail || `${tc}@dragosfk.com`;
+
+        const pass = String(plainPassword || athlete?.spPass || tc.slice(-6)).trim();
+        if (pass.length < 6) {
+            return { ok: false, reason: 'Şifre en az 6 karakter olmalı' };
+        }
+
+        const { data, error } = await sb.functions.invoke('provision-auth-user', {
+            body: {
+                userType: 'athlete',
+                sourceId: athlete?.id || '',
+                tc,
+                email,
+                password: pass,
+                displayName: `${athlete?.fn || ''} ${athlete?.ln || ''}`.trim(),
+                orgId: athlete?.orgId || '',
+                branchId: athlete?.branchId || ''
+            }
+        });
+
+        if (error) {
+            return { ok: false, reason: error.message || 'Edge Function hatası' };
+        }
+
+        if (data?.ok) {
+            return { ok: true, exists: !!data.exists, email: data.email || email };
+        }
+
+        return { ok: false, reason: data?.error || 'Auth kullanıcı oluşturulamadı' };
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'Beklenmeyen hata' };
+    }
+}
+
+async function provisionCoachAuthUser(coach, plainPassword) {
+    try {
+        const sb = getSupabase();
+        if (!sb || !sb.functions) {
+            return { ok: false, skipped: true, reason: 'Supabase client hazır değil' };
+        }
+
+        const tc = String(coach?.tc || '').replace(/\D/g, '').slice(0, 11);
+        if (tc.length !== 11) {
+            return { ok: false, reason: 'Geçersiz TC' };
+        }
+
+        const rawEmail = String(coach?.em || '').trim().toLowerCase();
+        const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : '';
+        const email = validEmail || `${tc}@dragosfk.com`;
+
+        const pass = String(plainPassword || coach?.coachPass || tc.slice(-6)).trim();
+        if (pass.length < 6) {
+            return { ok: false, reason: 'Şifre en az 6 karakter olmalı' };
+        }
+
+        const { data, error } = await sb.functions.invoke('provision-auth-user', {
+            body: {
+                userType: 'coach',
+                sourceId: coach?.id || '',
+                tc,
+                email,
+                password: pass,
+                displayName: `${coach?.fn || ''} ${coach?.ln || ''}`.trim(),
+                orgId: coach?.orgId || '',
+                branchId: coach?.branchId || ''
+            }
+        });
+
+        if (error) {
+            return { ok: false, reason: error.message || 'Edge Function hatası' };
+        }
+
+        if (data?.ok) {
+            return { ok: true, exists: !!data.exists, email: data.email || email };
+        }
+
+        return { ok: false, reason: data?.error || 'Auth kullanıcı oluşturulamadı' };
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'Beklenmeyen hata' };
+    }
+}
 window.editAth = function(id, prefill) {
     const a = id ? AppState.data.athletes.find(x => x.id === id) : null;
     const isNew = !a;
@@ -2218,6 +2314,13 @@ window.editAth = function(id, prefill) {
                     const idx = AppState.data.athletes.findIndex(x => x.id === obj.id);
                     if (idx >= 0) AppState.data.athletes[idx] = obj;
                 }
+                if (isNew) {
+                    const authRes = await provisionAthleteAuthUser(obj, newSpPass);
+                    if (!authRes.ok && !authRes.skipped) {
+                        toast('Sporcu kaydedildi ancak Auth hesabı oluşturulamadı: ' + authRes.reason, 'e');
+                    }
+                }
+
                 toast(i18n[AppState.lang].saveSuccess, 'g');
                 closeModal();
                 if (!isNew && AppState.ui.curPage === 'athleteProfile') {
@@ -3504,6 +3607,12 @@ window.editCoach = function(id) {
                 } else {
                     const idx = AppState.data.coaches.findIndex(x => x.id === obj.id);
                     if (idx >= 0) AppState.data.coaches[idx] = obj;
+                }
+                if (isNew) {
+                    const authRes = await provisionCoachAuthUser(obj, newPass);
+                    if (!authRes.ok && !authRes.skipped) {
+                        toast('Antrenör kaydedildi ancak Auth hesabı oluşturulamadı: ' + authRes.reason, 'e');
+                    }
                 }
                 toast(i18n[AppState.lang].saveSuccess, 'g');
                 closeModal();
@@ -5297,7 +5406,7 @@ window.importSelectedAthletes = async function() {
     const data = window._excelImportData;
     if (!data) { toast('Önce dosya seçiniz!', 'e'); return; }
     
-    let success = 0, errors = 0, skipped = 0;
+    let success = 0, errors = 0, skipped = 0, authFailed = 0;
     
     for (let i = 0; i < data.length; i++) {
         const checkbox = document.getElementById(`excel-row-${i}`);
@@ -5326,11 +5435,17 @@ window.importSelectedAthletes = async function() {
         };
         
         const result = await DB.upsert('athletes', DB.mappers.fromAthlete(obj));
-        if (result) { AppState.data.athletes.push(obj); success++; }
-        else errors++;
+        if (result) {
+            AppState.data.athletes.push(obj);
+            success++;
+            const authRes = await provisionAthleteAuthUser(obj, obj.spPass);
+            if (!authRes.ok && !authRes.skipped) authFailed++;
+        } else errors++;
     }
     
-    toast(`✅ ${success} sporcu eklendi${errors > 0 ? `, ${errors} hata` : ''}${skipped > 0 ? `, ${skipped} atlandı` : ''}`, 'g');
+    let importMsg = `✅ ${success} sporcu eklendi${errors > 0 ? `, ${errors} hata` : ''}${skipped > 0 ? `, ${skipped} atlandı` : ''}`;
+    if (authFailed > 0) importMsg += `, ${authFailed} auth hesabı oluşturulamadı`;
+    toast(importMsg, authFailed > 0 ? 'e' : 'g');
     closeModal();
     go('athletes');
 };
