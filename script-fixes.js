@@ -2508,7 +2508,7 @@ window.editClass = function(id) {
 
 // ── AKORDİYON SİDEBAR ──────────────────────────────────────
 (function() {
-    var KEY = 'sidebar_acc_v1';
+    var KEY = 'sidebar_acc_v2';
     function getState() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { return {}; } }
     function saveState(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch(e) {} }
 
@@ -2524,13 +2524,14 @@ window.editClass = function(id) {
 
     function init() {
         var s = getState();
-        ['general','athletes','academy','finance','system'].forEach(function(g) {
+        ['academy','finance'].forEach(function(g) {
             var body = document.getElementById('accb-' + g);
             var hdr  = body ? body.previousElementSibling : null;
             if (!body || !hdr) return;
-            if (s[g] === false) {
-                body.classList.add('collapsed');
-                hdr.setAttribute('aria-expanded', 'false');
+            // Default closed (HTML has collapsed class), open only if saved state says open
+            if (s[g] === true) {
+                body.classList.remove('collapsed');
+                hdr.setAttribute('aria-expanded', 'true');
             }
         });
     }
@@ -2544,10 +2545,10 @@ var _origUpdateBranchUI2 = typeof updateBranchUI === 'function' ? updateBranchUI
 window.updateBranchUI = function() {
     if (_origUpdateBranchUI2) _origUpdateBranchUI2();
     if (AppState.currentUser && AppState.currentUser.role === 'coach') {
-        ['accg-finance','accg-system'].forEach(function(g) {
+        ['accg-finance'].forEach(function(g) {
             var el = document.getElementById(g); if (el) el.style.display = 'none';
         });
-        ['ni-sports','ni-classes'].forEach(function(id) {
+        ['ni-sports','ni-classes','ni-settings','ni-dashboard'].forEach(function(id) {
             var el = document.getElementById(id); if (el) el.style.display = 'none';
         });
     }
