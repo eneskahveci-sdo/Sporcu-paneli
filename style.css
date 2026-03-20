@@ -491,3 +491,23 @@ background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62))
     padding:0 4px;line-height:1;pointer-events:none;
     animation:badge-pop .3s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ENVANTER YÖNETİMİ                                         */
+/* ═══════════════════════════════════════════════════════════ */
+.inv-table-wrap{overflow:hidden}
+.inv-table{width:100%;border-collapse:collapse;font-size:13px}
+.inv-table th{padding:10px 14px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);border-bottom:2px solid var(--border);white-space:nowrap}
+.inv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.inv-table tbody tr{transition:background .15s}
+.inv-table tbody tr:hover{background:var(--bg3)}
+.inv-row-critical{background:rgba(239,68,68,.04)}
+.inv-row-critical:hover{background:rgba(239,68,68,.08) !important}
+.inv-stock-ok{display:inline-block;padding:3px 10px;border-radius:8px;font-weight:700;font-size:13px;background:rgba(34,197,94,.12);color:var(--green)}
+.inv-stock-critical{display:inline-block;padding:3px 10px;border-radius:8px;font-weight:700;font-size:13px;background:rgba(239,68,68,.12);color:var(--red);animation:pulse-critical 2s infinite}
+@keyframes pulse-critical{0%,100%{opacity:1}50%{opacity:.7}}
+@media(max-width:768px){
+    .inv-table th,.inv-table td{padding:8px 8px;font-size:12px}
+    .inv-table th:nth-child(3),.inv-table td:nth-child(3),
+    .inv-table th:nth-child(4),.inv-table td:nth-child(4){display:none}
+}
