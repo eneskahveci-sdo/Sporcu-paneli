@@ -1,14 +1,14 @@
 // ═══════════════════════════════════════════════════════════
-// HATA DÜZELTMELERİ V11 — script.js'den SONRA yüklenir
+// HATA DÜZELTMELERİ V13 — script.js'den SONRA yüklenir
 //
-// V11 DEĞİŞİKLİKLER:
-// - Geliştirme 1-10: Canlı arama, yoklama geçmişi, finans filtresi,
-//   dashboard özet, otomatik uyarılar, antrenör iletişim, aktif/pasif
-//   sekmeler, Chart.js, FullCalendar, birleşik after hook
-// - V10 özellikleri korundu
+// V13 DEĞİŞİKLİKLER:
+// - Geliştirme 18: Takvime ders ekleme (Ayarlar), ders varlığı
+//   kontrolü, sınıf bazlı yoklama (CMT-PZR 09-10 / 10-11 gibi
+//   her grup için ayrı yoklama), class_id attendance kaydı
+// - V12 özellikleri korundu (Geliştirme 1-17)
 // ═══════════════════════════════════════════════════════════
 
-console.log('script-fixes.js V11 yukleniyor...');
+console.log('script-fixes.js V13 yukleniyor...');
 
 // ────────────────────────────────────────────────────────
 // CROSS-ORIGIN "Script error." FILTRESİ
@@ -2653,4 +2653,320 @@ window.registerGoHook('after', function(page) {
     });
 });
 
-console.log('✅ Geliştirme 1-17 uygulandı — script-fixes.js V12');
+// ═══════════════════════════════════════════════════════════
+// GELİŞTİRME 18: TAKVİME DERS EKLEME & SINIF BAZLI YOKLAMA
+// ═══════════════════════════════════════════════════════════
+
+// ── DERS VARLIĞI KONTROL FONKSİYONU ─────────────────────────
+// Verilen tarih ve sınıf için ders olup olmadığını kontrol eder
+// ve yoklama alınabilir duruma getirir
+window.checkLessonExists = function(date, classId) {
+    if (!date) date = DateUtils.today();
+    var d = new Date(date + 'T12:00:00');
+    var dayNames = ['pazar','pazartesi','salı','çarşamba','perşembe','cuma','cumartesi'];
+    var dayName = dayNames[d.getDay()];
+
+    if (classId) {
+        var cls = AppState.data.classes.find(function(c) { return c.id === classId; });
+        if (!cls || !cls.scheduleDays || cls.scheduleDays.indexOf(dayName) < 0) return null;
+        return cls;
+    }
+    // classId verilmezse o gün dersi olan tüm sınıfları döndür
+    var classes = AppState.data.classes.filter(function(c) {
+        return c.scheduleDays && c.scheduleDays.indexOf(dayName) > -1;
+    });
+    return classes.length > 0 ? classes : null;
+};
+
+// ── DERS YOKLAMASI AL FONKSİYONU ────────────────────────────
+// Ders varlığını kontrol edip yoklama sayfasına yönlendirir
+window.takeLessonAttendance = function(date, classId) {
+    if (!date) date = DateUtils.today();
+    var lesson = window.checkLessonExists(date, classId);
+    if (!lesson) {
+        toast('⚠️ Bu tarihte bu sınıf için planlanmış ders bulunamadı.', 'e');
+        return false;
+    }
+    // Ders var — yoklama sayfasına yönlendir
+    AppState.ui.atd = date;
+    AppState.ui.atcls = classId;
+    AppState.ui._attDateSet = true;
+    go('attendance');
+    toast('📋 ' + (lesson.name || 'Ders') + ' yoklaması açılıyor...', 'g');
+    return true;
+};
+
+// ── setAtt OVERRIDE — class_id kaydı ────────────────────────
+(function() {
+    var _origSetAtt = window.setAtt;
+    window.setAtt = async function(aid, status) {
+        var date = AppState.ui.atd || DateUtils.today();
+        var classId = AppState.ui.atcls || null;
+
+        if (!AppState.data.attendance[date]) {
+            AppState.data.attendance[date] = {};
+        }
+
+        if (status === undefined) {
+            delete AppState.data.attendance[date][aid];
+            var sb = getSupabase();
+            if (sb) {
+                var q = sb.from('attendance')
+                    .delete()
+                    .eq('athlete_id', aid)
+                    .eq('att_date', date)
+                    .eq('org_id', AppState.currentOrgId);
+                if (classId) q = q.eq('class_id', classId);
+                await q;
+            }
+        } else {
+            AppState.data.attendance[date][aid] = status;
+            var sb = getSupabase();
+            if (sb) {
+                try {
+                    var matchQ = sb.from('attendance')
+                        .select('id')
+                        .eq('athlete_id', aid)
+                        .eq('att_date', date)
+                        .eq('org_id', AppState.currentOrgId);
+                    if (classId) matchQ = matchQ.eq('class_id', classId);
+
+                    var resp = await matchQ.maybeSingle();
+                    var existing = resp.data;
+
+                    if (existing && existing.id) {
+                        await sb.from('attendance')
+                            .update({ status: status })
+                            .eq('id', existing.id);
+                    } else {
+                        var record = {
+                            id: generateId(),
+                            org_id: AppState.currentOrgId,
+                            branch_id: AppState.currentBranchId,
+                            athlete_id: aid,
+                            att_date: date,
+                            status: status
+                        };
+                        if (classId) record.class_id = classId;
+                        await sb.from('attendance').insert(record);
+                    }
+                } catch(e) {
+                    console.error('Attendance save error:', e);
+                    toast('Yoklama kaydedilemedi: ' + (e.message || e), 'e');
+                }
+            }
+        }
+        go('attendance');
+    };
+})();
+
+// ── AYARLAR SAYFASI OVERRIDE — Takvime Ders Ekleme ──────────
+(function() {
+    var _origPgSettings = window.pgSettings;
+    window.pgSettings = function() {
+        var baseHtml = _origPgSettings ? _origPgSettings() : '';
+
+        // Takvime Ders Ekleme kartı oluştur
+        var dayMap = { pazartesi:'Pzt', salı:'Sal', çarşamba:'Çar', perşembe:'Per', cuma:'Cum', cumartesi:'Cmt', pazar:'Paz' };
+        var scheduledClasses = AppState.data.classes.filter(function(c) {
+            return c.scheduleDays && c.scheduleDays.length > 0;
+        });
+
+        var classRows = '';
+        if (scheduledClasses.length === 0) {
+            classRows = '<p class="tm ts" style="text-align:center;padding:16px">Henüz takvime eklenmiş ders bulunmuyor.</p>';
+        } else {
+            // Sınıfları gün+saat grubuna göre grupla
+            var groups = {};
+            scheduledClasses.forEach(function(cls) {
+                var dayStr = cls.scheduleDays.map(function(d) { return dayMap[d] || d; }).join(', ');
+                var timeStr = (cls.scheduleTime && cls.scheduleTimeEnd) ? cls.scheduleTime + '-' + cls.scheduleTimeEnd : 'Saat belirtilmedi';
+                var key = dayStr + ' | ' + timeStr;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(cls);
+            });
+
+            Object.keys(groups).forEach(function(groupKey) {
+                classRows += '<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:10px">';
+                classRows += '<div style="font-weight:600;font-size:13px;color:var(--blue2);margin-bottom:8px">📅 ' + FormatUtils.escape(groupKey) + '</div>';
+                groups[groupKey].forEach(function(cls) {
+                    var athCount = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length;
+                    var coachStr = cls.coachId ? coachName(cls.coachId) : '-';
+                    classRows += '<div class="flex fjb fca" style="padding:6px 0;border-bottom:1px solid var(--border)">'
+                        + '<div>'
+                        + '<div class="tw6 tsm">' + FormatUtils.escape(cls.name) + '</div>'
+                        + '<div class="ts tm">Antrenör: ' + FormatUtils.escape(coachStr) + ' · ' + athCount + ' sporcu</div>'
+                        + '</div>'
+                        + '<div class="flex gap2">'
+                        + '<button class="btn btn-xs bp" onclick="editClass(\'' + FormatUtils.escape(cls.id) + '\')">✏️</button>'
+                        + '<button class="btn btn-xs bs" onclick="takeLessonAttendance(DateUtils.today(),\'' + FormatUtils.escape(cls.id) + '\')">📋 Yoklama</button>'
+                        + '<button class="btn btn-xs bd" onclick="deleteLessonFromCalendar(\'' + FormatUtils.escape(cls.id) + '\')">🗑️</button>'
+                        + '</div></div>';
+                });
+                classRows += '</div>';
+            });
+        }
+
+        // Bugün ders kontrolü
+        var today = DateUtils.today();
+        var todayLessons = window.checkLessonExists(today);
+        var todayInfo = '';
+        if (todayLessons && todayLessons.length > 0) {
+            todayInfo = '<div class="al al-g mb3" style="font-size:13px">✅ Bugün <strong>' + todayLessons.length + '</strong> ders planlanmış: '
+                + todayLessons.map(function(c) {
+                    var ts = (c.scheduleTime && c.scheduleTimeEnd) ? c.scheduleTime + '-' + c.scheduleTimeEnd : '';
+                    return '<strong>' + FormatUtils.escape(c.name) + '</strong>' + (ts ? ' (' + ts + ')' : '');
+                }).join(', ') + '</div>';
+        } else {
+            todayInfo = '<div class="al al-y mb3" style="font-size:13px">📅 Bugün için planlanmış ders bulunmuyor.</div>';
+        }
+
+        var lessonCard = '<div class="card mb3" style="border-left:4px solid var(--blue2)">'
+            + '<div class="flex fjb fca mb3">'
+            + '<div>'
+            + '<div class="tw6 tsm">📅 Takvim Ders Yönetimi</div>'
+            + '<div class="ts tm">Takvime ders ekleyin, düzenleyin ve sınıf bazlı yoklama alın</div>'
+            + '</div>'
+            + '<button class="btn bsu btn-sm" onclick="showAddLessonToCalendarModal()">➕ Yeni Ders Ekle</button>'
+            + '</div>'
+            + todayInfo
+            + classRows
+            + '<div class="al al-b mt3" style="font-size:12px">'
+            + 'ℹ️ Her sınıf grubu ve saat dilimi için ayrı yoklama alınır. '
+            + 'Örn: CMT-PZR 09:00-10:00 ve CMT-PZR 10:00-11:00 grupları ayrı yoklama listesine sahiptir.'
+            + '</div>'
+            + '</div>';
+
+        // Ders yönetimi kartını ayarlar sayfasının başına ekle (role yönetiminden sonra)
+        var insertPoint = baseHtml.indexOf('<div class="card mb3" style="border-left: 4px solid var(--purple)">');
+        if (insertPoint > -1) {
+            return baseHtml.slice(0, insertPoint) + lessonCard + baseHtml.slice(insertPoint);
+        }
+        // Fallback: sona ekle
+        return baseHtml + lessonCard;
+    };
+})();
+
+// ── YENİ DERS EKLEME MODALI ─────────────────────────────────
+window.showAddLessonToCalendarModal = function() {
+    var days = ['pazartesi','salı','çarşamba','perşembe','cuma','cumartesi','pazar'];
+    var dayLabels = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+    var dayCheckboxes = days.map(function(d, i) {
+        return '<label style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;cursor:pointer;font-size:13px">'
+            + '<input type="checkbox" value="' + d + '" class="lesson-day-cb" style="width:auto;accent-color:var(--blue2)"/> '
+            + dayLabels[i] + '</label>';
+    }).join('');
+
+    modal('📅 Takvime Yeni Ders Ekle',
+        '<div class="al al-b mb3" style="font-size:12px">Ders eklemek için sınıf adı, antrenman günleri ve saat aralığını belirleyin. Her sınıf grubu ve saat dilimi için ayrı yoklama alınacaktır.</div>'
+        + '<div class="fgr mb2"><label>Ders / Sınıf Adı *</label><input id="lesson-name" placeholder="Örn: CMT-PZR 09.00-10.00"/></div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Branş</label><select id="lesson-sp">' + AppState.data.sports.map(function(s) { return '<option value="' + s.id + '">' + FormatUtils.escape(s.name) + '</option>'; }).join('') + '</select></div>'
+        + '<div class="fgr"><label>Antrenör</label><select id="lesson-coach"><option value="">Seçiniz</option>' + AppState.data.coaches.map(function(co) { return '<option value="' + co.id + '">' + FormatUtils.escape(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div>'
+        + '</div>'
+        + '<div class="fgr mb2"><label>Antrenman Günleri *</label><div style="padding:8px 0">' + dayCheckboxes + '</div></div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Başlangıç Saati *</label><input type="time" id="lesson-time" value="09:00"/></div>'
+        + '<div class="fgr"><label>Bitiş Saati *</label><input type="time" id="lesson-time-end" value="10:00"/></div>'
+        + '</div>',
+        [
+            { lbl: 'İptal', cls: 'bs', fn: closeModal },
+            { lbl: '📅 Takvime Ekle', cls: 'bp', fn: async function() {
+                var name = UIUtils.getValue('lesson-name');
+                if (!name) { toast('Ders adı zorunludur!', 'e'); return; }
+                var selDays = [];
+                document.querySelectorAll('.lesson-day-cb:checked').forEach(function(cb) { selDays.push(cb.value); });
+                if (selDays.length === 0) { toast('En az bir antrenman günü seçmelisiniz!', 'e'); return; }
+                var time = UIUtils.getValue('lesson-time');
+                var timeEnd = UIUtils.getValue('lesson-time-end');
+                if (!time || !timeEnd) { toast('Başlangıç ve bitiş saati zorunludur!', 'e'); return; }
+
+                var obj = {
+                    id: generateId(),
+                    name: name,
+                    coachId: UIUtils.getValue('lesson-coach'),
+                    spId: UIUtils.getValue('lesson-sp'),
+                    cap: 30,
+                    scheduleDays: selDays,
+                    scheduleTime: time,
+                    scheduleTimeEnd: timeEnd
+                };
+                var result = await DB.upsert('classes', DB.mappers.fromClass(obj));
+                if (result) {
+                    AppState.data.classes.push(obj);
+                    toast('✅ "' + name + '" dersi takvime eklendi!', 'g');
+                    closeModal();
+                    go('settings');
+                }
+            }}
+        ]
+    );
+};
+
+// ── DERSİ TAKVİMDEN SİL ────────────────────────────────────
+window.deleteLessonFromCalendar = async function(classId) {
+    var cls = AppState.data.classes.find(function(c) { return c.id === classId; });
+    if (!cls) { toast('Sınıf bulunamadı!', 'e'); return; }
+
+    modal('⚠️ Ders Silme Onayı',
+        '<p>"<strong>' + FormatUtils.escape(cls.name) + '</strong>" dersini takvimden silmek istediğinize emin misiniz?</p>'
+        + '<p class="ts tm mt2">Bu işlem sınıfı ve takvim programını kalıcı olarak siler. Sporcuların yoklama geçmişi etkilenmez.</p>',
+        [
+            { lbl: 'İptal', cls: 'bs', fn: closeModal },
+            { lbl: '🗑️ Sil', cls: 'bd', fn: async function() {
+                var result = await DB.remove('classes', { id: classId });
+                if (result) {
+                    AppState.data.classes = AppState.data.classes.filter(function(c) { return c.id !== classId; });
+                    toast('🗑️ "' + cls.name + '" dersi takvimden silindi.', 'g');
+                    closeModal();
+                    go('settings');
+                }
+            }}
+        ]
+    );
+};
+
+// ── YOKLAMA SAYFASI — SINIF GRUBU & SAAT BAZLI YOKLAMA ─────
+// pgAttendance zaten yukarıda override edildi (line ~2477)
+// Aşağıda ek olarak: Bugünkü tüm dersler için toplu yoklama özeti
+window.registerGoHook('after', function(page) {
+    if (page !== 'attendance') return;
+    var main = document.getElementById('main');
+    if (!main) return;
+    if (main.querySelector('.per-class-summary')) return;
+
+    var today = AppState.ui.atd || DateUtils.today();
+    var lessons = window.checkLessonExists(today);
+    if (!lessons || lessons.length <= 1) return;
+
+    // Birden fazla ders varsa, her biri için özet göster
+    var summary = '<div class="per-class-summary card mt3" style="border-left:4px solid var(--blue2)">';
+    summary += '<div class="tw6 tsm mb2">📊 Günün Tüm Dersleri — ' + DateUtils.format(today) + '</div>';
+    var attDay = AppState.data.attendance[today] || {};
+
+    lessons.forEach(function(cls) {
+        var athInCls = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; });
+        var present = athInCls.filter(function(a) { return attDay[a.id] === 'P'; }).length;
+        var absent = athInCls.filter(function(a) { return attDay[a.id] === 'A'; }).length;
+        var filled = athInCls.filter(function(a) { return attDay[a.id]; }).length;
+        var ts = (cls.scheduleTime && cls.scheduleTimeEnd) ? cls.scheduleTime + '-' + cls.scheduleTimeEnd : '';
+        var isSelected = AppState.ui.atcls === cls.id;
+
+        summary += '<div class="flex fjb fca" style="padding:8px;margin-bottom:4px;border-radius:8px;background:' + (isSelected ? 'rgba(59,130,246,.12)' : 'var(--bg3)') + ';cursor:pointer" '
+            + 'onclick="AppState.ui.atcls=\'' + FormatUtils.escape(cls.id) + '\';AppState.ui._attDateSet=true;go(\'attendance\')">'
+            + '<div>'
+            + '<div class="tw6 tsm" style="' + (isSelected ? 'color:var(--blue2)' : '') + '">' + FormatUtils.escape(cls.name) + (ts ? ' <span class="tm ts">(' + ts + ')</span>' : '') + '</div>'
+            + '<div class="ts tm">' + athInCls.length + ' sporcu · ' + filled + '/' + athInCls.length + ' yoklama girildi</div>'
+            + '</div>'
+            + '<div class="flex gap2 fca">'
+            + '<span class="ts" style="color:var(--green)">✅' + present + '</span>'
+            + '<span class="ts" style="color:var(--red)">❌' + absent + '</span>'
+            + (isSelected ? '<span style="font-size:11px;background:var(--blue2);color:#fff;padding:2px 8px;border-radius:10px">Aktif</span>' : '')
+            + '</div></div>';
+    });
+    summary += '</div>';
+
+    main.insertAdjacentHTML('beforeend', summary);
+});
+
+console.log('✅ Geliştirme 1-18 uygulandı — script-fixes.js V13');
