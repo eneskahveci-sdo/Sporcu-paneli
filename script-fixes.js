@@ -4578,4 +4578,38 @@ window.generatePaymentHistory = function(athleteId) {
     return html;
 };
 
-console.log('✅ Geliştirme 1-27 uygulandı — script-fixes.js V15');
+// ── GELİŞTİRME 28: Tarayıcı geri tuşu ile uygulama içi navigasyon ──
+(function() {
+    var navByPopState = false;
+    var allowedPages = ['dashboard','athletes','athleteProfile','payments','accounting','attendance','coaches','sports','classes','settings','sms','onkayit','calendar','notifications','inventory'];
+
+    // go() çağrıldığında history'ye state ekle
+    window.registerGoHook('after', function(page, params) {
+        if (navByPopState) { navByPopState = false; return; }
+        if (allowedPages.indexOf(page) === -1) return;
+        var state = { page: page };
+        if (params && typeof params.id === 'string') state.id = params.id;
+        window.history.pushState(state, '', window.location.pathname);
+    });
+
+    // Tarayıcı geri tuşuna basıldığında önceki sayfaya dön
+    window.addEventListener('popstate', function(e) {
+        if (e.state && typeof e.state.page === 'string' && allowedPages.indexOf(e.state.page) !== -1) {
+            navByPopState = true;
+            var params = {};
+            if (typeof e.state.id === 'string') params.id = e.state.id;
+            window.go(e.state.page, params);
+        } else {
+            // İlk sayfa state'i yoksa dashboard'a dön ve geri çıkmayı engelle
+            navByPopState = true;
+            window.history.pushState({ page: 'dashboard' }, '', window.location.pathname);
+            window.go('dashboard');
+        }
+    });
+
+    // Sayfa ilk yüklendiğinde mevcut sayfayı history'ye kaydet
+    var curPage = (typeof AppState !== 'undefined' && AppState.ui && AppState.ui.curPage) ? AppState.ui.curPage : 'dashboard';
+    window.history.replaceState({ page: curPage }, '', window.location.pathname);
+})();
+
+console.log('✅ Geliştirme 1-28 uygulandı — script-fixes.js V15');
