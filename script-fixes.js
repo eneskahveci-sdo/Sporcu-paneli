@@ -2859,7 +2859,7 @@ window.showAddLessonToCalendarModal = function() {
 
     modal('📅 Takvime Yeni Ders Ekle',
         '<div class="al al-b mb3" style="font-size:12px">Ders eklemek için sınıf adı, antrenman günleri ve saat aralığını belirleyin. Her sınıf grubu ve saat dilimi için ayrı yoklama alınacaktır.</div>'
-        + '<div class="fgr mb2"><label>Ders / Sınıf Adı *</label><input id="lesson-name" placeholder="Örn: CMT-PZR 09.00-10.00"/></div>'
+        + '<div class="fgr mb2"><label>Ders / Sınıf Adı *</label><input id="lesson-name" placeholder="Örn: CMT-PZR 09:00-10:00"/></div>'
         + '<div class="g21 mb2">'
         + '<div class="fgr"><label>Branş</label><select id="lesson-sp">' + AppState.data.sports.map(function(s) { return '<option value="' + s.id + '">' + FormatUtils.escape(s.name) + '</option>'; }).join('') + '</select></div>'
         + '<div class="fgr"><label>Antrenör</label><select id="lesson-coach"><option value="">Seçiniz</option>' + AppState.data.coaches.map(function(co) { return '<option value="' + co.id + '">' + FormatUtils.escape(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div>'
@@ -2886,7 +2886,7 @@ window.showAddLessonToCalendarModal = function() {
                     name: name,
                     coachId: UIUtils.getValue('lesson-coach'),
                     spId: UIUtils.getValue('lesson-sp'),
-                    cap: 30,
+                    cap: 20,
                     scheduleDays: selDays,
                     scheduleTime: time,
                     scheduleTimeEnd: timeEnd
