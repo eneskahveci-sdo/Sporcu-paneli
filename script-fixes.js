@@ -2862,7 +2862,8 @@ window.takeLessonAttendance = function(date, classId) {
 
                 // Öğrenci alt listesi - aç/kapat
                 classListHtml += '<div style="margin-top:6px">';
-                classListHtml += '<button onclick="var el=document.getElementById(\'' + clsUid + '\');if(el){el.style.display=el.style.display===\'none\'?\'block\':\'none\';this.textContent=el.style.display===\'none\'?\'▸ Öğrenciler (' + students.length + ')\':\'▾ Öğrenciler (' + students.length + ')\'}" '
+                classListHtml += '<button onclick="toggleClassStudents(\'' + clsUid + '\',this,' + students.length + ')" '
+                    + 'aria-expanded="false" aria-controls="' + clsUid + '" '
                     + 'style="background:none;border:none;color:var(--blue2);font-size:12px;font-weight:600;cursor:pointer;padding:2px 0">▸ Öğrenciler (' + students.length + ')</button>';
                 classListHtml += '<div id="' + clsUid + '" style="display:none;margin-top:4px">';
 
@@ -2915,6 +2916,16 @@ window.takeLessonAttendance = function(date, classId) {
         return baseHtml + lessonCard;
     };
 })();
+
+// ── SINIF ÖĞRENCİ LİSTESİ AÇ/KAPAT ─────────────────────────
+window.toggleClassStudents = function(elId, btn, count) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var isHidden = el.style.display === 'none';
+    el.style.display = isHidden ? 'block' : 'none';
+    btn.textContent = (isHidden ? '▾' : '▸') + ' Öğrenciler (' + count + ')';
+    btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+};
 
 // ── YENİ DERS EKLEME MODALI ─────────────────────────────────
 window.showAddLessonToCalendarModal = function() {
