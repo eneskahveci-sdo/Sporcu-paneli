@@ -3893,6 +3893,11 @@ window.loadInventoryData = async function() {
 // ── Envanter sayfası: go('inventory') hook ───────────────────────
 window.registerGoHook('before', function(page) {
     if (page === 'inventory') {
+        // Coach erişimi engelle
+        if (AppState.currentUser && AppState.currentUser.role === 'coach') {
+            toast('Bu sayfaya erişim yetkiniz yok.', 'e');
+            return false;
+        }
         var main = document.getElementById('main');
         if (!main) return false;
         main.style.opacity = '0';
@@ -4522,19 +4527,5 @@ window.generatePaymentHistory = function(athleteId) {
 
     return html;
 };
-
-// ── Coach restriction: inventory sayfa erişimi engelle ───────────
-(function() {
-    var origGo = window.go;
-    var _goPatched = false;
-    function patchGo() {
-        if (_goPatched) return;
-        if (typeof window.go !== 'function') return;
-        _goPatched = true;
-        var _prevGo = window.go;
-        // Coach cannot access inventory
-        // Already handled by before hook returning false
-    }
-})();
 
 console.log('✅ Geliştirme 1-27 uygulandı — script-fixes.js V15');
