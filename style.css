@@ -482,3 +482,12 @@ html:not([data-theme]) .sp-nav{
 background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62));
 }
 }
+
+/* ===== MESSAGES TAB BADGE ===== */
+#sp-msg-badge{
+    background:#ef4444;color:#fff;font-size:10px;font-weight:800;
+    min-width:18px;height:18px;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    padding:0 4px;line-height:1;pointer-events:none;
+    animation:badge-pop .3s ease;
+}
