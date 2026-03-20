@@ -2079,8 +2079,8 @@ function initBranchChart() {
 
 // ── FULLCALENDAR ────────────────────────────────────────────
 function pgCalendar() {
-    return '<div class="ph"><div class="stit">📅 Antrenman Takvimi</div></div>'
-        + '<div class="card" style="min-height:500px"><div id="fc-calendar"></div></div>';
+    return '<div class="ph" style="margin-bottom:12px"><div class="stit" style="font-size:18px;font-weight:700">📅 Antrenman Takvimi</div></div>'
+        + '<div class="card" style="min-height:400px;padding:12px"><div id="fc-calendar"></div></div>';
 }
 window.pgCalendar = pgCalendar;
 
@@ -2142,7 +2142,8 @@ function initCalendarChart() {
 
     var cal = new FullCalendar.Calendar(el, {
         initialView: 'dayGridMonth', locale: 'tr',
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+        firstDay: 1,
+        headerToolbar: { left: 'prev,next', center: 'title', right: 'today' },
         buttonText: { today: 'Bugün', month: 'Ay', list: 'Liste' },
         events: events,
         eventClick: function(info) {
@@ -2821,6 +2822,71 @@ window.takeLessonAttendance = function(date, classId) {
             todayInfo = '<div class="al al-y mb3" style="font-size:13px">📅 Bugün için planlanmış ders bulunmuyor.</div>';
         }
 
+        // ── Mevcut Sınıflar Listesi ─────────────────────────────
+        var allClasses = AppState.data.classes || [];
+        var classListHtml = '';
+        if (allClasses.length === 0) {
+            classListHtml = '<p class="tm ts" style="text-align:center;padding:12px">Henüz sınıf bulunmuyor.</p>';
+        } else {
+            allClasses.forEach(function(cls) {
+                var sport = cls.spId ? (AppState.data.sports || []).find(function(s) { return s.id === cls.spId; }) : null;
+                var branchName = sport ? sport.name : '-';
+                var coachStr = cls.coachId ? coachName(cls.coachId) : '-';
+                var dayStr = (cls.scheduleDays && cls.scheduleDays.length > 0)
+                    ? cls.scheduleDays.map(function(d) { return dayMap[d] || d; }).join(', ')
+                    : '-';
+                var timeStr = (cls.scheduleTime && cls.scheduleTimeEnd)
+                    ? cls.scheduleTime + ' – ' + cls.scheduleTimeEnd
+                    : (cls.scheduleTime || '-');
+                // Öğrenci eşleşmesi: clsId (cls_id) üzerinden
+                var students = (AppState.data.athletes || []).filter(function(a) { return a.clsId === cls.id; });
+                var activeCount = students.filter(function(a) { return a.st === 'active'; }).length;
+                var clsUid = 'cls-stu-' + (cls.id || '').replace(/[^a-zA-Z0-9]/g, '');
+
+                classListHtml += '<div style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:8px">';
+
+                // Sınıf bilgileri - kompakt satır
+                classListHtml += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">';
+                classListHtml += '<div style="flex:1;min-width:0">';
+                classListHtml += '<div style="font-weight:600;font-size:13px;margin-bottom:2px">' + FormatUtils.escape(cls.name || '') + '</div>';
+                classListHtml += '<div style="font-size:12px;color:var(--text2);line-height:1.6">'
+                    + 'Branş: ' + FormatUtils.escape(branchName)
+                    + ' · Antrenör: ' + FormatUtils.escape(coachStr)
+                    + '<br>Günler: ' + FormatUtils.escape(dayStr)
+                    + ' · Saat: ' + FormatUtils.escape(timeStr)
+                    + ' · <strong>' + activeCount + '</strong> öğrenci'
+                    + '</div>';
+                classListHtml += '</div>';
+                classListHtml += '<button class="btn btn-xs bs" onclick="editClass(\'' + FormatUtils.escape(cls.id) + '\')" style="flex-shrink:0">✏️</button>';
+                classListHtml += '</div>';
+
+                // Öğrenci alt listesi - aç/kapat
+                classListHtml += '<div style="margin-top:6px">';
+                classListHtml += '<button onclick="toggleClassStudents(\'' + clsUid + '\',this,' + students.length + ')" '
+                    + 'aria-expanded="false" aria-controls="' + clsUid + '" '
+                    + 'style="background:none;border:none;color:var(--blue2);font-size:12px;font-weight:600;cursor:pointer;padding:2px 0">▸ Öğrenciler (' + students.length + ')</button>';
+                classListHtml += '<div id="' + clsUid + '" style="display:none;margin-top:4px">';
+
+                if (students.length === 0) {
+                    classListHtml += '<div style="font-size:12px;color:var(--text3);padding:4px 0">Bu sınıfta öğrenci yok.</div>';
+                } else {
+                    students.forEach(function(ath) {
+                        var fullName = ((ath.fn || '') + ' ' + (ath.ln || '')).trim() || '-';
+                        var stLabel = ath.st === 'active'
+                            ? '<span style="color:var(--green);font-size:11px">● Aktif</span>'
+                            : '<span style="color:var(--text3);font-size:11px">● Pasif</span>';
+                        classListHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;border-bottom:1px solid var(--border)">'
+                            + '<span style="color:var(--text)">' + FormatUtils.escape(fullName) + '</span>'
+                            + stLabel
+                            + '</div>';
+                    });
+                }
+
+                classListHtml += '</div></div>';
+                classListHtml += '</div>';
+            });
+        }
+
         var lessonCard = '<div class="card mb3" style="border-left:4px solid var(--blue2)">'
             + '<div class="flex fjb fca mb3">'
             + '<div>'
@@ -2835,6 +2901,10 @@ window.takeLessonAttendance = function(date, classId) {
             + 'ℹ️ Her sınıf grubu ve saat dilimi için ayrı yoklama alınır. '
             + 'Örn: CMT-PZR 09:00-10:00 ve CMT-PZR 10:00-11:00 grupları ayrı yoklama listesine sahiptir.'
             + '</div>'
+            + '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">'
+            + '<div class="tw6 tsm mb2">📋 Mevcut Sınıflar</div>'
+            + classListHtml
+            + '</div>'
             + '</div>';
 
         // Ders yönetimi kartını ayarlar sayfasının başına ekle (role yönetiminden sonra)
@@ -2846,6 +2916,16 @@ window.takeLessonAttendance = function(date, classId) {
         return baseHtml + lessonCard;
     };
 })();
+
+// ── SINIF ÖĞRENCİ LİSTESİ AÇ/KAPAT ─────────────────────────
+window.toggleClassStudents = function(elId, btn, count) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var isHidden = el.style.display === 'none';
+    el.style.display = isHidden ? 'block' : 'none';
+    btn.textContent = (isHidden ? '▾' : '▸') + ' Öğrenciler (' + count + ')';
+    btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+};
 
 // ── YENİ DERS EKLEME MODALI ─────────────────────────────────
 window.showAddLessonToCalendarModal = function() {
