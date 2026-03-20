@@ -3049,4 +3049,707 @@ window.registerGoHook('after', function(page) {
     main.insertAdjacentHTML('beforeend', summary);
 });
 
-console.log('✅ Geliştirme 1-18 uygulandı — script-fixes.js V13');
+// ═══════════════════════════════════════════════════════════════════
+// GELİŞTİRME 19-21: Bildirimler, Mesajlar, Ödeme Tipi Ayrımı
+// ═══════════════════════════════════════════════════════════════════
+
+// ── PAYMENT MAPPER: payment_type desteği ──────────────────────────
+(function() {
+    function extendPaymentMappers() {
+        if (!window.DB || !DB.mappers || !DB.mappers.toPayment) return false;
+
+        var _prevToPayment = DB.mappers.toPayment;
+        DB.mappers.toPayment = function(r) {
+            var base = _prevToPayment(r);
+            base.paymentType = r.payment_type || 'aidat';
+            return base;
+        };
+
+        var _prevFromPayment = DB.mappers.fromPayment;
+        DB.mappers.fromPayment = function(p) {
+            var base = _prevFromPayment(p);
+            base.payment_type = p.paymentType || 'aidat';
+            return base;
+        };
+
+        console.log('✅ payment_type mapper eklendi');
+        return true;
+    }
+
+    if (!extendPaymentMappers()) {
+        [200, 500, 1000, 2000, 3000].forEach(function(d) {
+            setTimeout(function() { extendPaymentMappers(); }, d);
+        });
+    }
+})();
+
+// ── NOTIFICATIONS PAGE (Admin & Antrenör) ─────────────────────────
+window.pgNotificationsPage = function() {
+    var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
+    var senderRole = isCoach ? 'coach' : 'admin';
+    var senderName = AppState.currentUser ? AppState.currentUser.name : 'Yönetici';
+
+    // Sporcu listesi — antrenör sadece kendi sınıflarındaki sporcuları görsün
+    var athletes = AppState.data.athletes.filter(function(a) { return a.st === 'active'; });
+    if (isCoach) {
+        var coachRecord = AppState.data.coaches.find(function(c) { return c.id === AppState.currentUser.id; })
+            || AppState.data.coaches.find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
+            || null;
+        var myClassIds = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
+        athletes = athletes.filter(function(a) { return myClassIds.indexOf(a.clsId) > -1; });
+    }
+
+    var athleteItems = athletes.map(function(a) {
+        return '<label class="ms-item" data-name="' + FormatUtils.escape((a.fn + ' ' + a.ln).toLowerCase()) + '">'
+            + '<input type="checkbox" class="notif-ath-cb" value="' + FormatUtils.escape(a.id) + '"/>'
+            + '<span>' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</span></label>';
+    }).join('');
+
+    var html = '<div class="ph"><div class="stit">📨 Bildirimler</div>'
+        + '<div class="ssub">' + (isCoach ? 'Grubunuzdaki sporculara mesaj gönderin' : 'Sporculara mesaj gönderin ve bildirim yönetimi') + '</div></div>';
+
+    // ── Mesaj gönderme formu ──
+    html += '<div class="card mb3" style="border-left:4px solid var(--blue2)">'
+        + '<div class="tw6 tsm mb3">✉️ Yeni Mesaj Gönder</div>';
+
+    if (athletes.length === 0) {
+        html += '<div class="al al-y">⚠️ Gönderilebilecek sporcu bulunamadı.</div>';
+    } else {
+        html += '<div class="fgr mb2"><label>Alıcı Sporcu(lar) *</label>'
+            + '<input id="notif-ath-search" type="text" placeholder="Sporcu ara..." oninput="filterNotifAthletes()" style="margin-bottom:6px"/>'
+            + '<div class="flex gap2 mb2">'
+            + '<button type="button" class="btn btn-xs bs" onclick="toggleAllNotifAthletes(true)">✅ Tümünü Seç</button>'
+            + '<button type="button" class="btn btn-xs bd" onclick="toggleAllNotifAthletes(false)">✕ Temizle</button>'
+            + '</div>'
+            + '<div id="notif-ath-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">' + athleteItems + '</div>'
+            + '<div id="notif-ath-tags" class="flex fwrap gap1 mt1" style="min-height:0"></div>'
+            + '</div>';
+
+        html += '<div class="fgr mb2"><label>Mesaj Başlığı</label>'
+            + '<input id="notif-title" type="text" placeholder="Başlık (opsiyonel)"/></div>';
+
+        html += '<div class="fgr mb2"><label>Mesaj İçeriği *</label>'
+            + '<textarea id="notif-body" rows="4" placeholder="Mesajınızı yazın..."></textarea></div>';
+
+        html += '<button class="btn bp w100" onclick="sendNotifMessage()">📤 Mesaj Gönder</button>';
+    }
+    html += '</div>';
+
+    // ── Mesaj geçmişi ──
+    html += '<div class="card" id="notif-history-card"><div class="tw6 tsm mb2">📋 Gönderilen Mesajlar</div>'
+        + '<div id="notif-history" style="min-height:40px"><div style="text-align:center;padding:20px;color:var(--text2)">⏳ Yükleniyor...</div></div></div>';
+
+    return html;
+};
+
+// ── Sporcu filtre/seçim fonksiyonları ─────────────────────────────
+window.filterNotifAthletes = function() {
+    var q = (document.getElementById('notif-ath-search') || {}).value || '';
+    q = q.toLowerCase();
+    document.querySelectorAll('#notif-ath-list .ms-item').forEach(function(el) {
+        el.style.display = (el.dataset.name || '').indexOf(q) > -1 ? '' : 'none';
+    });
+};
+
+window.toggleAllNotifAthletes = function(check) {
+    document.querySelectorAll('#notif-ath-list .notif-ath-cb').forEach(function(cb) {
+        if (check) { if (cb.closest('.ms-item').style.display !== 'none') cb.checked = true; }
+        else cb.checked = false;
+    });
+    _updateNotifTags();
+};
+
+function _updateNotifTags() {
+    var tags = document.getElementById('notif-ath-tags');
+    if (!tags) return;
+    var checked = document.querySelectorAll('#notif-ath-list .notif-ath-cb:checked');
+    if (checked.length === 0) { tags.innerHTML = ''; return; }
+    var html = '';
+    checked.forEach(function(cb) {
+        var label = cb.closest('.ms-item');
+        var name = label ? label.querySelector('span').textContent : '';
+        html += '<span class="ath-tag">' + FormatUtils.escape(name) + ' <span class="ath-tag-x" onclick="document.querySelector(\'.notif-ath-cb[value=&quot;' + cb.value + '&quot;]\').checked=false;_updateNotifTags()">✕</span></span>';
+    });
+    tags.innerHTML = '<span class="ts tm" style="margin-right:4px">' + checked.length + ' seçili:</span>' + html;
+}
+
+// ── Mesaj gönder ─────────────────────────────────────────────────
+window.sendNotifMessage = async function() {
+    var checked = document.querySelectorAll('#notif-ath-list .notif-ath-cb:checked');
+    var title = (document.getElementById('notif-title') || {}).value || '';
+    var body = (document.getElementById('notif-body') || {}).value || '';
+
+    if (checked.length === 0) { toast('En az bir sporcu seçiniz!', 'e'); return; }
+    if (!body.trim()) { toast('Mesaj içeriği yazınız!', 'e'); return; }
+
+    var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
+    var senderRole = isCoach ? 'coach' : 'admin';
+    var senderName = AppState.currentUser ? AppState.currentUser.name : 'Yönetici';
+    var senderId = AppState.currentUser ? AppState.currentUser.id : '';
+
+    var sb = window.supabase || (typeof createClient !== 'undefined' ? null : null);
+    if (!sb && window.AppState && AppState._sb) sb = AppState._sb;
+    if (!sb) { toast('Bağlantı hatası!', 'e'); return; }
+
+    var sent = 0;
+    var errors = 0;
+
+    for (var i = 0; i < checked.length; i++) {
+        var cb = checked[i];
+        var ath = AppState.data.athletes.find(function(a) { return a.id === cb.value; });
+        var recipientName = ath ? ath.fn + ' ' + ath.ln : '';
+
+        var msgObj = {
+            org_id: AppState.currentOrgId || '',
+            branch_id: AppState.currentBranchId || '',
+            sender_id: senderId,
+            sender_name: senderName,
+            sender_role: senderRole,
+            recipient_id: cb.value,
+            recipient_name: recipientName,
+            title: title.trim(),
+            body: body.trim(),
+            is_read: false
+        };
+
+        try {
+            var result = await sb.from('messages').insert(msgObj);
+            if (result.error) { console.error('Mesaj gönderme hatası:', result.error); errors++; }
+            else { sent++; }
+        } catch(e) { console.error('Mesaj gönderme exception:', e); errors++; }
+    }
+
+    if (sent > 0) {
+        toast('✅ ' + sent + ' sporcuya mesaj gönderildi!', 'g');
+        // Formu temizle
+        var titleEl = document.getElementById('notif-title');
+        var bodyEl = document.getElementById('notif-body');
+        if (titleEl) titleEl.value = '';
+        if (bodyEl) bodyEl.value = '';
+        document.querySelectorAll('#notif-ath-list .notif-ath-cb:checked').forEach(function(cb) { cb.checked = false; });
+        _updateNotifTags();
+        // Geçmişi yenile
+        _loadNotifHistory();
+    }
+    if (errors > 0) { toast('⚠️ ' + errors + ' mesaj gönderilemedi.', 'e'); }
+};
+
+// ── Mesaj geçmişi yükle ──────────────────────────────────────────
+function _loadNotifHistory() {
+    var sb = window.supabase || (AppState._sb ? AppState._sb : null);
+    if (!sb) return;
+
+    var container = document.getElementById('notif-history');
+    if (!container) return;
+
+    var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
+    var senderId = AppState.currentUser ? AppState.currentUser.id : '';
+
+    var query = sb.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
+    if (isCoach) {
+        query = query.eq('sender_id', senderId);
+    }
+
+    query.then(function(res) {
+        if (res.error) {
+            container.innerHTML = '<div class="al al-r">Mesaj geçmişi yüklenemedi.</div>';
+            return;
+        }
+        var data = res.data || [];
+        if (data.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:8px">📭</div><div class="tw6 ts">Henüz gönderilmiş mesaj yok</div></div>';
+            return;
+        }
+
+        var html = '';
+        data.forEach(function(m) {
+            var dt = m.created_at ? new Date(m.created_at) : null;
+            var dateStr = dt ? dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+            var roleLabel = m.sender_role === 'coach' ? '🏃 Antrenör' : '👤 Yönetici';
+            html += '<div style="padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">'
+                + '<div class="flex fjb fca fwrap gap1">'
+                + '<div style="flex:1;min-width:0">'
+                + (m.title ? '<div class="tw6 tsm">' + FormatUtils.escape(m.title) + '</div>' : '')
+                + '<div class="ts" style="word-break:break-word;white-space:pre-wrap;margin-top:2px">' + FormatUtils.escape(m.body) + '</div>'
+                + '</div>'
+                + '<div style="text-align:right;flex-shrink:0">'
+                + '<div class="ts tm">' + FormatUtils.escape(m.recipient_name || '') + '</div>'
+                + '<div style="font-size:11px;color:var(--text3)">' + dateStr + '</div>'
+                + '<div style="font-size:11px;color:var(--text3)">' + roleLabel + '</div>'
+                + '</div></div></div>';
+        });
+        container.innerHTML = html;
+    });
+}
+
+// ── NOTIFICATIONS PAGE'İ go() SİSTEMİNE EKLE ─────────────────────
+window.registerGoHook('before', function(page) {
+    if (page === 'notifications') {
+        var main = document.getElementById('main');
+        if (!main) return false;
+        main.style.opacity = '0';
+        setTimeout(function() {
+            main.innerHTML = pgNotificationsPage();
+            main.style.opacity = '1';
+            // Checkbox tıklanınca tag güncelle
+            setTimeout(function() {
+                document.querySelectorAll('#notif-ath-list .notif-ath-cb').forEach(function(cb) {
+                    cb.addEventListener('change', _updateNotifTags);
+                });
+                _loadNotifHistory();
+            }, 50);
+        }, 100);
+
+        document.querySelectorAll('.ni').forEach(function(el) {
+            el.classList.toggle('on', el.id === 'ni-notifications');
+        });
+        document.querySelectorAll('.bni-btn').forEach(function(el) {
+            el.classList.remove('on');
+        });
+        if (typeof closeSide === 'function') closeSide();
+        AppState.ui.curPage = 'notifications';
+        return false; // Prevent default go() handling
+    }
+});
+
+// ── updateBranchUI: Antrenör panelinde Bildirimler butonunu göster ──
+var _origUpdateBranchUI3 = typeof updateBranchUI === 'function' ? updateBranchUI : null;
+window.updateBranchUI = function() {
+    if (_origUpdateBranchUI3) _origUpdateBranchUI3();
+    if (AppState.currentUser && AppState.currentUser.role === 'coach') {
+        // Bildirimler butonu antrenör için görünür olsun
+        var notifBtn = document.getElementById('ni-notifications');
+        if (notifBtn) notifBtn.style.display = '';
+        // Eski SMS butonu gizli kalmalı
+        var smsBtn = document.getElementById('ni-sms');
+        if (smsBtn) smsBtn.style.display = 'none';
+    }
+};
+
+// ── SPORCU MESAJLAR SEKMESİ ──────────────────────────────────────
+window.spMesajlar = function() {
+    var a = AppState.currentSporcu;
+    if (!a) return '<div class="empty-state"><div style="font-size:44px;margin-bottom:10px">📭</div><div class="tw6 ts">Mesaj bulunmuyor</div></div>';
+
+    return '<div style="text-align:center;padding:40px;color:var(--text2)">⏳ Mesajlar yükleniyor...</div>';
+};
+
+function _loadSporcuMessages() {
+    var a = AppState.currentSporcu;
+    if (!a) return;
+
+    var sb = window.supabase || (AppState._sb ? AppState._sb : null);
+    if (!sb) return;
+
+    var container = document.getElementById('sp-content');
+    if (!container) return;
+
+    sb.from('messages')
+        .select('*')
+        .eq('recipient_id', a.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+        .then(function(res) {
+            if (res.error) {
+                container.innerHTML = '<div class="al al-r" style="margin:20px">Mesajlar yüklenemedi.</div>';
+                return;
+            }
+
+            var data = res.data || [];
+
+            // Rozet güncelle
+            var unread = data.filter(function(m) { return !m.is_read; }).length;
+            _updateMsgBadge(unread);
+
+            if (data.length === 0) {
+                container.innerHTML = '<div class="empty-state" style="margin-top:40px"><div style="font-size:56px;margin-bottom:12px">📭</div><div class="tw6" style="font-size:16px;margin-bottom:4px">Mesaj Bulunmuyor</div><div class="ts tm">Yönetici veya antrenörünüzden gelen mesajlar burada görünecektir.</div></div>';
+                return;
+            }
+
+            var html = '<div style="max-width:800px;margin:0 auto">';
+            html += '<div class="tw6 tsm mb3">📩 Mesajlarım (' + data.length + ')</div>';
+
+            data.forEach(function(m) {
+                var dt = m.created_at ? new Date(m.created_at) : null;
+                var dateStr = dt ? dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+                var roleLabel = m.sender_role === 'coach' ? '🏃 Antrenör' : '👤 Yönetici';
+                var isUnread = !m.is_read;
+                var borderColor = isUnread ? 'var(--blue2)' : 'var(--border)';
+                var bgStyle = isUnread ? 'background:rgba(59,130,246,.06);' : '';
+
+                html += '<div class="card mb2" style="border-left:3px solid ' + borderColor + ';' + bgStyle + 'padding:16px" data-msg-id="' + FormatUtils.escape(m.id) + '">';
+
+                if (m.title) {
+                    html += '<div class="flex fjb fca mb1">'
+                        + '<div class="tw6 tsm">' + FormatUtils.escape(m.title) + '</div>'
+                        + (isUnread ? '<span class="bg bg-b" style="font-size:10px">Yeni</span>' : '')
+                        + '</div>';
+                } else if (isUnread) {
+                    html += '<div style="text-align:right;margin-bottom:4px"><span class="bg bg-b" style="font-size:10px">Yeni</span></div>';
+                }
+
+                html += '<div class="ts" style="word-break:break-word;white-space:pre-wrap;line-height:1.6;color:var(--text);margin-bottom:8px">' + FormatUtils.escape(m.body) + '</div>';
+                html += '<div class="flex fjb fca" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">'
+                    + '<span style="font-size:11px;color:var(--text3)">' + roleLabel + (m.sender_name ? ' · ' + FormatUtils.escape(m.sender_name) : '') + '</span>'
+                    + '<span style="font-size:11px;color:var(--text3)">' + dateStr + '</span>'
+                    + '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+
+            // Okunmamış mesajları okundu olarak işaretle
+            var unreadIds = data.filter(function(m) { return !m.is_read; }).map(function(m) { return m.id; });
+            if (unreadIds.length > 0) {
+                sb.from('messages').update({ is_read: true }).in('id', unreadIds).then(function() {
+                    // Rozeti güncelle
+                    setTimeout(function() { _updateMsgBadge(0); }, 1500);
+                });
+            }
+        });
+}
+
+function _updateMsgBadge(count) {
+    var badge = document.getElementById('sp-msg-badge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('dn');
+    } else {
+        badge.classList.add('dn');
+    }
+}
+
+// ── Sporcu portal: mesajlar sekmesi desteği ──────────────────────
+// spTab override — mesajlar sekmesini ekle
+var _prevSpTab = window.spTab;
+window.spTab = function(tab) {
+    if (tab === 'odeme-yap') tab = 'odemeler';
+
+    document.querySelectorAll('.sp-tab').forEach(function(el) {
+        var elTab = el.getAttribute('data-tab');
+        if (elTab) {
+            el.classList.toggle('on', elTab === tab);
+            if (elTab === tab) el.setAttribute('aria-selected', 'true');
+            else el.setAttribute('aria-selected', 'false');
+        }
+    });
+
+    var content = document.getElementById('sp-content');
+    var pages = {
+        'profil': spProfil,
+        'yoklama': spYoklama,
+        'odemeler': spOdemeler,
+        'mesajlar': spMesajlar
+    };
+
+    if (tab === 'odemeler' && AppState.currentSporcu) {
+        if (content) content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)">⏳ Yükleniyor...</div>';
+        refreshSporcuPayments().then(function() {
+            if (content && pages[tab]) content.innerHTML = pages[tab]();
+        });
+        return;
+    }
+
+    if (tab === 'mesajlar') {
+        if (content) content.innerHTML = spMesajlar();
+        _loadSporcuMessages();
+        return;
+    }
+
+    if (content && pages[tab]) content.innerHTML = pages[tab]();
+};
+
+// ── Sporcu portal yüklendiğinde mesaj sayısını kontrol et ────────
+function _checkUnreadMessages() {
+    var a = AppState.currentSporcu;
+    if (!a) return;
+
+    var sb = window.supabase || (AppState._sb ? AppState._sb : null);
+    if (!sb) return;
+
+    sb.from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_id', a.id)
+        .eq('is_read', false)
+        .then(function(res) {
+            if (res.error) return;
+            _updateMsgBadge(res.count || 0);
+        });
+}
+
+// Portal açıldığında rozeti kontrol et
+// Her tab geçişinde de kontrol et (spTab override zaten yapıldı)
+// İlk açılışta kontrol et
+setTimeout(function() {
+    if (AppState.currentSporcu) _checkUnreadMessages();
+}, 1500);
+// MutationObserver ile sporcu portal görünür olunca kontrol et
+(function() {
+    var portal = document.getElementById('sporcu-portal');
+    if (portal) {
+        var obs = new MutationObserver(function() {
+            if (portal.style.display === 'flex') {
+                setTimeout(_checkUnreadMessages, 500);
+                obs.disconnect();
+            }
+        });
+        obs.observe(portal, { attributes: true, attributeFilter: ['style'] });
+    }
+})();
+
+// ── ÖDEMELER: AYDINLAR / SPOR MALZEMELERİ ALT TABLARI ───────────
+var _origSpOdemeler = window.spOdemeler;
+window.spOdemeler = function() {
+    var a = AppState.currentSporcu;
+    if (!a) return '';
+
+    var activeSubTab = AppState.ui.spPaySubTab || 'aidat';
+
+    // Alt tab bar
+    var html = '<div class="tab-nav mb3" style="max-width:400px">'
+        + '<button class="tab-btn ' + (activeSubTab === 'aidat' ? 'active' : '') + '" onclick="AppState.ui.spPaySubTab=\'aidat\';document.getElementById(\'sp-content\').innerHTML=spOdemeler()">💰 Aidatlar</button>'
+        + '<button class="tab-btn ' + (activeSubTab === 'spor_malzemesi' ? 'active' : '') + '" onclick="AppState.ui.spPaySubTab=\'spor_malzemesi\';document.getElementById(\'sp-content\').innerHTML=spOdemeler()">🏋️ Spor Malzemeleri</button>'
+        + '</div>';
+
+    // Filtrelenmiş ödeme verileri
+    var s = AppState.data.settings || {};
+    var hasPayTR = s && s.paytrActive && s.paytrMerchantId;
+    var hasBank = s && (s.iban || s.bankName);
+
+    var allPayments = AppState.data.payments.filter(function(p) { return p.aid === a.id; });
+    var typePayments = allPayments.filter(function(p) { return (p.paymentType || 'aidat') === activeSubTab; });
+
+    var completed = typePayments.filter(function(p) { return p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
+    var pending = typePayments.filter(function(p) { return p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
+    var pendingPayments = typePayments.filter(function(p) { return p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return x.dt.localeCompare(y.dt); });
+    var totalPaid = completed.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
+    var totalDebt = pendingPayments.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
+    var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
+    var mLabel = function(m) { return ({ nakit: 'Nakit', kredi_karti: 'Kredi Kartı', havale: 'Havale/EFT', paytr: 'PayTR Online' })[m] || (m || 'Ödeme'); };
+
+    var tabLabel = activeSubTab === 'aidat' ? 'Aidat' : 'Spor Malzemesi';
+
+    // ── Özet istatistikler ──
+    html += '<div class="sp-stats-row mb3"><div class="stat-box"><div class="stat-box-value tg">' + FormatUtils.currency(totalPaid) + '</div><div class="stat-box-label">Ödenen (' + tabLabel + ')</div></div><div class="stat-box"><div class="stat-box-value ' + (totalDebt > 0 ? 'tr2' : 'tg') + '">' + FormatUtils.currency(totalDebt) + '</div><div class="stat-box-label">Borç (' + tabLabel + ')</div></div><div class="stat-box"><div class="stat-box-value ' + (pending.length > 0 ? 'to' : 'tg') + '">' + pending.length + '</div><div class="stat-box-label">Onay Bekleyen</div></div></div>';
+
+    // ── Bekleyen ödemeler ──
+    if (pendingPayments.length > 0) {
+        var planRows = '';
+        pendingPayments.forEach(function(p) {
+            var isOverdue = p.st === 'overdue';
+            var today = typeof DateUtils !== 'undefined' ? DateUtils.today() : new Date().toISOString().slice(0, 10);
+            var isLate = !isOverdue && p.dt && p.dt < today;
+            var badge = (isOverdue || isLate)
+                ? '<span class="bg bg-r">Gecikmiş</span>'
+                : '<span class="bg bg-y">Bekliyor</span>';
+            planRows += '<div class="sp-plan-cb-row" onclick="var cb=this.querySelector(\'.sp-plan-cb\');cb.checked=!cb.checked;this.classList.toggle(\'checked\',cb.checked);_spUpdateBulkTotal()">'
+                + '<input type="checkbox" class="sp-plan-cb" value="' + FormatUtils.escape(p.id) + '" data-amt="' + (p.amt || 0) + '" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'checked\',this.checked);_spUpdateBulkTotal()"/>'
+                + '<div style="flex:1;min-width:0">'
+                + '<div class="tw6 ts">' + ((isOverdue || isLate) ? '⚠️ ' : '📅 ') + FormatUtils.escape(p.ds || p.serviceName || tabLabel) + '</div>'
+                + '<div class="ts tm mt1">Vade: ' + DateUtils.format(p.dt) + '</div>'
+                + '</div>'
+                + '<div style="text-align:right;flex-shrink:0">'
+                + '<div class="tw6 ts tg">' + FormatUtils.currency(p.amt) + '</div>'
+                + badge
+                + '</div></div>';
+        });
+
+        html += '<div class="card mb3" style="border-left:3px solid var(--red)">';
+        html += '<div class="tw6 ts mb2" style="color:var(--red)">📋 Bekleyen ' + tabLabel + ' Ödemelerim (' + pendingPayments.length + ')</div>';
+
+        html += '<div class="sp-debt-bar mb3"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span class="ts tm">Toplam Bekleyen Borç</span><span class="tw6 tr2">' + FormatUtils.currency(totalDebt) + '</span></div><div class="prb"><div style="height:100%;background:var(--red);border-radius:4px;width:100%"></div></div></div>';
+
+        html += '<div class="flex fjb fca gap2 mb2"><button type="button" class="btn btn-xs bs" onclick="selectAllSpPlans()">✅ Tümünü Seç</button><div id="sp-bulk-total" class="sp-bulk-total" style="display:none"><span class="ts tm">Seçilen toplam:</span><span class="tw6 tg" id="sp-bulk-total-val">₺0</span></div></div>';
+        html += '<button class="btn bp w100 mb3" id="sp-bulk-pay-btn" style="display:none" onclick="spPayBulk()">💳 Seçilenleri Öde</button>';
+
+        html += '<div class="plan-list" style="gap:8px">' + planRows + '</div>';
+        html += '</div>';
+    }
+
+    // ── Ödeme formu ──
+    html += '<div class="card mb3" id="sp-pay-form" style="display:none">';
+    html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
+    html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
+    html += '<div class="pay-choice-grid mb3">';
+    if (hasBank) {
+        html += '<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice(\'havale\')"><div class="pay-choice-icon">🏦</div><div class="pay-choice-title">Havale / EFT</div><div class="pay-choice-desc">Banka havalesi veya EFT ile ödeme yapın</div></div>';
+    }
+    if (hasPayTR) {
+        html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
+    }
+    if (!hasBank && !hasPayTR) {
+        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
+    }
+    html += '</div>';
+    html += '<div id="pay-method-detail" class="mb2"></div>';
+    html += '<div class="fgr mb2 dn" id="sp-desc-wrapper"><label>Açıklama <span class="tm ts">(opsiyonel)</span></label><input id="sp-desc" placeholder="Ödeme notu ekleyin..."/></div>';
+    html += '<button class="btn bp w100 mt2" id="pay-submit-btn" style="display:none" onclick="submitSpPayment()">Bildirim Gönder</button>';
+    html += '</div>';
+
+    // ── Onay bekleyen bildirimler ──
+    if (pending.length > 0) {
+        html += '<div class="card mb3" style="border-left:3px solid var(--yellow)"><div class="tw6 ts mb2" style="color:var(--yellow)">⏳ Onay Bekleyen Bildirimlerim</div>';
+        pending.forEach(function(p) {
+            html += '<div class="payment-card" style="border-color:rgba(234,179,8,.35);gap:10px"><div style="font-size:24px;flex-shrink:0">' + mIcon(p.payMethod) + '</div><div class="payment-info"><div class="payment-amount" style="font-size:16px;color:var(--yellow)">' + FormatUtils.currency(p.amt) + '</div><div class="payment-date">' + mLabel(p.payMethod) + ' • ' + DateUtils.format(p.dt) + '</div><div class="ts tm mt1">' + FormatUtils.escape(p.ds || p.serviceName || tabLabel) + '</div></div><span class="bg bg-y" style="flex-shrink:0;white-space:nowrap">Bekliyor</span></div>';
+        });
+        html += '</div>';
+    }
+
+    // ── Ödeme geçmişi ──
+    html += '<div class="card"><div class="tw6 tsm mb3">✅ ' + tabLabel + ' Ödeme Geçmişim</div>';
+    if (completed.length === 0) {
+        html += '<div class="empty-state"><div style="font-size:44px;margin-bottom:10px">📭</div><div class="tw6 ts">Henüz onaylanmış ' + tabLabel.toLowerCase() + ' ödemesi yok</div></div>';
+    } else {
+        completed.forEach(function(p) {
+            html += '<div class="payment-card" style="gap:12px"><div style="font-size:28px;flex-shrink:0">' + mIcon(p.payMethod) + '</div><div class="payment-info" style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px"><span class="payment-amount tg">' + FormatUtils.currency(p.amt) + '</span></div><div class="payment-date">' + DateUtils.format(p.dt) + ' • ' + FormatUtils.escape(p.serviceName || p.ds || tabLabel) + '</div><div class="ts tm" style="margin-top:2px">' + mLabel(p.payMethod) + '</div></div><div class="flex fc gap2" style="align-items:flex-end;flex-shrink:0"><span class="bg bg-g">Ödendi ✓</span><button class="btn btn-xs bpur" onclick="generateReceipt(\'' + p.id + '\')">🧾 Makbuz</button></div></div>';
+        });
+    }
+    html += '</div>';
+
+    // Ödeme yoksa tipleri göster
+    if (typePayments.length === 0 && pendingPayments.length === 0 && completed.length === 0 && pending.length === 0) {
+        html = html.replace('</div><!-- stats end -->', '');
+        // İstatistiklerden sonra boş durum mesajı zaten gösterildi
+    }
+
+    return html;
+};
+
+// ── ADMIN ÖDEME PLANI: TİP SEÇİMİ EKLEMESİ ─────────────────────
+// pgPayments sayfasında ödeme planı oluşturma formuna tip alanı ekle
+window.registerGoHook('after', function(page) {
+    if (page !== 'payments') return;
+    var main = document.getElementById('main');
+    if (!main) return;
+
+    // Açıklama inputunun altına ödeme tipi seçimi ekle
+    var descInput = main.querySelector('#plan-desc');
+    if (descInput && !main.querySelector('#plan-type')) {
+        var typeDiv = document.createElement('div');
+        typeDiv.className = 'fgr mb2';
+        typeDiv.innerHTML = '<label>Ödeme Tipi</label>'
+            + '<select id="plan-type" style="padding:10px 12px">'
+            + '<option value="aidat">💰 Aidat</option>'
+            + '<option value="spor_malzemesi">🏋️ Spor Malzemesi</option>'
+            + '</select>';
+        descInput.parentElement.parentElement.insertBefore(typeDiv, descInput.parentElement.nextSibling);
+    }
+});
+
+// ── createPaymentPlan override: paymentType dahil ────────────────
+var _origCreatePaymentPlan = window.createPaymentPlan;
+window.createPaymentPlan = async function() {
+    var selectedIds = _getSelectedAthleteIds();
+    var amt = parseFloat((document.getElementById('plan-amt') || {}).value);
+    var month = (document.getElementById('plan-month') || {}).value;
+    var desc = ((document.getElementById('plan-desc') || {}).value || '').trim();
+    var paymentType = (document.getElementById('plan-type') || {}).value || 'aidat';
+
+    if (selectedIds.length === 0) { toast('En az bir sporcu seçiniz!', 'e'); return; }
+    if (!amt || amt <= 0) { toast('Tutar giriniz!', 'e'); return; }
+    if (!month) { toast('Ay seçiniz!', 'e'); return; }
+
+    var dt = month + '-01';
+    var months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    var parts = month.split('-');
+    var y = parts[0], m = parts[1];
+    var typeLabel = paymentType === 'spor_malzemesi' ? 'Spor Malzemesi' : 'Aidatı';
+    var autoDesc = desc || (months[parseInt(m)-1] + ' ' + y + ' ' + typeLabel);
+    var created = 0, skipped = 0;
+
+    for (var i = 0; i < selectedIds.length; i++) {
+        var aid = selectedIds[i];
+        var ath = AppState.data.athletes.find(function(a) { return a.id === aid; });
+        if (!ath) continue;
+        var exists = AppState.data.payments.find(function(p) { return p.source === 'plan' && p.aid === aid && p.dt === dt && (p.paymentType || 'aidat') === paymentType; });
+        if (exists) { skipped++; continue; }
+        var obj = {
+            id: generateId(), aid: aid, an: ath.fn + ' ' + ath.ln,
+            amt: amt, dt: dt, ty: 'income', st: 'pending',
+            ds: autoDesc, serviceName: autoDesc,
+            source: 'plan', notifStatus: '', payMethod: '',
+            paymentType: paymentType
+        };
+        var result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
+        if (result) {
+            AppState.data.payments.push(obj);
+            created++;
+        }
+    }
+    var msg = '✅ ' + created + ' sporcu için ' + autoDesc + ' planı oluşturuldu!';
+    if (skipped > 0) msg += ' (' + skipped + ' sporcu zaten mevcut, atlandı)';
+    toast(msg, 'g');
+    go('payments');
+};
+
+// ── showBulkPlanModal override: paymentType dahil ────────────────
+var _origShowBulkPlanModal = window.showBulkPlanModal;
+window.showBulkPlanModal = function() {
+    var months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+    var now = new Date();
+    var bulkAthCheckboxes = _buildAthleteCheckboxes('bulk-ath-cb', false);
+    modal('📆 Toplu Ödeme Planı Oluştur', '<div class="al al-b mb3" style="font-size:13px">'
+        + 'Seçili sporcular için başlangıç ayından itibaren belirtilen ay sayısı kadar plan oluşturur.'
+        + '</div>'
+        + '<div class="fgr mb2">'
+        + '<label>Sporcu(lar) *</label>'
+        + '<input id="bulk-ath-search" type="text" placeholder="Sporcu ara..." oninput="filterBulkAthletes()" style="margin-bottom:6px"/>'
+        + '<div class="flex gap2 mb2">'
+        + '<button type="button" class="btn btn-xs bs" onclick="toggleAllBulkAthletes(true)">✅ Tümünü Seç</button>'
+        + '<button type="button" class="btn btn-xs bd" onclick="toggleAllBulkAthletes(false)">✕ Temizle</button>'
+        + '</div>'
+        + '<div id="bulk-ath-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">' + bulkAthCheckboxes + '</div>'
+        + '</div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Başlangıç Ayı *</label><input id="bulk-start" type="month" value="' + now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '"/></div>'
+        + '<div class="fgr"><label>Ay Sayısı *</label><input id="bulk-count" type="number" min="1" max="24" value="12"/></div>'
+        + '</div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Aylık Tutar (₺) *</label><input id="bulk-amt" type="number" placeholder="Tutar giriniz"/></div>'
+        + '<div class="fgr"><label>Ödeme Tipi</label><select id="bulk-type" style="padding:10px 12px"><option value="aidat">💰 Aidat</option><option value="spor_malzemesi">🏋️ Spor Malzemesi</option></select></div>'
+        + '</div>'
+    , [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: '✅ Planları Oluştur', cls: 'bp', fn: async function() {
+            var selectedIds = Array.from(document.querySelectorAll('#bulk-ath-list .bulk-ath-cb:checked')).map(function(cb) { return cb.value; });
+            var startMonth = (document.getElementById('bulk-start') || {}).value;
+            var count = parseInt((document.getElementById('bulk-count') || {}).value) || 0;
+            var amt = parseFloat((document.getElementById('bulk-amt') || {}).value) || 0;
+            var paymentType = (document.getElementById('bulk-type') || {}).value || 'aidat';
+            if (selectedIds.length === 0 || !startMonth || count < 1 || amt <= 0) { toast('Tüm alanları doldurun!', 'e'); return; }
+            var created = 0;
+            var parts = startMonth.split('-').map(Number);
+            var sy = parts[0], sm = parts[1];
+            var typeLabel = paymentType === 'spor_malzemesi' ? 'Spor Malzemesi' : 'Aidatı';
+            for (var j = 0; j < selectedIds.length; j++) {
+                var aid = selectedIds[j];
+                var ath = AppState.data.athletes.find(function(a) { return a.id === aid; });
+                if (!ath) continue;
+                for (var i = 0; i < count; i++) {
+                    var d = new Date(sy, sm - 1 + i, 1);
+                    var yy = d.getFullYear(), mm = d.getMonth();
+                    var dt = yy + '-' + String(mm+1).padStart(2,'0') + '-01';
+                    var exists = AppState.data.payments.find(function(p) { return p.source === 'plan' && p.aid === aid && p.dt === dt && (p.paymentType || 'aidat') === paymentType; });
+                    if (exists) continue;
+                    var autoDesc = months[mm] + ' ' + yy + ' ' + typeLabel;
+                    var obj = {
+                        id: generateId(), aid: aid, an: ath.fn + ' ' + ath.ln,
+                        amt: amt, dt: dt, ty: 'income', st: 'pending',
+                        ds: autoDesc, serviceName: autoDesc,
+                        source: 'plan', notifStatus: '', payMethod: '',
+                        paymentType: paymentType
+                    };
+                    await DB.upsert('payments', DB.mappers.fromPayment(obj));
+                    AppState.data.payments.push(obj);
+                    created++;
+                }
+            }
+            toast('✅ ' + selectedIds.length + ' sporcu için ' + created + ' plan oluşturuldu!', 'g');
+            closeModal();
+            go('payments');
+        }}
+    ]);
+};
+
+console.log('✅ Geliştirme 1-21 uygulandı — script-fixes.js V14');
