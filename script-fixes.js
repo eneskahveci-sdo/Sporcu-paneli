@@ -3083,6 +3083,13 @@ window.registerGoHook('after', function(page) {
     }
 })();
 
+// ── Güvenli Supabase client erişimi ────────────────────────────────
+function _getSafeSupabaseClient() {
+    var sb = (typeof getSupabase === 'function') ? getSupabase() : (AppState.sb || null);
+    if (sb && typeof sb.from === 'function') return sb;
+    return null;
+}
+
 // ── NOTIFICATIONS PAGE (Admin & Antrenör) ─────────────────────────
 window.pgNotificationsPage = function() {
     var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
@@ -3187,8 +3194,8 @@ window.sendNotifMessage = async function() {
     var senderName = AppState.currentUser ? AppState.currentUser.name : 'Yönetici';
     var senderId = AppState.currentUser ? AppState.currentUser.id : '';
 
-    var sb = (typeof getSupabase === 'function') ? getSupabase() : (AppState.sb || null);
-    if (!sb || typeof sb.from !== 'function') { toast('Bağlantı hatası!', 'e'); console.warn('_sendNotif: geçerli Supabase client bulunamadı'); return; }
+    var sb = _getSafeSupabaseClient();
+    if (!sb) { toast('Bağlantı hatası!', 'e'); console.warn('_sendNotif: geçerli Supabase client bulunamadı'); return; }
 
     var sent = 0;
     var errors = 0;
@@ -3235,8 +3242,8 @@ window.sendNotifMessage = async function() {
 
 // ── Mesaj geçmişi yükle ──────────────────────────────────────────
 function _loadNotifHistory() {
-    var sb = (typeof getSupabase === 'function') ? getSupabase() : (AppState.sb || null);
-    if (!sb || typeof sb.from !== 'function') {
+    var sb = _getSafeSupabaseClient();
+    if (!sb) {
         console.warn('_loadNotifHistory: geçerli Supabase client bulunamadı');
         return;
     }
@@ -3348,8 +3355,8 @@ function _loadSporcuMessages() {
     var a = AppState.currentSporcu;
     if (!a) return;
 
-    var sb = (typeof getSupabase === 'function') ? getSupabase() : (AppState.sb || null);
-    if (!sb || typeof sb.from !== 'function') {
+    var sb = _getSafeSupabaseClient();
+    if (!sb) {
         console.warn('_loadSporcuMessages: geçerli Supabase client bulunamadı');
         _updateMsgBadge(0);
         return;
@@ -3492,8 +3499,8 @@ function _checkUnreadMessages() {
     var a = AppState.currentSporcu;
     if (!a) return;
 
-    var sb = (typeof getSupabase === 'function') ? getSupabase() : (AppState.sb || null);
-    if (!sb || typeof sb.from !== 'function') {
+    var sb = _getSafeSupabaseClient();
+    if (!sb) {
         console.warn('_checkUnreadMessages: geçerli Supabase client bulunamadı');
         _updateMsgBadge(0);
         return;
