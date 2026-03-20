@@ -173,7 +173,7 @@ table{min-width:600px}
 .plan-acc-item.open .plan-acc-body{display:block!important}.plan-acc-item.open .plan-acc-arrow{transform:rotate(180deg)}
 /* Feature 3: Bulk payment checkboxes */
 .sp-plan-cb-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .2s}.sp-plan-cb-row:hover{border-color:var(--blue2)}.sp-plan-cb-row.checked{border-color:var(--blue2);background:rgba(59,130,246,.08)}.sp-plan-cb-row input[type="checkbox"]{width:18px;height:18px;flex-shrink:0;cursor:pointer}.sp-bulk-total{background:var(--bg3);border:1px solid var(--blue);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
-.acc-group{margin-bottom:2px}.acc-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:transparent;color:var(--text2);font-size:inherit;font-weight:500;text-transform:none;letter-spacing:normal;cursor:pointer;transition:all .2s;min-height:44px}.acc-header:hover{background:var(--bg3);color:var(--text)}.acc-title{flex:1;text-align:left}.acc-arrow{width:16px;height:16px;transition:transform .25s;opacity:.7;flex-shrink:0}.acc-body{overflow:hidden;transition:max-height .3s ease,opacity .25s;max-height:500px;opacity:1}.acc-body.collapsed{max-height:0!important;opacity:0;pointer-events:none}.acc-header[aria-expanded="false"] .acc-arrow{transform:rotate(-90deg)}.slogo{padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--bg3)}.slogo-icon{width:36px;height:36px;background:var(--grad);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:800;overflow:hidden;flex-shrink:0;box-shadow:0 2px 6px rgba(59,130,246,.25)}html[data-theme="light"] .slogo-icon{color:#FFED00}
+.acc-group{margin-bottom:2px}.acc-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:transparent;color:var(--text2);font-size:inherit;font-weight:500;text-transform:none;letter-spacing:normal;cursor:pointer;transition:all .2s;min-height:44px}.acc-header:hover{background:var(--bg3);color:var(--text)}.acc-title{flex:1;text-align:left}.acc-arrow{width:16px;height:16px;transition:transform .25s;opacity:.7;flex-shrink:0}.acc-body{overflow:hidden;transition:max-height .3s ease,opacity .25s;max-height:500px;opacity:1}.acc-body.collapsed{max-height:0!important;opacity:0;pointer-events:none}.acc-header[aria-expanded="false"] .acc-arrow{transform:rotate(-90deg)}.acc-header[aria-expanded="true"]{background:var(--grad);color:#fff;box-shadow:0 14px 30px rgba(11,34,92,.22)}.acc-header[aria-expanded="true"] .acc-arrow{opacity:1}.slogo{padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--bg3)}.slogo-icon{width:36px;height:36px;background:var(--grad);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:800;overflow:hidden;flex-shrink:0;box-shadow:0 2px 6px rgba(59,130,246,.25)}html[data-theme="light"] .slogo-icon{color:#FFED00}
 
 /* Theme refresh: corporate navy-gold, subtle glass only via CSS overrides */
 :root{
@@ -417,7 +417,8 @@ box-shadow:0 10px 22px rgba(15,27,51,.05), inset 0 1px 0 rgba(255,255,255,.56);
 html[data-theme="light"] .ni.on,
 html[data-theme="light"] .bp,
 html[data-theme="light"] .pay-method-btn.active,
-html[data-theme="light"] .pay-choice-card.active{
+html[data-theme="light"] .pay-choice-card.active,
+html[data-theme="light"] .acc-header[aria-expanded="true"]{
 color:#f5da82;
 }
 
