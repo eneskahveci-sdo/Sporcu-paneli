@@ -3083,6 +3083,13 @@ window.registerGoHook('after', function(page) {
     }
 })();
 
+// ── Güvenli Supabase client erişimi ────────────────────────────────
+function _getSafeSupabaseClient() {
+    var sb = (typeof getSupabase === 'function') ? getSupabase() : (AppState.sb || null);
+    if (sb && typeof sb.from === 'function') return sb;
+    return null;
+}
+
 // ── NOTIFICATIONS PAGE (Admin & Antrenör) ─────────────────────────
 window.pgNotificationsPage = function() {
     var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
@@ -3187,9 +3194,8 @@ window.sendNotifMessage = async function() {
     var senderName = AppState.currentUser ? AppState.currentUser.name : 'Yönetici';
     var senderId = AppState.currentUser ? AppState.currentUser.id : '';
 
-    var sb = window.supabase || (typeof createClient !== 'undefined' ? null : null);
-    if (!sb && window.AppState && AppState._sb) sb = AppState._sb;
-    if (!sb) { toast('Bağlantı hatası!', 'e'); return; }
+    var sb = _getSafeSupabaseClient();
+    if (!sb) { toast('Bağlantı hatası!', 'e'); console.warn('_sendNotif: geçerli Supabase client bulunamadı'); return; }
 
     var sent = 0;
     var errors = 0;
@@ -3236,8 +3242,11 @@ window.sendNotifMessage = async function() {
 
 // ── Mesaj geçmişi yükle ──────────────────────────────────────────
 function _loadNotifHistory() {
-    var sb = window.supabase || (AppState._sb ? AppState._sb : null);
-    if (!sb) return;
+    var sb = _getSafeSupabaseClient();
+    if (!sb) {
+        console.warn('_loadNotifHistory: geçerli Supabase client bulunamadı');
+        return;
+    }
 
     var container = document.getElementById('notif-history');
     if (!container) return;
@@ -3245,41 +3254,49 @@ function _loadNotifHistory() {
     var isCoach = AppState.currentUser && AppState.currentUser.role === 'coach';
     var senderId = AppState.currentUser ? AppState.currentUser.id : '';
 
-    var query = sb.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
-    if (isCoach) {
-        query = query.eq('sender_id', senderId);
-    }
-
-    query.then(function(res) {
-        if (res.error) {
-            container.innerHTML = '<div class="al al-r">Mesaj geçmişi yüklenemedi.</div>';
-            return;
-        }
-        var data = res.data || [];
-        if (data.length === 0) {
-            container.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:8px">📭</div><div class="tw6 ts">Henüz gönderilmiş mesaj yok</div></div>';
-            return;
+    try {
+        var query = sb.from('messages').select('*').order('created_at', { ascending: false }).limit(50);
+        if (isCoach) {
+            query = query.eq('sender_id', senderId);
         }
 
-        var html = '';
-        data.forEach(function(m) {
-            var dt = m.created_at ? new Date(m.created_at) : null;
-            var dateStr = dt ? dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
-            var roleLabel = m.sender_role === 'coach' ? '🏃 Antrenör' : '👤 Yönetici';
-            html += '<div style="padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">'
-                + '<div class="flex fjb fca fwrap gap1">'
-                + '<div style="flex:1;min-width:0">'
-                + (m.title ? '<div class="tw6 tsm">' + FormatUtils.escape(m.title) + '</div>' : '')
-                + '<div class="ts" style="word-break:break-word;white-space:pre-wrap;margin-top:2px">' + FormatUtils.escape(m.body) + '</div>'
-                + '</div>'
-                + '<div style="text-align:right;flex-shrink:0">'
-                + '<div class="ts tm">' + FormatUtils.escape(m.recipient_name || '') + '</div>'
-                + '<div style="font-size:11px;color:var(--text3)">' + dateStr + '</div>'
-                + '<div style="font-size:11px;color:var(--text3)">' + roleLabel + '</div>'
-                + '</div></div></div>';
+        query.then(function(res) {
+            if (res.error) {
+                console.warn('_loadNotifHistory sorgu hatası:', res.error.message || res.error);
+                container.innerHTML = '<div class="al al-r">Mesaj geçmişi yüklenemedi.</div>';
+                return;
+            }
+            var data = res.data || [];
+            if (data.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div style="font-size:36px;margin-bottom:8px">📭</div><div class="tw6 ts">Henüz gönderilmiş mesaj yok</div></div>';
+                return;
+            }
+
+            var html = '';
+            data.forEach(function(m) {
+                var dt = m.created_at ? new Date(m.created_at) : null;
+                var dateStr = dt ? dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+                var roleLabel = m.sender_role === 'coach' ? '🏃 Antrenör' : '👤 Yönetici';
+                html += '<div style="padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">'
+                    + '<div class="flex fjb fca fwrap gap1">'
+                    + '<div style="flex:1;min-width:0">'
+                    + (m.title ? '<div class="tw6 tsm">' + FormatUtils.escape(m.title) + '</div>' : '')
+                    + '<div class="ts" style="word-break:break-word;white-space:pre-wrap;margin-top:2px">' + FormatUtils.escape(m.body) + '</div>'
+                    + '</div>'
+                    + '<div style="text-align:right;flex-shrink:0">'
+                    + '<div class="ts tm">' + FormatUtils.escape(m.recipient_name || '') + '</div>'
+                    + '<div style="font-size:11px;color:var(--text3)">' + dateStr + '</div>'
+                    + '<div style="font-size:11px;color:var(--text3)">' + roleLabel + '</div>'
+                    + '</div></div></div>';
+            });
+            container.innerHTML = html;
+        }).catch(function(err) {
+            console.warn('_loadNotifHistory exception:', err);
+            if (container) container.innerHTML = '<div class="al al-r">Mesaj geçmişi yüklenemedi.</div>';
         });
-        container.innerHTML = html;
-    });
+    } catch(e) {
+        console.warn('_loadNotifHistory exception:', e);
+    }
 }
 
 // ── NOTIFICATIONS PAGE'İ go() SİSTEMİNE EKLE ─────────────────────
@@ -3338,75 +3355,92 @@ function _loadSporcuMessages() {
     var a = AppState.currentSporcu;
     if (!a) return;
 
-    var sb = window.supabase || (AppState._sb ? AppState._sb : null);
-    if (!sb) return;
+    var sb = _getSafeSupabaseClient();
+    if (!sb) {
+        console.warn('_loadSporcuMessages: geçerli Supabase client bulunamadı');
+        _updateMsgBadge(0);
+        return;
+    }
 
     var container = document.getElementById('sp-content');
     if (!container) return;
 
-    sb.from('messages')
-        .select('*')
-        .eq('recipient_id', a.id)
-        .order('created_at', { ascending: false })
-        .limit(100)
-        .then(function(res) {
-            if (res.error) {
-                container.innerHTML = '<div class="al al-r" style="margin:20px">Mesajlar yüklenemedi.</div>';
-                return;
-            }
-
-            var data = res.data || [];
-
-            // Rozet güncelle
-            var unread = data.filter(function(m) { return !m.is_read; }).length;
-            _updateMsgBadge(unread);
-
-            if (data.length === 0) {
-                container.innerHTML = '<div class="empty-state" style="margin-top:40px"><div style="font-size:56px;margin-bottom:12px">📭</div><div class="tw6" style="font-size:16px;margin-bottom:4px">Mesaj Bulunmuyor</div><div class="ts tm">Yönetici veya antrenörünüzden gelen mesajlar burada görünecektir.</div></div>';
-                return;
-            }
-
-            var html = '<div style="max-width:800px;margin:0 auto">';
-            html += '<div class="tw6 tsm mb3">📩 Mesajlarım (' + data.length + ')</div>';
-
-            data.forEach(function(m) {
-                var dt = m.created_at ? new Date(m.created_at) : null;
-                var dateStr = dt ? dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
-                var roleLabel = m.sender_role === 'coach' ? '🏃 Antrenör' : '👤 Yönetici';
-                var isUnread = !m.is_read;
-                var borderColor = isUnread ? 'var(--blue2)' : 'var(--border)';
-                var bgStyle = isUnread ? 'background:rgba(59,130,246,.06);' : '';
-
-                html += '<div class="card mb2" style="border-left:3px solid ' + borderColor + ';' + bgStyle + 'padding:16px" data-msg-id="' + FormatUtils.escape(m.id) + '">';
-
-                if (m.title) {
-                    html += '<div class="flex fjb fca mb1">'
-                        + '<div class="tw6 tsm">' + FormatUtils.escape(m.title) + '</div>'
-                        + (isUnread ? '<span class="bg bg-b" style="font-size:10px">Yeni</span>' : '')
-                        + '</div>';
-                } else if (isUnread) {
-                    html += '<div style="text-align:right;margin-bottom:4px"><span class="bg bg-b" style="font-size:10px">Yeni</span></div>';
+    try {
+        sb.from('messages')
+            .select('*')
+            .eq('recipient_id', a.id)
+            .order('created_at', { ascending: false })
+            .limit(100)
+            .then(function(res) {
+                if (res.error) {
+                    console.warn('_loadSporcuMessages sorgu hatası:', res.error.message || res.error);
+                    container.innerHTML = '<div class="al al-r" style="margin:20px">Mesajlar yüklenemedi.</div>';
+                    _updateMsgBadge(0);
+                    return;
                 }
 
-                html += '<div class="ts" style="word-break:break-word;white-space:pre-wrap;line-height:1.6;color:var(--text);margin-bottom:8px">' + FormatUtils.escape(m.body) + '</div>';
-                html += '<div class="flex fjb fca" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">'
-                    + '<span style="font-size:11px;color:var(--text3)">' + roleLabel + (m.sender_name ? ' · ' + FormatUtils.escape(m.sender_name) : '') + '</span>'
-                    + '<span style="font-size:11px;color:var(--text3)">' + dateStr + '</span>'
-                    + '</div>';
-                html += '</div>';
-            });
-            html += '</div>';
-            container.innerHTML = html;
+                var data = res.data || [];
 
-            // Okunmamış mesajları okundu olarak işaretle
-            var unreadIds = data.filter(function(m) { return !m.is_read; }).map(function(m) { return m.id; });
-            if (unreadIds.length > 0) {
-                sb.from('messages').update({ is_read: true }).in('id', unreadIds).then(function() {
-                    // Rozeti güncelle
-                    setTimeout(function() { _updateMsgBadge(0); }, 1500);
+                // Rozet güncelle
+                var unread = data.filter(function(m) { return !m.is_read; }).length;
+                _updateMsgBadge(unread);
+
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="empty-state" style="margin-top:40px"><div style="font-size:56px;margin-bottom:12px">📭</div><div class="tw6" style="font-size:16px;margin-bottom:4px">Mesaj Bulunmuyor</div><div class="ts tm">Yönetici veya antrenörünüzden gelen mesajlar burada görünecektir.</div></div>';
+                    return;
+                }
+
+                var html = '<div style="max-width:800px;margin:0 auto">';
+                html += '<div class="tw6 tsm mb3">📩 Mesajlarım (' + data.length + ')</div>';
+
+                data.forEach(function(m) {
+                    var dt = m.created_at ? new Date(m.created_at) : null;
+                    var dateStr = dt ? dt.toLocaleDateString('tr-TR') + ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+                    var roleLabel = m.sender_role === 'coach' ? '🏃 Antrenör' : '👤 Yönetici';
+                    var isUnread = !m.is_read;
+                    var borderColor = isUnread ? 'var(--blue2)' : 'var(--border)';
+                    var bgStyle = isUnread ? 'background:rgba(59,130,246,.06);' : '';
+
+                    html += '<div class="card mb2" style="border-left:3px solid ' + borderColor + ';' + bgStyle + 'padding:16px" data-msg-id="' + FormatUtils.escape(m.id) + '">';
+
+                    if (m.title) {
+                        html += '<div class="flex fjb fca mb1">'
+                            + '<div class="tw6 tsm">' + FormatUtils.escape(m.title) + '</div>'
+                            + (isUnread ? '<span class="bg bg-b" style="font-size:10px">Yeni</span>' : '')
+                            + '</div>';
+                    } else if (isUnread) {
+                        html += '<div style="text-align:right;margin-bottom:4px"><span class="bg bg-b" style="font-size:10px">Yeni</span></div>';
+                    }
+
+                    html += '<div class="ts" style="word-break:break-word;white-space:pre-wrap;line-height:1.6;color:var(--text);margin-bottom:8px">' + FormatUtils.escape(m.body) + '</div>';
+                    html += '<div class="flex fjb fca" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">'
+                        + '<span style="font-size:11px;color:var(--text3)">' + roleLabel + (m.sender_name ? ' · ' + FormatUtils.escape(m.sender_name) : '') + '</span>'
+                        + '<span style="font-size:11px;color:var(--text3)">' + dateStr + '</span>'
+                        + '</div>';
+                    html += '</div>';
                 });
-            }
-        });
+                html += '</div>';
+                container.innerHTML = html;
+
+                // Okunmamış mesajları okundu olarak işaretle
+                var unreadIds = data.filter(function(m) { return !m.is_read; }).map(function(m) { return m.id; });
+                if (unreadIds.length > 0) {
+                    sb.from('messages').update({ is_read: true }).in('id', unreadIds).then(function() {
+                        // Rozeti güncelle
+                        setTimeout(function() { _updateMsgBadge(0); }, 1500);
+                    }).catch(function(err) {
+                        console.warn('_loadSporcuMessages mark-read hatası:', err);
+                    });
+                }
+            }).catch(function(err) {
+                console.warn('_loadSporcuMessages exception:', err);
+                _updateMsgBadge(0);
+                if (container) container.innerHTML = '<div class="al al-r" style="margin:20px">Mesajlar yüklenemedi.</div>';
+            });
+    } catch(e) {
+        console.warn('_loadSporcuMessages exception:', e);
+        _updateMsgBadge(0);
+    }
 }
 
 function _updateMsgBadge(count) {
@@ -3465,24 +3499,40 @@ function _checkUnreadMessages() {
     var a = AppState.currentSporcu;
     if (!a) return;
 
-    var sb = window.supabase || (AppState._sb ? AppState._sb : null);
-    if (!sb) return;
+    var sb = _getSafeSupabaseClient();
+    if (!sb) {
+        console.warn('_checkUnreadMessages: geçerli Supabase client bulunamadı');
+        _updateMsgBadge(0);
+        return;
+    }
 
-    sb.from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('recipient_id', a.id)
-        .eq('is_read', false)
-        .then(function(res) {
-            if (res.error) return;
-            _updateMsgBadge(res.count || 0);
-        });
+    try {
+        sb.from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('recipient_id', a.id)
+            .eq('is_read', false)
+            .then(function(res) {
+                if (res.error) {
+                    console.warn('_checkUnreadMessages sorgu hatası:', res.error.message || res.error);
+                    _updateMsgBadge(0);
+                    return;
+                }
+                _updateMsgBadge(res.count || 0);
+            }).catch(function(err) {
+                console.warn('_checkUnreadMessages exception:', err);
+                _updateMsgBadge(0);
+            });
+    } catch(e) {
+        console.warn('_checkUnreadMessages exception:', e);
+        _updateMsgBadge(0);
+    }
 }
 
 // Portal açıldığında rozeti kontrol et
 // Her tab geçişinde de kontrol et (spTab override zaten yapıldı)
 // İlk açılışta kontrol et
 setTimeout(function() {
-    if (AppState.currentSporcu) _checkUnreadMessages();
+    try { if (AppState.currentSporcu) _checkUnreadMessages(); } catch(e) { console.warn('İlk mesaj kontrolü başarısız:', e); }
 }, 1500);
 // MutationObserver ile sporcu portal görünür olunca kontrol et
 (function() {
@@ -3490,7 +3540,7 @@ setTimeout(function() {
     if (portal) {
         var obs = new MutationObserver(function() {
             if (portal.style.display === 'flex') {
-                setTimeout(_checkUnreadMessages, 500);
+                try { setTimeout(_checkUnreadMessages, 500); } catch(e) { console.warn('Portal mesaj kontrolü başarısız:', e); }
                 obs.disconnect();
             }
         });
