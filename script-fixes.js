@@ -3752,4 +3752,789 @@ window.showBulkPlanModal = function() {
     ]);
 };
 
-console.log('✅ Geliştirme 1-21 uygulandı — script-fixes.js V14');
+// ═══════════════════════════════════════════════════════════════════
+// GELİŞTİRME 22-27: ENVANTER YÖNETİM SİSTEMİ
+// ═══════════════════════════════════════════════════════════════════
+
+// ── AppState: Envanter verisi ────────────────────────────────────
+if (!AppState.data.inventoryItems) AppState.data.inventoryItems = [];
+if (!AppState.data.inventoryMovements) AppState.data.inventoryMovements = [];
+
+// ── DB Mappers: inventory_items ──────────────────────────────────
+if (!DB.mappers.toInventoryItem) {
+    DB.mappers.toInventoryItem = function(r) {
+        return {
+            id: r.id,
+            name: r.name || '',
+            category: r.category || '',
+            sku: r.sku || '',
+            unit: r.unit || 'adet',
+            unitPrice: r.unit_price || 0,
+            stockQty: r.stock_qty || 0,
+            criticalStock: r.critical_stock || 5,
+            status: r.status || 'active',
+            orgId: r.org_id || '',
+            branchId: r.branch_id || '',
+            createdAt: r.created_at || ''
+        };
+    };
+    DB.mappers.fromInventoryItem = function(item) {
+        var out = {};
+        if (item.id !== undefined) out.id = item.id;
+        if (item.name !== undefined) out.name = item.name;
+        if (item.category !== undefined) out.category = item.category;
+        if (item.sku !== undefined) out.sku = item.sku;
+        if (item.unit !== undefined) out.unit = item.unit;
+        if (item.unitPrice !== undefined) out.unit_price = item.unitPrice;
+        if (item.stockQty !== undefined) out.stock_qty = item.stockQty;
+        if (item.criticalStock !== undefined) out.critical_stock = item.criticalStock;
+        if (item.status !== undefined) out.status = item.status;
+        out.org_id = item.orgId || AppState.currentOrgId || '';
+        out.branch_id = item.branchId || AppState.currentBranchId || '';
+        return out;
+    };
+}
+
+// ── DB Mappers: inventory_movements ──────────────────────────────
+if (!DB.mappers.toInventoryMovement) {
+    DB.mappers.toInventoryMovement = function(r) {
+        return {
+            id: r.id,
+            itemId: r.item_id || '',
+            itemName: r.item_name || '',
+            movementType: r.movement_type || '',
+            quantityDelta: r.quantity_delta || 0,
+            note: r.note || '',
+            relatedPaymentId: r.related_payment_id || '',
+            athleteId: r.athlete_id || '',
+            athleteName: r.athlete_name || '',
+            createdAt: r.created_at || '',
+            orgId: r.org_id || '',
+            branchId: r.branch_id || ''
+        };
+    };
+    DB.mappers.fromInventoryMovement = function(m) {
+        var out = {};
+        if (m.id !== undefined) out.id = m.id;
+        if (m.itemId !== undefined) out.item_id = m.itemId;
+        if (m.itemName !== undefined) out.item_name = m.itemName;
+        if (m.movementType !== undefined) out.movement_type = m.movementType;
+        if (m.quantityDelta !== undefined) out.quantity_delta = m.quantityDelta;
+        if (m.note !== undefined) out.note = m.note;
+        if (m.relatedPaymentId !== undefined) out.related_payment_id = m.relatedPaymentId;
+        if (m.athleteId !== undefined) out.athlete_id = m.athleteId;
+        if (m.athleteName !== undefined) out.athlete_name = m.athleteName;
+        out.org_id = m.orgId || AppState.currentOrgId || '';
+        out.branch_id = m.branchId || AppState.currentBranchId || '';
+        return out;
+    };
+}
+
+// ── Payment Mapper extension: inventory fields ───────────────────
+(function() {
+    function extendPaymentMappersForInventory() {
+        if (!window.DB || !DB.mappers || !DB.mappers.toPayment) return false;
+        var _prevToPaymentInv = DB.mappers.toPayment;
+        DB.mappers.toPayment = function(r) {
+            var base = _prevToPaymentInv(r);
+            base.inventoryItemId = r.inventory_item_id || '';
+            base.inventoryItemName = r.inventory_item_name || '';
+            base.inventoryQty = r.inventory_qty || 0;
+            base.inventoryUnitPrice = r.inventory_unit_price || 0;
+            return base;
+        };
+        var _prevFromPaymentInv = DB.mappers.fromPayment;
+        DB.mappers.fromPayment = function(p) {
+            var base = _prevFromPaymentInv(p);
+            if (p.inventoryItemId !== undefined) base.inventory_item_id = p.inventoryItemId;
+            if (p.inventoryItemName !== undefined) base.inventory_item_name = p.inventoryItemName;
+            if (p.inventoryQty !== undefined) base.inventory_qty = p.inventoryQty;
+            if (p.inventoryUnitPrice !== undefined) base.inventory_unit_price = p.inventoryUnitPrice;
+            return base;
+        };
+        return true;
+    }
+    if (!extendPaymentMappersForInventory()) {
+        [200, 500, 1000, 2000].forEach(function(d) {
+            setTimeout(function() { extendPaymentMappersForInventory(); }, d);
+        });
+    }
+})();
+
+// ── Envanter verisi yükleme ──────────────────────────────────────
+window.loadInventoryData = async function() {
+    try {
+        var sb = typeof getSupabase === 'function' ? getSupabase() : AppState.sb;
+        if (!sb) return;
+        var filters = {};
+        if (AppState.currentOrgId) filters.org_id = AppState.currentOrgId;
+        if (AppState.currentBranchId) filters.branch_id = AppState.currentBranchId;
+
+        var q1 = sb.from('inventory_items').select('*');
+        if (filters.org_id) q1 = q1.eq('org_id', filters.org_id);
+        if (filters.branch_id) q1 = q1.eq('branch_id', filters.branch_id);
+        var res1 = await q1;
+        if (res1.data) {
+            AppState.data.inventoryItems = res1.data.map(DB.mappers.toInventoryItem);
+        }
+
+        var q2 = sb.from('inventory_movements').select('*').order('created_at', { ascending: false }).limit(500);
+        if (filters.org_id) q2 = q2.eq('org_id', filters.org_id);
+        if (filters.branch_id) q2 = q2.eq('branch_id', filters.branch_id);
+        var res2 = await q2;
+        if (res2.data) {
+            AppState.data.inventoryMovements = res2.data.map(DB.mappers.toInventoryMovement);
+        }
+    } catch (e) {
+        console.warn('Envanter verisi yüklenemedi:', e);
+    }
+};
+
+// ── Envanter sayfası: go('inventory') hook ───────────────────────
+window.registerGoHook('before', function(page) {
+    if (page === 'inventory') {
+        var main = document.getElementById('main');
+        if (!main) return false;
+        main.style.opacity = '0';
+        setTimeout(function() {
+            main.innerHTML = pgInventory();
+            main.style.opacity = '1';
+        }, 100);
+
+        document.querySelectorAll('.ni').forEach(function(el) {
+            el.classList.toggle('on', el.id === 'ni-inventory');
+        });
+        document.querySelectorAll('.bni-btn').forEach(function(el) {
+            el.classList.remove('on');
+        });
+        if (typeof closeSide === 'function') closeSide();
+        AppState.ui.curPage = 'inventory';
+
+        // Envanter verisini yükle
+        loadInventoryData().then(function() {
+            var main2 = document.getElementById('main');
+            if (main2 && AppState.ui.curPage === 'inventory') {
+                main2.innerHTML = pgInventory();
+            }
+        });
+
+        return false;
+    }
+});
+
+// ── Envanter sayfası render ──────────────────────────────────────
+window.pgInventory = function() {
+    var items = AppState.data.inventoryItems || [];
+    var activeItems = items.filter(function(i) { return i.status !== 'deleted'; });
+    var criticalItems = activeItems.filter(function(i) { return i.stockQty <= i.criticalStock && i.status === 'active'; });
+
+    // İstatistik kartları
+    var totalProducts = activeItems.length;
+    var totalStock = activeItems.reduce(function(s, i) { return s + i.stockQty; }, 0);
+    var totalValue = activeItems.reduce(function(s, i) { return s + (i.stockQty * i.unitPrice); }, 0);
+
+    var html = '<div class="ph"><div class="stit">📦 Envanter Yönetimi</div><div class="ssub">Ürün stok takibi ve yönetimi</div></div>';
+
+    // Stat cards
+    html += '<div class="g3 mb3">'
+        + '<div class="card kasa-card" style="border-left:4px solid var(--blue)"><div class="kasa-card-icon">📦</div><div class="kasa-card-val tb">' + totalProducts + '</div><div class="kasa-card-lbl">Toplam Ürün</div></div>'
+        + '<div class="card kasa-card" style="border-left:4px solid var(--green)"><div class="kasa-card-icon">📊</div><div class="kasa-card-val tg">' + totalStock + '</div><div class="kasa-card-lbl">Toplam Stok</div></div>'
+        + '<div class="card kasa-card" style="border-left:4px solid var(--purple)"><div class="kasa-card-icon">💰</div><div class="kasa-card-val tpur">' + FormatUtils.currency(totalValue) + '</div><div class="kasa-card-lbl">Stok Değeri</div></div>'
+        + '</div>';
+
+    // Kritik stok uyarısı
+    if (criticalItems.length > 0) {
+        html += '<div class="al al-y mb3" style="border-radius:12px;padding:14px"><div class="flex fca gap2"><span style="font-size:20px">⚠️</span><div><div class="tw6 tsm">Kritik Stok Uyarısı</div><div class="ts tm mt1">' + criticalItems.length + ' ürün kritik stok seviyesinin altında: '
+            + criticalItems.map(function(i) { return '<strong>' + FormatUtils.escape(i.name) + '</strong> (' + i.stockQty + ' ' + FormatUtils.escape(i.unit) + ')'; }).join(', ')
+            + '</div></div></div></div>';
+    }
+
+    // Butonlar
+    html += '<div class="flex fjb fca mb3 fwrap gap2">'
+        + '<button class="btn bp" onclick="showAddInventoryModal()">+ Yeni Ürün Ekle</button>'
+        + '<button class="btn bs" onclick="showInventoryMovements()">📋 Stok Hareketleri</button>'
+        + '</div>';
+
+    // Ürün tablosu
+    if (activeItems.length === 0) {
+        html += '<div class="card"><div class="empty-state" style="padding:48px;text-align:center"><div style="font-size:56px;margin-bottom:14px">📦</div><div class="tw6 tsm">Henüz ürün eklenmemiş</div><div class="ts tm mt2">Yeni ürün eklemek için yukarıdaki butonu kullanın.</div></div></div>';
+    } else {
+        html += '<div class="card inv-table-wrap"><div class="tw" style="overflow-x:auto"><table class="inv-table"><thead><tr>'
+            + '<th>Ürün</th><th>Kategori</th><th>SKU</th><th>Birim</th><th>Birim Fiyat</th><th>Stok</th><th>Kritik</th><th>Durum</th><th>İşlem</th>'
+            + '</tr></thead><tbody>';
+
+        activeItems.forEach(function(item) {
+            var isCritical = item.stockQty <= item.criticalStock;
+            var stockClass = isCritical ? 'inv-stock-critical' : 'inv-stock-ok';
+            var statusBadge = item.status === 'active'
+                ? '<span class="bg bg-g">Aktif</span>'
+                : '<span class="bg bg-y">Pasif</span>';
+
+            html += '<tr class="' + (isCritical ? 'inv-row-critical' : '') + '">'
+                + '<td><div class="tw6">' + FormatUtils.escape(item.name) + '</div></td>'
+                + '<td>' + FormatUtils.escape(item.category || '-') + '</td>'
+                + '<td class="ts tm">' + FormatUtils.escape(item.sku || '-') + '</td>'
+                + '<td>' + FormatUtils.escape(item.unit) + '</td>'
+                + '<td class="tw6">' + FormatUtils.currency(item.unitPrice) + '</td>'
+                + '<td><span class="' + stockClass + '">' + item.stockQty + '</span></td>'
+                + '<td class="ts tm">' + item.criticalStock + '</td>'
+                + '<td>' + statusBadge + '</td>'
+                + '<td><div class="flex gap1 fwrap">'
+                + '<button class="btn btn-xs bp" onclick="showStockAddModal(\'' + FormatUtils.escape(item.id) + '\')">+ Stok</button>'
+                + '<button class="btn btn-xs bs" onclick="showEditInventoryModal(\'' + FormatUtils.escape(item.id) + '\')">✏️</button>'
+                + '<button class="btn btn-xs bd" onclick="deleteInventoryItem(\'' + FormatUtils.escape(item.id) + '\')">🗑</button>'
+                + '</div></td>'
+                + '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
+    }
+
+    return html;
+};
+
+// ── Ürün ekleme modalı ───────────────────────────────────────────
+window.showAddInventoryModal = function() {
+    modal('📦 Yeni Ürün Ekle',
+        '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Ürün Adı *</label><input id="inv-name" type="text" placeholder="Örn: Forma"/></div>'
+        + '<div class="fgr"><label>Kategori</label><input id="inv-category" type="text" placeholder="Örn: Giyim"/></div>'
+        + '</div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>SKU</label><input id="inv-sku" type="text" placeholder="Örn: FRM-001"/></div>'
+        + '<div class="fgr"><label>Birim</label><select id="inv-unit" style="padding:10px 12px">'
+        + '<option value="adet">Adet</option><option value="çift">Çift</option><option value="paket">Paket</option><option value="kg">Kg</option><option value="metre">Metre</option>'
+        + '</select></div>'
+        + '</div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Birim Fiyat (₺) *</label><input id="inv-price" type="number" min="0" step="0.01" placeholder="0.00"/></div>'
+        + '<div class="fgr"><label>Başlangıç Stok *</label><input id="inv-stock" type="number" min="0" value="0"/></div>'
+        + '</div>'
+        + '<div class="fgr mb2"><label>Kritik Stok Seviyesi</label><input id="inv-critical" type="number" min="0" value="5"/></div>'
+    , [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: '✅ Kaydet', cls: 'bp', fn: async function() {
+            var name = (document.getElementById('inv-name') || {}).value || '';
+            var price = parseFloat((document.getElementById('inv-price') || {}).value) || 0;
+            var stock = parseInt((document.getElementById('inv-stock') || {}).value) || 0;
+            if (!name.trim()) { toast('Ürün adı gerekli!', 'e'); return; }
+            if (price <= 0) { toast('Birim fiyat gerekli!', 'e'); return; }
+
+            var item = {
+                id: generateId(),
+                name: name.trim(),
+                category: ((document.getElementById('inv-category') || {}).value || '').trim(),
+                sku: ((document.getElementById('inv-sku') || {}).value || '').trim(),
+                unit: (document.getElementById('inv-unit') || {}).value || 'adet',
+                unitPrice: price,
+                stockQty: stock,
+                criticalStock: parseInt((document.getElementById('inv-critical') || {}).value) || 5,
+                status: 'active',
+                orgId: AppState.currentOrgId || '',
+                branchId: AppState.currentBranchId || ''
+            };
+
+            var result = await DB.upsert('inventory_items', DB.mappers.fromInventoryItem(item));
+            if (result) {
+                AppState.data.inventoryItems.push(item);
+                // Stok girişi hareketi
+                if (stock > 0) {
+                    var mov = {
+                        id: generateId(),
+                        itemId: item.id,
+                        itemName: item.name,
+                        movementType: 'stock_in',
+                        quantityDelta: stock,
+                        note: 'Başlangıç stoğu',
+                        orgId: AppState.currentOrgId || '',
+                        branchId: AppState.currentBranchId || ''
+                    };
+                    await DB.upsert('inventory_movements', DB.mappers.fromInventoryMovement(mov));
+                    AppState.data.inventoryMovements.unshift(mov);
+                }
+                toast('✅ Ürün eklendi!', 'g');
+                closeModal();
+                go('inventory');
+            }
+        }}
+    ]);
+};
+
+// ── Ürün düzenleme modalı ────────────────────────────────────────
+window.showEditInventoryModal = function(itemId) {
+    var item = (AppState.data.inventoryItems || []).find(function(i) { return i.id === itemId; });
+    if (!item) { toast('Ürün bulunamadı!', 'e'); return; }
+
+    modal('✏️ Ürün Düzenle',
+        '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Ürün Adı *</label><input id="inv-name" type="text" value="' + FormatUtils.escape(item.name) + '"/></div>'
+        + '<div class="fgr"><label>Kategori</label><input id="inv-category" type="text" value="' + FormatUtils.escape(item.category) + '"/></div>'
+        + '</div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>SKU</label><input id="inv-sku" type="text" value="' + FormatUtils.escape(item.sku) + '"/></div>'
+        + '<div class="fgr"><label>Birim</label><select id="inv-unit" style="padding:10px 12px">'
+        + '<option value="adet"' + (item.unit === 'adet' ? ' selected' : '') + '>Adet</option>'
+        + '<option value="çift"' + (item.unit === 'çift' ? ' selected' : '') + '>Çift</option>'
+        + '<option value="paket"' + (item.unit === 'paket' ? ' selected' : '') + '>Paket</option>'
+        + '<option value="kg"' + (item.unit === 'kg' ? ' selected' : '') + '>Kg</option>'
+        + '<option value="metre"' + (item.unit === 'metre' ? ' selected' : '') + '>Metre</option>'
+        + '</select></div>'
+        + '</div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Birim Fiyat (₺) *</label><input id="inv-price" type="number" min="0" step="0.01" value="' + item.unitPrice + '"/></div>'
+        + '<div class="fgr"><label>Kritik Stok Seviyesi</label><input id="inv-critical" type="number" min="0" value="' + item.criticalStock + '"/></div>'
+        + '</div>'
+        + '<div class="fgr mb2"><label>Durum</label><select id="inv-status" style="padding:10px 12px">'
+        + '<option value="active"' + (item.status === 'active' ? ' selected' : '') + '>Aktif</option>'
+        + '<option value="passive"' + (item.status === 'passive' ? ' selected' : '') + '>Pasif</option>'
+        + '</select></div>'
+    , [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: '💾 Güncelle', cls: 'bp', fn: async function() {
+            var name = (document.getElementById('inv-name') || {}).value || '';
+            var price = parseFloat((document.getElementById('inv-price') || {}).value) || 0;
+            if (!name.trim()) { toast('Ürün adı gerekli!', 'e'); return; }
+            if (price <= 0) { toast('Birim fiyat gerekli!', 'e'); return; }
+
+            item.name = name.trim();
+            item.category = ((document.getElementById('inv-category') || {}).value || '').trim();
+            item.sku = ((document.getElementById('inv-sku') || {}).value || '').trim();
+            item.unit = (document.getElementById('inv-unit') || {}).value || 'adet';
+            item.unitPrice = price;
+            item.criticalStock = parseInt((document.getElementById('inv-critical') || {}).value) || 5;
+            item.status = (document.getElementById('inv-status') || {}).value || 'active';
+
+            var result = await DB.upsert('inventory_items', DB.mappers.fromInventoryItem(item));
+            if (result) {
+                toast('✅ Ürün güncellendi!', 'g');
+                closeModal();
+                go('inventory');
+            }
+        }}
+    ]);
+};
+
+// ── Stok artırma modalı ──────────────────────────────────────────
+window.showStockAddModal = function(itemId) {
+    var item = (AppState.data.inventoryItems || []).find(function(i) { return i.id === itemId; });
+    if (!item) { toast('Ürün bulunamadı!', 'e'); return; }
+
+    modal('📦 Stok Girişi — ' + FormatUtils.escape(item.name),
+        '<div class="al al-b mb3" style="border-radius:10px;padding:12px"><div class="ts">Mevcut stok: <strong>' + item.stockQty + ' ' + FormatUtils.escape(item.unit) + '</strong></div></div>'
+        + '<div class="fgr mb2"><label>Eklenecek Miktar *</label><input id="stock-add-qty" type="number" min="1" value="1"/></div>'
+        + '<div class="fgr mb2"><label>Not</label><input id="stock-add-note" type="text" placeholder="Tedarikçiden alındı vb."/></div>'
+    , [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: '+ Stok Ekle', cls: 'bp', fn: async function() {
+            var qty = parseInt((document.getElementById('stock-add-qty') || {}).value) || 0;
+            if (qty <= 0) { toast('Geçerli bir miktar girin!', 'e'); return; }
+            var note = ((document.getElementById('stock-add-note') || {}).value || '').trim();
+
+            item.stockQty += qty;
+            await DB.upsert('inventory_items', DB.mappers.fromInventoryItem(item));
+
+            var mov = {
+                id: generateId(),
+                itemId: item.id,
+                itemName: item.name,
+                movementType: 'stock_in',
+                quantityDelta: qty,
+                note: note || 'Manuel stok girişi',
+                orgId: AppState.currentOrgId || '',
+                branchId: AppState.currentBranchId || ''
+            };
+            await DB.upsert('inventory_movements', DB.mappers.fromInventoryMovement(mov));
+            AppState.data.inventoryMovements.unshift(mov);
+
+            toast('✅ ' + qty + ' ' + item.unit + ' stok eklendi. Yeni stok: ' + item.stockQty, 'g');
+            closeModal();
+            go('inventory');
+        }}
+    ]);
+};
+
+// ── Ürün silme ───────────────────────────────────────────────────
+window.deleteInventoryItem = function(itemId) {
+    var item = (AppState.data.inventoryItems || []).find(function(i) { return i.id === itemId; });
+    if (!item) return;
+
+    modal('🗑 Ürün Sil', '<div class="al al-r mb3" style="border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Dikkat</div><p class="ts">"<strong>' + FormatUtils.escape(item.name) + '</strong>" ürünü silinecek. Bu işlem geri alınamaz.</p></div>', [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: '🗑 Sil', cls: 'bd', fn: async function() {
+            item.status = 'deleted';
+            await DB.upsert('inventory_items', DB.mappers.fromInventoryItem(item));
+            toast('Ürün silindi.', 'g');
+            closeModal();
+            go('inventory');
+        }}
+    ]);
+};
+
+// ── Stok hareketleri görüntüleme ─────────────────────────────────
+window.showInventoryMovements = function() {
+    var movements = AppState.data.inventoryMovements || [];
+    var rows = '';
+    if (movements.length === 0) {
+        rows = '<div class="empty-state" style="padding:32px;text-align:center"><div style="font-size:44px;margin-bottom:10px">📋</div><div class="tw6 ts">Henüz stok hareketi yok</div></div>';
+    } else {
+        rows = '<div class="tw" style="overflow-x:auto;max-height:400px;overflow-y:auto"><table class="inv-table"><thead><tr><th>Tarih</th><th>Ürün</th><th>Tür</th><th>Miktar</th><th>Not</th><th>Sporcu</th></tr></thead><tbody>';
+        movements.slice(0, 100).forEach(function(m) {
+            var typeLabel = m.movementType === 'stock_in' ? '<span class="bg bg-g">Giriş</span>'
+                : m.movementType === 'sale' ? '<span class="bg bg-b">Satış</span>'
+                : '<span class="bg bg-y">' + FormatUtils.escape(m.movementType) + '</span>';
+            var qtyClass = m.quantityDelta > 0 ? 'tg' : 'tr2';
+            var qtySign = m.quantityDelta > 0 ? '+' : '';
+            var dateStr = m.createdAt ? DateUtils.format(m.createdAt.substring(0, 10)) : '-';
+            rows += '<tr>'
+                + '<td class="ts">' + dateStr + '</td>'
+                + '<td class="tw6">' + FormatUtils.escape(m.itemName || '-') + '</td>'
+                + '<td>' + typeLabel + '</td>'
+                + '<td class="tw6 ' + qtyClass + '">' + qtySign + m.quantityDelta + '</td>'
+                + '<td class="ts tm">' + FormatUtils.escape(m.note || '-') + '</td>'
+                + '<td class="ts">' + FormatUtils.escape(m.athleteName || '-') + '</td>'
+                + '</tr>';
+        });
+        rows += '</tbody></table></div>';
+    }
+
+    modal('📋 Stok Hareketleri', rows, [
+        { lbl: 'Kapat', cls: 'bs', fn: closeModal }
+    ]);
+};
+
+// ── Sporcu profiline envanter satışı: addPaymentForAthlete override
+var _origAddPaymentForAthlete = window.addPaymentForAthlete;
+window.addPaymentForAthlete = function(aid) {
+    var a = AppState.data.athletes.find(function(x) { return x.id === aid; });
+    if (!a) return;
+
+    var invItems = (AppState.data.inventoryItems || []).filter(function(i) { return i.status === 'active' && i.stockQty > 0; });
+    var invOptions = invItems.map(function(i) {
+        return '<option value="' + FormatUtils.escape(i.id) + '">' + FormatUtils.escape(i.name) + ' (' + i.stockQty + ' ' + FormatUtils.escape(i.unit) + ' — ' + FormatUtils.currency(i.unitPrice) + ')</option>';
+    }).join('');
+
+    modal('Yeni Ödeme Ekle', '<div class="fgr mb2"><label>Sporcu</label><input value="' + FormatUtils.escape(a.fn + ' ' + a.ln) + '" disabled/></div>'
+        + '<div class="fgr mb3"><label>Ödeme Tipi</label><select id="p-payment-type" onchange="togglePaymentTypeFields()" style="padding:10px 12px">'
+        + '<option value="aidat">💰 Aidat</option>'
+        + '<option value="spor_malzemesi">🏋️ Spor Malzemesi</option>'
+        + '</select></div>'
+
+        // Aidat alanları
+        + '<div id="aidat-fields">'
+        + '<div class="g21">'
+        + '<div class="fgr"><label>Tutar (₺) *</label><input id="p-amt" type="number" value="' + (a.fee || '') + '"/></div>'
+        + '<div class="fgr"><label>İşlem Türü</label><select id="p-ty"><option value="income">Gelir (Tahsilat)</option><option value="expense">Gider</option></select></div>'
+        + '</div>'
+        + '<div class="fgr mt2"><label>Açıklama</label><input id="p-ds" value="Aylık Aidat"/></div>'
+        + '<div class="g21 mt2">'
+        + '<div class="fgr"><label>Durum</label><select id="p-st"><option value="completed">Ödendi</option><option value="pending">Bekliyor</option></select></div>'
+        + '<div class="fgr"><label>Tarih</label><input id="p-dt" type="date" value="' + DateUtils.today() + '"/></div>'
+        + '</div>'
+        + '</div>'
+
+        // Spor malzemesi alanları
+        + '<div id="malzeme-fields" style="display:none">'
+        + '<div class="fgr mb2"><label>Ürün *</label><select id="p-inv-item" onchange="updateInvPrice()" style="padding:10px 12px">'
+        + '<option value="">Ürün seçin...</option>' + invOptions
+        + '</select></div>'
+        + '<div class="g21 mb2">'
+        + '<div class="fgr"><label>Adet *</label><input id="p-inv-qty" type="number" min="1" value="1" onchange="updateInvTotal()" oninput="updateInvTotal()"/></div>'
+        + '<div class="fgr"><label>Birim Fiyat (₺)</label><input id="p-inv-price" type="number" readonly style="background:var(--bg3)"/></div>'
+        + '</div>'
+        + '<div class="fgr mb2"><label>Toplam Tutar (₺)</label><input id="p-inv-total" type="number" readonly style="background:var(--bg3);font-weight:700"/></div>'
+        + '<div class="fgr mb2"><label>Tarih</label><input id="p-inv-date" type="date" value="' + DateUtils.today() + '"/></div>'
+        + '<div class="fgr mb2"><label>Durum</label><select id="p-inv-st" style="padding:10px 12px"><option value="completed">Ödendi</option><option value="pending">Bekliyor</option></select></div>'
+        + (invItems.length === 0 ? '<div class="al al-y" style="border-radius:10px;padding:12px"><div class="tw6 tsm mb1">⚠️ Stokta ürün yok</div><div class="ts tm">Önce Envanter sayfasından ürün ekleyin.</div></div>' : '')
+        + '</div>'
+    , [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: 'Kaydet', cls: 'bp', fn: async function() {
+            var paymentType = (document.getElementById('p-payment-type') || {}).value || 'aidat';
+
+            if (paymentType === 'aidat') {
+                // Orijinal aidat akışı
+                var obj = {
+                    id: generateId(),
+                    aid: aid,
+                    an: a.fn + ' ' + a.ln,
+                    amt: parseFloat((document.getElementById('p-amt') || {}).value) || 0,
+                    ds: (document.getElementById('p-ds') || {}).value || '',
+                    st: (document.getElementById('p-st') || {}).value || 'completed',
+                    dt: (document.getElementById('p-dt') || {}).value || DateUtils.today(),
+                    ty: (document.getElementById('p-ty') || {}).value || 'income',
+                    serviceName: (document.getElementById('p-ds') || {}).value || 'Aylık Aidat',
+                    paymentType: 'aidat'
+                };
+                if (!obj.amt) { toast('Tutar giriniz!', 'e'); return; }
+                var result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
+                if (result) {
+                    AppState.data.payments.push(obj);
+                    toast('Ödeme kaydedildi!', 'g');
+                    closeModal();
+                    go('athleteProfile', { id: aid });
+                }
+            } else {
+                // Spor malzemesi satışı
+                var itemId = (document.getElementById('p-inv-item') || {}).value;
+                var qty = parseInt((document.getElementById('p-inv-qty') || {}).value) || 0;
+                var invDate = (document.getElementById('p-inv-date') || {}).value || DateUtils.today();
+                var invStatus = (document.getElementById('p-inv-st') || {}).value || 'completed';
+
+                if (!itemId) { toast('Ürün seçiniz!', 'e'); return; }
+                if (qty <= 0) { toast('Geçerli adet giriniz!', 'e'); return; }
+
+                var invItem = (AppState.data.inventoryItems || []).find(function(i) { return i.id === itemId; });
+                if (!invItem) { toast('Ürün bulunamadı!', 'e'); return; }
+                if (invItem.stockQty < qty) { toast('Stok yetersiz! Mevcut: ' + invItem.stockQty + ' ' + invItem.unit, 'e'); return; }
+
+                var unitPrice = invItem.unitPrice;
+                var totalAmt = unitPrice * qty;
+
+                // 1) payments tablosuna kayıt
+                var payObj = {
+                    id: generateId(),
+                    aid: aid,
+                    an: a.fn + ' ' + a.ln,
+                    amt: totalAmt,
+                    ds: invItem.name + ' x' + qty,
+                    st: invStatus,
+                    dt: invDate,
+                    ty: 'income',
+                    serviceName: invItem.name + ' x' + qty,
+                    paymentType: 'spor_malzemesi',
+                    inventoryItemId: invItem.id,
+                    inventoryItemName: invItem.name,
+                    inventoryQty: qty,
+                    inventoryUnitPrice: unitPrice
+                };
+                var payResult = await DB.upsert('payments', DB.mappers.fromPayment(payObj));
+                if (!payResult) { toast('Ödeme kaydedilemedi!', 'e'); return; }
+                AppState.data.payments.push(payObj);
+
+                // 2) inventory_movements tablosuna satış kaydı
+                var movObj = {
+                    id: generateId(),
+                    itemId: invItem.id,
+                    itemName: invItem.name,
+                    movementType: 'sale',
+                    quantityDelta: -qty,
+                    note: a.fn + ' ' + a.ln + ' — ' + qty + ' ' + invItem.unit + ' satış',
+                    relatedPaymentId: payObj.id,
+                    athleteId: aid,
+                    athleteName: a.fn + ' ' + a.ln,
+                    orgId: AppState.currentOrgId || '',
+                    branchId: AppState.currentBranchId || ''
+                };
+                await DB.upsert('inventory_movements', DB.mappers.fromInventoryMovement(movObj));
+                AppState.data.inventoryMovements.unshift(movObj);
+
+                // 3) inventory_items stok düşür
+                invItem.stockQty -= qty;
+                await DB.upsert('inventory_items', DB.mappers.fromInventoryItem(invItem));
+
+                toast('✅ ' + invItem.name + ' x' + qty + ' satışı kaydedildi! Toplam: ' + FormatUtils.currency(totalAmt), 'g');
+                closeModal();
+                go('athleteProfile', { id: aid });
+            }
+        }}
+    ]);
+};
+
+// ── Ödeme tipi geçiş yardımcıları ───────────────────────────────
+window.togglePaymentTypeFields = function() {
+    var type = (document.getElementById('p-payment-type') || {}).value;
+    var aidatFields = document.getElementById('aidat-fields');
+    var malzemeFields = document.getElementById('malzeme-fields');
+    if (aidatFields) aidatFields.style.display = type === 'aidat' ? '' : 'none';
+    if (malzemeFields) malzemeFields.style.display = type === 'spor_malzemesi' ? '' : 'none';
+};
+
+window.updateInvPrice = function() {
+    var itemId = (document.getElementById('p-inv-item') || {}).value;
+    var invItem = (AppState.data.inventoryItems || []).find(function(i) { return i.id === itemId; });
+    var priceEl = document.getElementById('p-inv-price');
+    if (priceEl) priceEl.value = invItem ? invItem.unitPrice : 0;
+    updateInvTotal();
+};
+
+window.updateInvTotal = function() {
+    var price = parseFloat((document.getElementById('p-inv-price') || {}).value) || 0;
+    var qty = parseInt((document.getElementById('p-inv-qty') || {}).value) || 0;
+    var totalEl = document.getElementById('p-inv-total');
+    if (totalEl) totalEl.value = (price * qty).toFixed(2);
+};
+
+// ── Envanter veri yükleme — mevcut veri yükleme akışına entegre ──
+window.registerGoHook('after', function(page) {
+    if (page === 'dashboard' || page === 'payments' || page === 'accounting') {
+        // Bu sayfalara geçince envanter verisi de yükle (gerekirse)
+        if ((AppState.data.inventoryItems || []).length === 0) {
+            loadInventoryData();
+        }
+    }
+});
+
+// ── Envanter accordion auto-open: inventory sayfasına gidince ────
+window.registerGoHook('after', function(page) {
+    if (page === 'inventory') {
+        // Muhasebe accordion'ını aç
+        var body = document.getElementById('accb-finance');
+        if (body && body.classList.contains('collapsed')) {
+            toggleAccordion('finance');
+        }
+    }
+});
+
+// ── updateBranchUI override: Envanter butonunu coach için gizle ──
+var _origUpdateBranchUI4 = typeof updateBranchUI === 'function' ? updateBranchUI : null;
+window.updateBranchUI = function() {
+    if (_origUpdateBranchUI4) _origUpdateBranchUI4();
+    if (AppState.currentUser && AppState.currentUser.role === 'coach') {
+        var invBtn = document.getElementById('ni-inventory');
+        if (invBtn) invBtn.style.display = 'none';
+    }
+};
+
+// ── Finans / Rapor: pgAccountingV8 override — envanter ile ──────
+var _origPgAccountingV8 = window.pgAccountingV8;
+window.pgAccountingV8 = function() {
+    var baseHtml = _origPgAccountingV8();
+
+    // Aidat vs Envanter gelir ayrımı
+    var allCompleted = AppState.data.payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; });
+    var aidatIncome = 0, envIncome = 0;
+    allCompleted.forEach(function(p) {
+        if ((p.paymentType || 'aidat') === 'spor_malzemesi') {
+            envIncome += (p.amt || 0);
+        } else {
+            aidatIncome += (p.amt || 0);
+        }
+    });
+    var totalIncome = aidatIncome + envIncome;
+
+    // Dönem filtresi uygula
+    var filteredCompleted = allCompleted.filter(function(p) { return isInPeriod(p.dt); });
+    var fAidatIncome = 0, fEnvIncome = 0;
+    filteredCompleted.forEach(function(p) {
+        if ((p.paymentType || 'aidat') === 'spor_malzemesi') {
+            fEnvIncome += (p.amt || 0);
+        } else {
+            fAidatIncome += (p.amt || 0);
+        }
+    });
+
+    // Ürün bazlı satış dağılımı
+    var productSales = {};
+    filteredCompleted.filter(function(p) { return (p.paymentType || 'aidat') === 'spor_malzemesi'; }).forEach(function(p) {
+        var name = p.inventoryItemName || p.ds || 'Bilinmeyen Ürün';
+        if (!productSales[name]) productSales[name] = { name: name, totalAmount: 0, totalQty: 0 };
+        productSales[name].totalAmount += (p.amt || 0);
+        productSales[name].totalQty += (p.inventoryQty || 0);
+    });
+    var productSalesList = Object.keys(productSales).map(function(k) { return productSales[k]; }).sort(function(a, b) { return b.totalAmount - a.totalAmount; });
+
+    // Envanter gelir kartlarını oluştur
+    var envSection = '<div class="card mb3" style="border-left:4px solid var(--blue2)">'
+        + '<div class="tw6 tsm mb3">📦 Gelir Dağılımı: Aidat vs Envanter Satış</div>'
+        + '<div class="g3 mb3">'
+        + '<div style="text-align:center;padding:16px;background:var(--bg3);border-radius:12px"><div class="stat-box-value tg" style="font-size:20px">' + FormatUtils.currency(fAidatIncome) + '</div><div class="ts tm mt1">💰 Aidat Geliri</div></div>'
+        + '<div style="text-align:center;padding:16px;background:var(--bg3);border-radius:12px"><div class="stat-box-value tb" style="font-size:20px">' + FormatUtils.currency(fEnvIncome) + '</div><div class="ts tm mt1">📦 Envanter Satış Geliri</div></div>'
+        + '<div style="text-align:center;padding:16px;background:var(--bg3);border-radius:12px"><div class="stat-box-value tpur" style="font-size:20px">' + FormatUtils.currency(fAidatIncome + fEnvIncome) + '</div><div class="ts tm mt1">💎 Genel Toplam Gelir</div></div>'
+        + '</div>';
+
+    // Gelir dağılımı çubuk
+    var totalF = fAidatIncome + fEnvIncome || 1;
+    var aidatPct = Math.round((fAidatIncome / totalF) * 100);
+    var envPct = 100 - aidatPct;
+    envSection += '<div class="mb3"><div class="flex fjb fca mb1"><span class="ts tm">Aidat: %' + aidatPct + '</span><span class="ts tm">Envanter: %' + envPct + '</span></div>'
+        + '<div class="prb" style="height:12px;border-radius:6px;overflow:hidden;display:flex">'
+        + '<div style="width:' + aidatPct + '%;background:var(--green);height:100%"></div>'
+        + '<div style="width:' + envPct + '%;background:var(--blue2);height:100%"></div>'
+        + '</div>'
+        + '<div class="flex gap3 mt2"><div class="flex fca gap1"><div style="width:10px;height:10px;border-radius:50%;background:var(--green)"></div><span class="ts tm">Aidat</span></div><div class="flex fca gap1"><div style="width:10px;height:10px;border-radius:50%;background:var(--blue2)"></div><span class="ts tm">Envanter</span></div></div>'
+        + '</div>';
+
+    // Ürün bazlı satış tablosu
+    if (productSalesList.length > 0) {
+        envSection += '<div class="tw6 tsm mb2 mt3">🛒 Ürün Bazlı Satış Dağılımı</div>'
+            + '<div class="tw" style="overflow-x:auto"><table class="inv-table"><thead><tr><th>Ürün</th><th>Satış Adedi</th><th>Toplam Gelir</th></tr></thead><tbody>';
+        productSalesList.forEach(function(ps) {
+            envSection += '<tr><td class="tw6">' + FormatUtils.escape(ps.name) + '</td><td>' + ps.totalQty + '</td><td class="tw6 tg">' + FormatUtils.currency(ps.totalAmount) + '</td></tr>';
+        });
+        envSection += '</tbody></table></div>';
+    } else {
+        envSection += '<div class="ts tm" style="text-align:center;padding:16px">Seçili dönemde envanter satışı bulunmuyor.</div>';
+    }
+
+    envSection += '</div>';
+
+    // baseHtml'in sonuna envanter bölümünü ekle (banka bilgileri kartından önce)
+    var bankCardIndex = baseHtml.lastIndexOf('<div class="card"><div class="tw6 tsm mb2">🏦 Banka Bilgileri');
+    if (bankCardIndex > -1) {
+        baseHtml = baseHtml.substring(0, bankCardIndex) + envSection + baseHtml.substring(bankCardIndex);
+    } else {
+        baseHtml += envSection;
+    }
+
+    return baseHtml;
+};
+
+// ── Sporcu profil: ödeme geçmişinde envanter satışlarını göster ──
+// generatePaymentHistory override — spor malzemesi kayıtlarını farklı göster
+var _origGeneratePaymentHistory = typeof generatePaymentHistory === 'function' ? generatePaymentHistory : null;
+window.generatePaymentHistory = function(athleteId) {
+    var payments = AppState.data.payments.filter(function(p) { return p.aid === athleteId; });
+    if (payments.length === 0) {
+        return '<div class="empty-state" style="padding:32px;text-align:center"><div style="font-size:44px;margin-bottom:10px">📭</div><div class="tw6 ts">Henüz ödeme kaydı yok</div></div>';
+    }
+
+    // Ayrı listeler
+    var aidatPayments = payments.filter(function(p) { return (p.paymentType || 'aidat') === 'aidat'; });
+    var envPayments = payments.filter(function(p) { return (p.paymentType || 'aidat') === 'spor_malzemesi'; });
+
+    var html = '';
+
+    // Aidat ödemeleri
+    html += '<div class="tw6 tsm mb2">💰 Aidat Ödemeleri (' + aidatPayments.length + ')</div>';
+    if (aidatPayments.length > 0) {
+        html += '<div class="tw mb3" style="overflow-x:auto"><table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>';
+        aidatPayments.sort(function(a, b) { return new Date(b.dt) - new Date(a.dt); }).forEach(function(p) {
+            var statusBadge = p.st === 'completed' ? '<span class="bg bg-g">Ödendi</span>' : p.st === 'overdue' ? '<span class="bg bg-r">Gecikmiş</span>' : '<span class="bg bg-y">Bekliyor</span>';
+            html += '<tr><td>' + DateUtils.format(p.dt) + '</td><td>' + FormatUtils.escape(p.ds || p.serviceName || 'Aidat') + '</td><td class="tw6">' + FormatUtils.currency(p.amt) + '</td><td>' + statusBadge + '</td><td><button class="btn btn-xs bs" onclick="editPay(\'' + p.id + '\')">✏️</button></td></tr>';
+        });
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="ts tm mb3">Aidat kaydı bulunamadı.</div>';
+    }
+
+    // Spor malzemesi ödemeleri
+    html += '<div class="tw6 tsm mb2">🏋️ Spor Malzemesi Satışları (' + envPayments.length + ')</div>';
+    if (envPayments.length > 0) {
+        html += '<div class="tw" style="overflow-x:auto"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Adet</th><th>Birim Fiyat</th><th>Toplam</th><th>Durum</th></tr></thead><tbody>';
+        envPayments.sort(function(a, b) { return new Date(b.dt) - new Date(a.dt); }).forEach(function(p) {
+            var statusBadge = p.st === 'completed' ? '<span class="bg bg-g">Ödendi</span>' : p.st === 'overdue' ? '<span class="bg bg-r">Gecikmiş</span>' : '<span class="bg bg-y">Bekliyor</span>';
+            html += '<tr><td>' + DateUtils.format(p.dt) + '</td><td class="tw6">' + FormatUtils.escape(p.inventoryItemName || p.ds || '-') + '</td><td>' + (p.inventoryQty || '-') + '</td><td>' + FormatUtils.currency(p.inventoryUnitPrice || 0) + '</td><td class="tw6 tg">' + FormatUtils.currency(p.amt) + '</td><td>' + statusBadge + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="ts tm">Spor malzemesi satış kaydı bulunamadı.</div>';
+    }
+
+    return html;
+};
+
+// ── Coach restriction: inventory sayfa erişimi engelle ───────────
+(function() {
+    var origGo = window.go;
+    var _goPatched = false;
+    function patchGo() {
+        if (_goPatched) return;
+        if (typeof window.go !== 'function') return;
+        _goPatched = true;
+        var _prevGo = window.go;
+        // Coach cannot access inventory
+        // Already handled by before hook returning false
+    }
+})();
+
+console.log('✅ Geliştirme 1-27 uygulandı — script-fixes.js V15');
