@@ -958,17 +958,17 @@ window.spOdemeler = function() {
     if (!a) return '';
     var completed = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
     var pending = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
-    var pendingPlans = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return x.dt.localeCompare(y.dt); });
+    var pendingPayments = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return x.dt.localeCompare(y.dt); });
     var totalPaid = completed.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
-    var totalDebt = pendingPlans.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
+    var totalDebt = pendingPayments.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
     var mLabel = function(m) { return ({ nakit: 'Nakit', kredi_karti: 'Kredi Kartı', havale: 'Havale/EFT', paytr: 'PayTR Online' })[m] || (m || 'Ödeme'); };
 
     var html = '<div class="sp-stats-row mb3"><div class="stat-box"><div class="stat-box-value tg">' + FormatUtils.currency(totalPaid) + '</div><div class="stat-box-label">Toplam Ödenen</div></div><div class="stat-box"><div class="stat-box-value ' + (totalDebt > 0 ? 'tr2' : 'tg') + '">' + FormatUtils.currency(totalDebt) + '</div><div class="stat-box-label">Toplam Borç</div></div><div class="stat-box"><div class="stat-box-value ' + (pending.length > 0 ? 'to' : 'tg') + '">' + pending.length + '</div><div class="stat-box-label">Onay Bekleyen</div></div></div>';
 
-    if (pendingPlans.length > 0) {
-        html += '<div class="card mb3" style="border-left:3px solid var(--red)"><div class="flex fjb fca mb2"><div class="tw6 ts" style="color:var(--red)">📋 Bekleyen Ödemelerim (' + pendingPlans.length + ')</div><button class="btn bp btn-sm" onclick="spTab(\'odeme-yap\')">Ödeme Yap →</button></div>';
-        pendingPlans.forEach(function(p) { html += '<div class="payment-card"><div class="payment-info"><div class="payment-amount">' + FormatUtils.currency(p.amt) + '</div><div class="payment-date">' + FormatUtils.escape(p.ds || 'Aidat') + ' • Vade: ' + DateUtils.format(p.dt) + '</div></div><span class="bg ' + (p.st === 'overdue' ? 'bg-r' : 'bg-y') + '">' + (p.st === 'overdue' ? 'Gecikmiş' : 'Bekliyor') + '</span></div>'; });
+    if (pendingPayments.length > 0) {
+        html += '<div class="card mb3" style="border-left:3px solid var(--red)"><div class="flex fjb fca mb2"><div class="tw6 ts" style="color:var(--red)">📋 Bekleyen Ödemelerim (' + pendingPayments.length + ')</div><button class="btn bp btn-sm" onclick="spTab(\'odeme-yap\')">Ödeme Yap →</button></div>';
+        pendingPayments.forEach(function(p) { html += '<div class="payment-card"><div class="payment-info"><div class="payment-amount">' + FormatUtils.currency(p.amt) + '</div><div class="payment-date">' + FormatUtils.escape(p.ds || 'Aidat') + ' • Vade: ' + DateUtils.format(p.dt) + '</div></div><span class="bg ' + (p.st === 'overdue' ? 'bg-r' : 'bg-y') + '">' + (p.st === 'overdue' ? 'Gecikmiş' : 'Bekliyor') + '</span></div>'; });
         html += '</div>';
     }
 
