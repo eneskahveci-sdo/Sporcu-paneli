@@ -38,6 +38,9 @@ console.log('script-fixes.js V11 yukleniyor...');
 //    Orijinal spTab textContent ile eşleştiriyordu, i18n bozuyordu
 // ────────────────────────────────────────────────────────
 window.spTab = function(tab) {
+    // "odeme-yap" kaldırıldı — eski çağrıları "odemeler" sayfasına yönlendir
+    if (tab === 'odeme-yap') tab = 'odemeler';
+
     // Tab butonlarını data-tab attribute ile eşleştir
     document.querySelectorAll('.sp-tab').forEach(function(el) {
         var elTab = el.getAttribute('data-tab');
@@ -50,12 +53,11 @@ window.spTab = function(tab) {
     var pages = {
         'profil': spProfil,
         'yoklama': spYoklama,
-        'odemeler': spOdemeler,
-        'odeme-yap': spOdemeYap
+        'odemeler': spOdemeler
     };
 
-    // Ödeme sekmelerine geçince DB'den taze payments çek
-    if ((tab === 'odeme-yap' || tab === 'odemeler') && AppState.currentSporcu) {
+    // Ödeme sekmesine geçince DB'den taze payments çek
+    if (tab === 'odemeler' && AppState.currentSporcu) {
         if (content) content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)">⏳ Yükleniyor...</div>';
         refreshSporcuPayments().then(function() {
             if (content && pages[tab]) content.innerHTML = pages[tab]();
@@ -950,12 +952,17 @@ window.submitOnKayit = async function() {
 };
 
 // ────────────────────────────────────────────────────────
-// 15) Sporcu portalında makbuz indirme butonu (spOdemeler override)
+// 15) Sporcu portalında birleşik ödemeler sayfası
+//     Geçmiş ödemeler + bekleyen ödemeler + toplu ödeme + makbuz
 // ────────────────────────────────────────────────────────
 var _origSpOdemeler = typeof spOdemeler === 'function' ? spOdemeler : null;
 window.spOdemeler = function() {
     var a = AppState.currentSporcu;
     if (!a) return '';
+    var s = AppState.data.settings;
+    var hasPayTR = s && s.paytrActive && s.paytrMerchantId;
+    var hasBank = s && (s.iban || s.bankName);
+
     var completed = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
     var pending = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
     var pendingPayments = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return x.dt.localeCompare(y.dt); });
@@ -964,14 +971,76 @@ window.spOdemeler = function() {
     var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
     var mLabel = function(m) { return ({ nakit: 'Nakit', kredi_karti: 'Kredi Kartı', havale: 'Havale/EFT', paytr: 'PayTR Online' })[m] || (m || 'Ödeme'); };
 
+    // ── Özet istatistikler ──
     var html = '<div class="sp-stats-row mb3"><div class="stat-box"><div class="stat-box-value tg">' + FormatUtils.currency(totalPaid) + '</div><div class="stat-box-label">Toplam Ödenen</div></div><div class="stat-box"><div class="stat-box-value ' + (totalDebt > 0 ? 'tr2' : 'tg') + '">' + FormatUtils.currency(totalDebt) + '</div><div class="stat-box-label">Toplam Borç</div></div><div class="stat-box"><div class="stat-box-value ' + (pending.length > 0 ? 'to' : 'tg') + '">' + pending.length + '</div><div class="stat-box-label">Onay Bekleyen</div></div></div>';
 
+    // ── Bekleyen ödemeler — checkbox ile seçim ve ödeme yapabilme ──
     if (pendingPayments.length > 0) {
-        html += '<div class="card mb3" style="border-left:3px solid var(--red)"><div class="flex fjb fca mb2"><div class="tw6 ts" style="color:var(--red)">📋 Bekleyen Ödemelerim (' + pendingPayments.length + ')</div><button class="btn bp btn-sm" onclick="spTab(\'odeme-yap\')">Ödeme Yap →</button></div>';
-        pendingPayments.forEach(function(p) { html += '<div class="payment-card"><div class="payment-info"><div class="payment-amount">' + FormatUtils.currency(p.amt) + '</div><div class="payment-date">' + FormatUtils.escape(p.ds || 'Aidat') + ' • Vade: ' + DateUtils.format(p.dt) + '</div></div><span class="bg ' + (p.st === 'overdue' ? 'bg-r' : 'bg-y') + '">' + (p.st === 'overdue' ? 'Gecikmiş' : 'Bekliyor') + '</span></div>'; });
+        var planRows = '';
+        pendingPayments.forEach(function(p) {
+            var isOverdue = p.st === 'overdue';
+            var today = typeof DateUtils !== 'undefined' ? DateUtils.today() : new Date().toISOString().slice(0, 10);
+            var isLate = !isOverdue && p.dt && p.dt < today;
+            var badge = (isOverdue || isLate)
+                ? '<span class="bg bg-r">Gecikmiş</span>'
+                : '<span class="bg bg-y">Bekliyor</span>';
+            planRows += '<div class="sp-plan-cb-row" onclick="var cb=this.querySelector(\'.sp-plan-cb\');cb.checked=!cb.checked;this.classList.toggle(\'checked\',cb.checked);_spUpdateBulkTotal()">'
+                + '<input type="checkbox" class="sp-plan-cb" value="' + FormatUtils.escape(p.id) + '" data-amt="' + (p.amt || 0) + '" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'checked\',this.checked);_spUpdateBulkTotal()"/>'
+                + '<div style="flex:1;min-width:0">'
+                + '<div class="tw6 ts">' + ((isOverdue || isLate) ? '⚠️ ' : '📅 ') + FormatUtils.escape(p.ds || p.serviceName || 'Aidat') + '</div>'
+                + '<div class="ts tm mt1">Vade: ' + DateUtils.format(p.dt) + '</div>'
+                + '</div>'
+                + '<div style="text-align:right;flex-shrink:0">'
+                + '<div class="tw6 ts tg">' + FormatUtils.currency(p.amt) + '</div>'
+                + badge
+                + '</div></div>';
+        });
+
+        html += '<div class="card mb3" style="border-left:3px solid var(--red)">';
+        html += '<div class="tw6 ts mb2" style="color:var(--red)">📋 Bekleyen Ödemelerim (' + pendingPayments.length + ')</div>';
+
+        // Borç barı
+        html += '<div class="sp-debt-bar mb3"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span class="ts tm">Toplam Bekleyen Borç</span><span class="tw6 tr2">' + FormatUtils.currency(totalDebt) + '</span></div><div class="prb"><div style="height:100%;background:var(--red);border-radius:4px;width:100%"></div></div></div>';
+
+        // Toplu seçim kontrolleri
+        html += '<div class="flex fjb fca gap2 mb2"><button type="button" class="btn btn-xs bs" onclick="selectAllSpPlans()">✅ Tümünü Seç</button><div id="sp-bulk-total" class="sp-bulk-total" style="display:none"><span class="ts tm">Seçilen toplam:</span><span class="tw6 tg" id="sp-bulk-total-val">₺0</span></div></div>';
+        html += '<button class="btn bp w100 mb3" id="sp-bulk-pay-btn" style="display:none" onclick="spPayBulk()">💳 Seçilenleri Öde</button>';
+
+        // Plan satırları
+        html += '<div class="plan-list" style="gap:8px">' + planRows + '</div>';
         html += '</div>';
     }
 
+    // ── Ödeme formu (gizli, plan seçilince açılır) ──
+    html += '<div class="card mb3" id="sp-pay-form" style="display:none">';
+    html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
+    html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
+    html += '<div class="pay-choice-grid mb3">';
+    if (hasBank) {
+        html += '<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice(\'havale\')"><div class="pay-choice-icon">🏦</div><div class="pay-choice-title">Havale / EFT</div><div class="pay-choice-desc">Banka havalesi veya EFT ile ödeme yapın</div></div>';
+    }
+    if (hasPayTR) {
+        html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
+    }
+    if (!hasBank && !hasPayTR) {
+        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
+    }
+    html += '</div>';
+    html += '<div id="pay-method-detail" class="mb2"></div>';
+    html += '<div class="fgr mb2 dn" id="sp-desc-wrapper"><label>Açıklama <span class="tm ts">(opsiyonel)</span></label><input id="sp-desc" placeholder="Ödeme notu ekleyin..."/></div>';
+    html += '<button class="btn bp w100 mt2" id="pay-submit-btn" style="display:none" onclick="submitSpPayment()">Bildirim Gönder</button>';
+    html += '</div>';
+
+    // ── Onay bekleyen bildirimler ──
+    if (pending.length > 0) {
+        html += '<div class="card mb3" style="border-left:3px solid var(--yellow)"><div class="tw6 ts mb2" style="color:var(--yellow)">⏳ Onay Bekleyen Bildirimlerim</div>';
+        pending.forEach(function(p) {
+            html += '<div class="payment-card" style="border-color:rgba(234,179,8,.35);gap:10px"><div style="font-size:24px;flex-shrink:0">' + mIcon(p.payMethod) + '</div><div class="payment-info"><div class="payment-amount" style="font-size:16px;color:var(--yellow)">' + FormatUtils.currency(p.amt) + '</div><div class="payment-date">' + mLabel(p.payMethod) + ' • ' + DateUtils.format(p.dt) + '</div><div class="ts tm mt1">' + FormatUtils.escape(p.ds || p.serviceName || 'Aidat') + '</div></div><span class="bg bg-y" style="flex-shrink:0;white-space:nowrap">Bekliyor</span></div>';
+        });
+        html += '</div>';
+    }
+
+    // ── Ödeme geçmişi ──
     html += '<div class="card"><div class="tw6 tsm mb3">✅ Ödeme Geçmişim</div>';
     if (completed.length === 0) {
         html += '<div class="empty-state"><div style="font-size:44px;margin-bottom:10px">📭</div><div class="tw6 ts">Henüz onaylanmış ödeme yok</div></div>';
@@ -981,6 +1050,7 @@ window.spOdemeler = function() {
         });
     }
     html += '</div>';
+
     return html;
 };
 
