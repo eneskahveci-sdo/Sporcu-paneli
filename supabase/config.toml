@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.paytr-webhook]
 verify_jwt = false
+
+[functions.provision-auth-user]
+verify_jwt = false
