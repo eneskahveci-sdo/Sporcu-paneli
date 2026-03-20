@@ -174,23 +174,311 @@ table{min-width:600px}
 /* Feature 3: Bulk payment checkboxes */
 .sp-plan-cb-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .2s}.sp-plan-cb-row:hover{border-color:var(--blue2)}.sp-plan-cb-row.checked{border-color:var(--blue2);background:rgba(59,130,246,.08)}.sp-plan-cb-row input[type="checkbox"]{width:18px;height:18px;flex-shrink:0;cursor:pointer}.sp-bulk-total{background:var(--bg3);border:1px solid var(--blue);border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
 .acc-group{margin-bottom:2px}.acc-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:transparent;color:var(--text2);font-size:inherit;font-weight:500;text-transform:none;letter-spacing:normal;cursor:pointer;transition:all .2s;min-height:44px}.acc-header:hover{background:var(--bg3);color:var(--text)}.acc-title{flex:1;text-align:left}.acc-arrow{width:16px;height:16px;transition:transform .25s;opacity:.7;flex-shrink:0}.acc-body{overflow:hidden;transition:max-height .3s ease,opacity .25s;max-height:500px;opacity:1}.acc-body.collapsed{max-height:0!important;opacity:0;pointer-events:none}.acc-header[aria-expanded="false"] .acc-arrow{transform:rotate(-90deg)}.slogo{padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--bg3)}.slogo-icon{width:36px;height:36px;background:var(--grad);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:800;overflow:hidden;flex-shrink:0;box-shadow:0 2px 6px rgba(59,130,246,.25)}html[data-theme="light"] .slogo-icon{color:#FFED00}
-/* ===== COMPACT FULLCALENDAR ===== */
-#fc-calendar .fc-toolbar{margin-bottom:8px!important;gap:6px;flex-wrap:wrap}
-#fc-calendar .fc-toolbar-title{font-size:15px!important;font-weight:600!important}
-#fc-calendar .fc-button{padding:4px 10px!important;font-size:12px!important;border-radius:6px!important}
-#fc-calendar .fc-col-header-cell{padding:4px 0!important;font-size:11px!important;font-weight:600!important}
-#fc-calendar .fc-daygrid-day{min-height:auto!important}
-#fc-calendar .fc-daygrid-day-frame{padding:2px!important;min-height:60px!important}
-#fc-calendar .fc-daygrid-day-number{font-size:12px!important;padding:2px 4px!important}
-#fc-calendar .fc-event{font-size:10px!important;padding:1px 3px!important;border-radius:3px!important;line-height:1.3!important;margin-bottom:1px!important}
-#fc-calendar .fc-daygrid-day-events{margin-top:0!important}
-#fc-calendar .fc-scrollgrid{border:none!important}
-#fc-calendar .fc-theme-standard td,#fc-calendar .fc-theme-standard th{border-color:var(--border)!important}
-#fc-calendar .fc-day-today{background:rgba(59,130,246,0.08)!important}
-@media(max-width:768px){
-#fc-calendar .fc-toolbar{flex-direction:row!important;gap:4px}
-#fc-calendar .fc-toolbar-title{font-size:14px!important}
-#fc-calendar .fc-daygrid-day-frame{min-height:48px!important}
-#fc-calendar .fc-event{font-size:9px!important}
-#fc-calendar .fc-col-header-cell{font-size:10px!important}
+
+/* Theme refresh: corporate navy-gold, subtle glass only via CSS overrides */
+:root{
+--bg:#09111f;
+--bg2:rgba(17,28,46,.88);
+--bg3:rgba(24,38,61,.82);
+--bg4:#1a2942;
+--border:rgba(151,176,216,.12);
+--border2:rgba(84,119,186,.38);
+--text:#e6edf8;
+--text2:#9cafc9;
+--text3:#6e819f;
+--blue:#163979;
+--blue2:#2d5cb3;
+--blue3:#0b225c;
+--yellow:#d8a312;
+--orange:#c98716;
+--grad:linear-gradient(135deg,#0b225c,#224b93);
+--grad-hover:linear-gradient(135deg,#173a7f,#2a57a1);
+}
+
+html[data-theme="light"]{
+--bg:#edf3f8;
+--bg2:rgba(255,255,255,.72);
+--bg3:rgba(255,255,255,.56);
+--bg4:rgba(231,238,247,.92);
+--border:rgba(11,34,92,.1);
+--border2:rgba(29,61,124,.22);
+--text:#10203b;
+--text2:#50627e;
+--text3:#75849b;
+--blue:#0b225c;
+--blue2:#21488e;
+--blue3:#091a47;
+--yellow:#d4a019;
+--orange:#bc7e18;
+--grad:linear-gradient(135deg,#0b225c,#21488e);
+--grad-hover:linear-gradient(135deg,#173a7f,#29539a);
+}
+
+@media(prefers-color-scheme:light){
+html:not([data-theme]){
+--bg:#edf3f8;
+--bg2:rgba(255,255,255,.72);
+--bg3:rgba(255,255,255,.56);
+--bg4:rgba(231,238,247,.92);
+--border:rgba(11,34,92,.1);
+--border2:rgba(29,61,124,.22);
+--text:#10203b;
+--text2:#50627e;
+--text3:#75849b;
+--blue:#0b225c;
+--blue2:#21488e;
+--blue3:#091a47;
+--yellow:#d4a019;
+--orange:#bc7e18;
+--grad:linear-gradient(135deg,#0b225c,#21488e);
+--grad-hover:linear-gradient(135deg,#173a7f,#29539a);
+}
+}
+
+body{
+background:
+radial-gradient(circle at top left, rgba(212,160,25,.12), transparent 22%),
+radial-gradient(circle at top right, rgba(33,72,142,.1), transparent 28%),
+var(--bg);
+}
+
+#side,
+#head,
+.card,
+.info-card,
+.stat-box,
+.chart-container,
+.document-card,
+.payment-card,
+.plan-card,
+.sp-plan-info-box,
+.sp-debt-bar,
+.pay-method-btn,
+.pay-choice-card,
+.m-box,
+.m-foot,
+.lbox,
+.ltab.on,
+.tab-nav,
+.tab-btn.active,
+.notif-panel,
+.toast,
+.bnav,
+.sp-head,
+.sp-nav,
+.slogo,
+.menu-btn,
+.ht-btn,
+.bs,
+.bw,
+.qa-btn,
+.excel-drop-zone,
+.onkayit-card,
+.att-day,
+.att-b,
+.calendar-shell,
+.fc,
+.fc-theme-standard .fc-scrollgrid,
+.fc-theme-standard td,
+.fc-theme-standard th{
+transition:background .3s ease,border-color .3s ease,box-shadow .3s ease,color .3s ease,backdrop-filter .3s ease;
+}
+
+#side,
+#head,
+.card,
+.info-card,
+.chart-container,
+.m-box,
+.lbox,
+.notif-panel,
+.sp-head,
+.sp-nav,
+.slogo{
+backdrop-filter:blur(14px);
+-webkit-backdrop-filter:blur(14px);
+}
+
+#head,
+.sp-head,
+.sp-nav,
+.notif-panel{
+box-shadow:0 14px 34px rgba(4,10,24,.18);
+}
+
+.card,
+.info-card,
+.chart-container,
+.m-box,
+.lbox,
+.notif-panel,
+.document-card,
+.payment-card,
+.plan-card,
+.pay-choice-card,
+.pay-method-btn,
+.excel-drop-zone,
+.onkayit-card,
+.stat-box{
+box-shadow:0 14px 36px rgba(8,15,32,.12), inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+.bp{
+background:var(--grad);
+box-shadow:0 10px 26px rgba(11,34,92,.22);
+}
+
+.bp:hover{
+background:var(--grad-hover);
+box-shadow:0 14px 30px rgba(11,34,92,.28);
+}
+
+.ni.on,
+.pay-method-btn.active,
+.pay-choice-card.active{
+background:var(--grad);
+color:#f3d57b;
+border-color:transparent;
+box-shadow:0 14px 30px rgba(11,34,92,.22);
+}
+
+.bni-btn.on,
+.sp-tab.on,
+.tab-btn.active,
+.ltab.on{
+color:var(--blue2);
+}
+
+html[data-theme="light"] .ni.on,
+html[data-theme="light"] .bp,
+html[data-theme="light"] .slogo-icon,
+html[data-theme="light"] .ava{color:#f5d978;}
+
+html[data-theme="light"] #side,
+html[data-theme="light"] #head,
+html[data-theme="light"] .card,
+html[data-theme="light"] .info-card,
+html[data-theme="light"] .chart-container,
+html[data-theme="light"] .m-box,
+html[data-theme="light"] .m-foot,
+html[data-theme="light"] .lbox,
+html[data-theme="light"] .notif-panel,
+html[data-theme="light"] .sp-head,
+html[data-theme="light"] .sp-nav,
+html[data-theme="light"] .slogo,
+html[data-theme="light"] .document-card,
+html[data-theme="light"] .payment-card,
+html[data-theme="light"] .plan-card,
+html[data-theme="light"] .pay-choice-card,
+html[data-theme="light"] .pay-method-btn,
+html[data-theme="light"] .excel-drop-zone,
+html[data-theme="light"] .onkayit-card,
+html[data-theme="light"] .stat-box,
+html[data-theme="light"] .menu-btn,
+html[data-theme="light"] .ht-btn,
+html[data-theme="light"] .bs,
+html[data-theme="light"] .bw,
+html[data-theme="light"] .qa-btn,
+html[data-theme="light"] .tab-nav,
+html[data-theme="light"] .att-day,
+html[data-theme="light"] .att-b{
+background:linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.56));
+border-color:rgba(255,255,255,.62);
+box-shadow:0 14px 34px rgba(15,27,51,.06), inset 0 1px 0 rgba(255,255,255,.5);
+backdrop-filter:blur(16px) saturate(1.04);
+-webkit-backdrop-filter:blur(16px) saturate(1.04);
+}
+
+html[data-theme="light"] #side,
+html[data-theme="light"] .slogo,
+html[data-theme="light"] #head,
+html[data-theme="light"] .sp-head,
+html[data-theme="light"] .sp-nav{
+background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62));
+}
+
+html[data-theme="light"] .ni:hover,
+html[data-theme="light"] .qa-btn:hover,
+html[data-theme="light"] .document-card:hover,
+html[data-theme="light"] .pay-method-btn:hover,
+html[data-theme="light"] .pay-choice-card:hover,
+html[data-theme="light"] .bs:hover,
+html[data-theme="light"] .ht-btn:hover,
+html[data-theme="light"] .menu-btn:hover{
+background:linear-gradient(180deg, rgba(255,255,255,.86), rgba(245,249,255,.68));
+}
+
+html[data-theme="light"] .ltab.on,
+html[data-theme="light"] .tab-btn.active{
+background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(247,250,255,.7));
+box-shadow:0 10px 22px rgba(15,27,51,.05), inset 0 1px 0 rgba(255,255,255,.56);
+}
+
+html[data-theme="light"] .ni.on,
+html[data-theme="light"] .bp,
+html[data-theme="light"] .pay-method-btn.active,
+html[data-theme="light"] .pay-choice-card.active{
+color:#f5da82;
+}
+
+html[data-theme="light"] .bg-y,
+html[data-theme="light"] .al-y,
+html[data-theme="light"] .badge-yellow{
+background:rgba(212,160,25,.12);
+border-color:rgba(212,160,25,.18);
+color:#9b6d00;
+}
+
+html[data-theme="light"] .bg-b,
+html[data-theme="light"] .al-b,
+html[data-theme="light"] .badge-blue,
+html[data-theme="light"] .change-badge.neutral{
+background:rgba(33,72,142,.1);
+border-color:rgba(33,72,142,.16);
+color:#173e82;
+}
+
+@media(prefers-color-scheme:light){
+html:not([data-theme]) #side,
+html:not([data-theme]) #head,
+html:not([data-theme]) .card,
+html:not([data-theme]) .info-card,
+html:not([data-theme]) .chart-container,
+html:not([data-theme]) .m-box,
+html:not([data-theme]) .m-foot,
+html:not([data-theme]) .lbox,
+html:not([data-theme]) .notif-panel,
+html:not([data-theme]) .sp-head,
+html:not([data-theme]) .sp-nav,
+html:not([data-theme]) .slogo,
+html:not([data-theme]) .document-card,
+html:not([data-theme]) .payment-card,
+html:not([data-theme]) .plan-card,
+html:not([data-theme]) .pay-choice-card,
+html:not([data-theme]) .pay-method-btn,
+html:not([data-theme]) .excel-drop-zone,
+html:not([data-theme]) .onkayit-card,
+html:not([data-theme]) .stat-box,
+html:not([data-theme]) .menu-btn,
+html:not([data-theme]) .ht-btn,
+html:not([data-theme]) .bs,
+html:not([data-theme]) .bw,
+html:not([data-theme]) .qa-btn,
+html:not([data-theme]) .tab-nav,
+html:not([data-theme]) .att-day,
+html:not([data-theme]) .att-b{
+background:linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.56));
+border-color:rgba(255,255,255,.62);
+box-shadow:0 14px 34px rgba(15,27,51,.06), inset 0 1px 0 rgba(255,255,255,.5);
+backdrop-filter:blur(16px) saturate(1.04);
+-webkit-backdrop-filter:blur(16px) saturate(1.04);
+}
+
+html:not([data-theme]) #side,
+html:not([data-theme]) .slogo,
+html:not([data-theme]) #head,
+html:not([data-theme]) .sp-head,
+html:not([data-theme]) .sp-nav{
+background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62));
+}
 }
