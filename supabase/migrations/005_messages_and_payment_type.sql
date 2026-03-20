@@ -22,33 +22,40 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at DESC);
 
--- RLS policies for messages
+-- RLS: Enable and create policies (consistent with 001_rls_policies.sql pattern)
+-- Note: If 001_rls_policies.sql already created messages policies,
+-- these IF NOT EXISTS equivalents ensure idempotency.
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
--- Authenticated users (admin/coach) can insert messages
-CREATE POLICY messages_insert_auth ON messages
-    FOR INSERT TO authenticated
-    WITH CHECK (true);
+-- Grant permissions to anon (consistent with other tables)
+GRANT SELECT ON messages TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON messages TO authenticated, service_role;
 
--- Authenticated users can read all messages
-CREATE POLICY messages_select_auth ON messages
-    FOR SELECT TO authenticated
-    USING (true);
+-- Create policies only if they don't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'messages_select') THEN
+        EXECUTE 'CREATE POLICY messages_select ON messages FOR SELECT TO anon, authenticated USING (true)';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'messages_insert') THEN
+        EXECUTE 'CREATE POLICY messages_insert ON messages FOR INSERT TO authenticated WITH CHECK (true)';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'messages_update') THEN
+        EXECUTE 'CREATE POLICY messages_update ON messages FOR UPDATE TO authenticated USING (true) WITH CHECK (true)';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'messages_delete') THEN
+        EXECUTE 'CREATE POLICY messages_delete ON messages FOR DELETE TO authenticated USING (true)';
+    END IF;
+END $$;
 
--- Authenticated users can update messages (for marking as read)
-CREATE POLICY messages_update_auth ON messages
-    FOR UPDATE TO authenticated
-    USING (true);
-
--- Anon users (athletes) can read their own messages
-CREATE POLICY messages_select_anon ON messages
-    FOR SELECT TO anon
-    USING (true);
-
--- Anon users can update their own messages (mark as read)
-CREATE POLICY messages_update_anon ON messages
-    FOR UPDATE TO anon
-    USING (true);
+-- Anon role needs UPDATE for marking messages as read (is_read field)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'messages_update_anon') THEN
+        EXECUTE 'CREATE POLICY messages_update_anon ON messages FOR UPDATE TO anon USING (true)';
+    END IF;
+END $$;
+GRANT UPDATE ON messages TO anon;
 
 -- ── 2) Payment type column ─────────────────────────────────────────
 -- Add payment_type column to payments table if it doesn't exist

@@ -3479,11 +3479,24 @@ function _checkUnreadMessages() {
 }
 
 // Portal açıldığında rozeti kontrol et
-var _origSpProfil = typeof spProfil === 'function' ? spProfil : null;
-if (_origSpProfil) {
-    // spProfil yüklendiğinde mesaj sayısını da kontrol et
-    setTimeout(_checkUnreadMessages, 1000);
-}
+// Her tab geçişinde de kontrol et (spTab override zaten yapıldı)
+// İlk açılışta kontrol et
+setTimeout(function() {
+    if (AppState.currentSporcu) _checkUnreadMessages();
+}, 1500);
+// MutationObserver ile sporcu portal görünür olunca kontrol et
+(function() {
+    var portal = document.getElementById('sporcu-portal');
+    if (portal) {
+        var obs = new MutationObserver(function() {
+            if (portal.style.display === 'flex') {
+                setTimeout(_checkUnreadMessages, 500);
+                obs.disconnect();
+            }
+        });
+        obs.observe(portal, { attributes: true, attributeFilter: ['style'] });
+    }
+})();
 
 // ── ÖDEMELER: AYDINLAR / SPOR MALZEMELERİ ALT TABLARI ───────────
 var _origSpOdemeler = window.spOdemeler;
