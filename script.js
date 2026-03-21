@@ -12,6 +12,8 @@ window.onerror = function(msg, url, line, col, error) {
 };
 
 // Mobil uyumlu localStorage wrapper
+// Private browsing / iOS kısıtlamaları için in-memory fallback
+const _memStore = {};
 const StorageManager = {
     isAvailable() {
         try {
@@ -23,10 +25,10 @@ const StorageManager = {
             return false;
         }
     },
-    
+
     get(key) {
         try {
-            if (!this.isAvailable()) return null;
+            if (!this.isAvailable()) return _memStore[key] !== undefined ? _memStore[key] : null;
             const item = localStorage.getItem(key);
             if (!item) return null;
 
@@ -51,8 +53,8 @@ const StorageManager = {
     set(key, value) {
         try {
             if (!this.isAvailable()) {
-                console.warn('localStorage not available');
-                return false;
+                _memStore[key] = value;
+                return true;
             }
             localStorage.setItem(key, JSON.stringify(value));
             return true;
@@ -61,10 +63,10 @@ const StorageManager = {
             return false;
         }
     },
-    
+
     remove(key) {
         try {
-            if (!this.isAvailable()) return false;
+            if (!this.isAvailable()) { delete _memStore[key]; return true; }
             localStorage.removeItem(key);
             return true;
         } catch (e) {
@@ -72,10 +74,10 @@ const StorageManager = {
             return false;
         }
     },
-    
+
     clear() {
         try {
-            if (!this.isAvailable()) return false;
+            if (!this.isAvailable()) { Object.keys(_memStore).forEach(k => delete _memStore[k]); return true; }
             localStorage.clear();
             return true;
         } catch (e) {
