@@ -248,28 +248,29 @@ window.generateReceipt = function(paymentId) {
 };
 
 function _generateReceiptHTML(p, receiptNo, s) {
-    // Fallback: HTML tabanlı yazdırma
-    var w = window.open('', '_blank', 'width=400,height=600');
-    if (!w) { toast('Popup engellenmiş!', 'e'); return; }
-    w.document.write('<html><head><title>Makbuz ' + receiptNo + '</title><style>body{font-family:Arial;padding:20px;max-width:400px;margin:auto}h1{text-align:center;font-size:18px}h2{text-align:center;font-size:14px;color:#666}.line{border-top:1px solid #333;margin:12px 0}.row{display:flex;justify-content:space-between;padding:6px 0}.label{font-weight:bold;color:#555}.footer{text-align:center;font-size:11px;color:#999;margin-top:20px}@media print{body{padding:10px}}</style></head><body>');
-    w.document.write('<h1>' + _escHtml(s.schoolName || 'Dragos Futbol Akademisi') + '</h1>');
-    if (s.address) w.document.write('<div style="text-align:center;font-size:12px;color:#555;margin-bottom:2px">' + _escHtml(s.address) + '</div>');
-    if (s.ownerPhone) w.document.write('<div style="text-align:center;font-size:12px;color:#555;margin-bottom:4px">Tel: ' + _escHtml(s.ownerPhone) + '</div>');
-    w.document.write('<h2>ÖDEME MAKBUZU</h2>');
-    w.document.write('<div class="line"></div>');
-    w.document.write('<div class="row"><span class="label">Makbuz No:</span><span>' + receiptNo + '</span></div>');
-    w.document.write('<div class="row"><span class="label">Tarih:</span><span>' + DateUtils.format(p.dt) + '</span></div>');
-    w.document.write('<div class="line"></div>');
-    w.document.write('<div class="row"><span class="label">Sporcu:</span><span>' + _escHtml(p.an) + '</span></div>');
-    w.document.write('<div class="row"><span class="label">Açıklama:</span><span>' + _escHtml(p.serviceName || p.ds || 'Aidat') + '</span></div>');
-    w.document.write('<div class="row"><span class="label">Tutar:</span><span><strong>' + FormatUtils.currency(p.amt) + '</strong></span></div>');
-    w.document.write('<div class="row"><span class="label">Ödeme Yöntemi:</span><span>' + statusLabel(p.payMethod || '-') + '</span></div>');
-    if (p.slipCode) w.document.write('<div class="row"><span class="label">Slip Kodu:</span><span>' + _escHtml(p.slipCode) + '</span></div>');
-    w.document.write('<div class="line"></div>');
-    w.document.write('<div class="footer">Bu makbuz elektronik ortamda oluşturulmuştur.<br>' + _escHtml(s.schoolName || 'Dragos Futbol Akademisi') + '</div>');
-    w.document.write('</body></html>');
-    w.document.close();
-    setTimeout(function() { w.print(); }, 500);
+    // HTML string olarak oluştur, Blob URL ile aç (document.write() kullanmaz)
+    var html = '<html><head><title>Makbuz ' + receiptNo + '</title><style>body{font-family:Arial;padding:20px;max-width:400px;margin:auto}h1{text-align:center;font-size:18px}h2{text-align:center;font-size:14px;color:#666}.line{border-top:1px solid #333;margin:12px 0}.row{display:flex;justify-content:space-between;padding:6px 0}.label{font-weight:bold;color:#555}.footer{text-align:center;font-size:11px;color:#999;margin-top:20px}@media print{body{padding:10px}}</style></head><body>';
+    html += '<h1>' + _escHtml(s.schoolName || 'Dragos Futbol Akademisi') + '</h1>';
+    if (s.address) html += '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:2px">' + _escHtml(s.address) + '</div>';
+    if (s.ownerPhone) html += '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:4px">Tel: ' + _escHtml(s.ownerPhone) + '</div>';
+    html += '<h2>ÖDEME MAKBUZU</h2>';
+    html += '<div class="line"></div>';
+    html += '<div class="row"><span class="label">Makbuz No:</span><span>' + receiptNo + '</span></div>';
+    html += '<div class="row"><span class="label">Tarih:</span><span>' + DateUtils.format(p.dt) + '</span></div>';
+    html += '<div class="line"></div>';
+    html += '<div class="row"><span class="label">Sporcu:</span><span>' + _escHtml(p.an) + '</span></div>';
+    html += '<div class="row"><span class="label">Açıklama:</span><span>' + _escHtml(p.serviceName || p.ds || 'Aidat') + '</span></div>';
+    html += '<div class="row"><span class="label">Tutar:</span><span><strong>' + FormatUtils.currency(p.amt) + '</strong></span></div>';
+    html += '<div class="row"><span class="label">Ödeme Yöntemi:</span><span>' + statusLabel(p.payMethod || '-') + '</span></div>';
+    if (p.slipCode) html += '<div class="row"><span class="label">Slip Kodu:</span><span>' + _escHtml(p.slipCode) + '</span></div>';
+    html += '<div class="line"></div>';
+    html += '<div class="footer">Bu makbuz elektronik ortamda oluşturulmuştur.<br>' + _escHtml(s.schoolName || 'Dragos Futbol Akademisi') + '</div>';
+    html += '</body></html>';
+    var blob = new Blob([html], { type: 'text/html' });
+    var blobUrl = URL.createObjectURL(blob);
+    var w = window.open(blobUrl, '_blank', 'width=400,height=600');
+    if (!w) { URL.revokeObjectURL(blobUrl); toast('Popup engellenmiş!', 'e'); return; }
+    setTimeout(function() { w.print(); URL.revokeObjectURL(blobUrl); }, 500);
 
     _saveReceiptNo(p.id, receiptNo, (s.receiptCounter || 0) + 1);
     toast('✅ Makbuz oluşturuldu: ' + receiptNo, 'g');

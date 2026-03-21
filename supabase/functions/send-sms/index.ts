@@ -8,25 +8,36 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Basit in-memory rate limiting (IP başına dakikada max 5 SMS)
-// NOT: Serverless ortamda birden fazla instance çalışabilir.
-// Üretim ortamında dağıtık rate limiting için Redis veya DB kullanılmalıdır.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 dakika
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+// DB tabanlı rate limiting (IP başına dakikada max 5 SMS)
+// Tüm serverless instance'lar aynı DB'yi kullandığından gerçek koruma sağlar.
+// Gerekli: check_sms_rate_limit() fonksiyonu ve sms_rate_limits tablosu (fix-rate-limit.sql)
+async function checkRateLimit(ip: string): Promise<boolean> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.warn('Rate limit: DB env vars eksik, istek geçiriliyor');
+      return true;
+    }
+    const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/check_sms_rate_limit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': serviceRoleKey,
+        'Authorization': `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({ client_ip: ip, max_count: 5, window_seconds: 60 }),
+    });
+    if (!resp.ok) {
+      console.warn('Rate limit RPC başarısız, istek geçiriliyor:', resp.status);
+      return true;
+    }
+    const allowed = await resp.json();
+    return allowed === true;
+  } catch (e) {
+    console.warn('Rate limit hatası, istek geçiriliyor:', e);
     return true;
   }
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
-  entry.count++;
-  return true;
 }
 
 Deno.serve(async (req: Request) => {
@@ -57,7 +68,7 @@ Deno.serve(async (req: Request) => {
   // Rate limiting
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
                    req.headers.get('cf-connecting-ip') || 'unknown';
-  if (!checkRateLimit(clientIp)) {
+  if (!await checkRateLimit(clientIp)) {
     return new Response(
       JSON.stringify({ error: 'Çok fazla istek. Lütfen bir dakika bekleyin.' }),
       { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
