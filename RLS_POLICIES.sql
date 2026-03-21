@@ -69,13 +69,15 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON orgs       TO authenticated, service_rol
 GRANT SELECT, INSERT, UPDATE, DELETE ON users      TO authenticated, service_role;
 
 -- ── anon role: SELECT tüm tablolara (sporcu/veli paneli için gerekli),
--- users tablosu hariç. Yazma işlemleri (INSERT/UPDATE/DELETE) engellenir.
+-- users tablosu hariç.
+-- payments: anon INSERT gerekli — sporcu ödeme bildirimi gönderebilsin.
+-- messages: anon UPDATE gerekli — sporcu mesajları "okundu" işaretleyebilsin.
 REVOKE ALL ON users FROM anon;
 GRANT SELECT ON athletes   TO anon;
-GRANT SELECT ON payments   TO anon;
+GRANT SELECT, INSERT ON payments   TO anon;
 GRANT SELECT ON coaches    TO anon;
 GRANT SELECT ON attendance TO anon;
-GRANT SELECT ON messages   TO anon;
+GRANT SELECT, UPDATE ON messages   TO anon;
 GRANT SELECT ON settings   TO anon;
 GRANT SELECT ON sports     TO anon;
 GRANT SELECT ON classes    TO anon;
@@ -135,9 +137,10 @@ CREATE POLICY "athletes_insert" ON athletes FOR INSERT TO authenticated WITH CHE
 CREATE POLICY "athletes_update" ON athletes FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "athletes_delete" ON athletes FOR DELETE TO authenticated USING (true);
 
--- Payments (anon SELECT: sporcu/veli ödeme geçmişi için gerekli)
+-- Payments (anon SELECT+INSERT: sporcu/veli ödeme geçmişi ve bildirim gönderimi için gerekli)
 CREATE POLICY "payments_select" ON payments FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "payments_insert" ON payments FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "payments_insert_anon" ON payments FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY "payments_update" ON payments FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "payments_delete" ON payments FOR DELETE TO authenticated USING (true);
 
@@ -153,10 +156,11 @@ CREATE POLICY "attendance_insert" ON attendance FOR INSERT TO authenticated WITH
 CREATE POLICY "attendance_update" ON attendance FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "attendance_delete" ON attendance FOR DELETE TO authenticated USING (true);
 
--- Messages (anon SELECT: sporcu/veli mesaj görüntüleme için gerekli)
+-- Messages (anon SELECT+UPDATE: sporcu mesaj görüntüleme ve okundu işaretleme için gerekli)
 CREATE POLICY "messages_select" ON messages FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "messages_insert" ON messages FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "messages_update" ON messages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "messages_update_anon" ON messages FOR UPDATE TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "messages_delete" ON messages FOR DELETE TO authenticated USING (true);
 
 -- Sports (anon SELECT: sporcu paneli spor bilgisi için gerekli)
