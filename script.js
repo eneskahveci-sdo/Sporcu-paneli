@@ -1105,8 +1105,9 @@ async function loadBranchData() {
         });
         
         AppState.data.messages = (results[4] || []).map(r => ({
-            id: r.id, fr: r.fr, role: r.role, sub: r.sub,
-            body: r.body, dt: r.dt, rd: r.rd
+            id: r.id, senderId: r.sender_id, senderName: r.sender_name,
+            senderRole: r.sender_role, recipientId: r.recipient_id,
+            title: r.title, body: r.body, isRead: r.is_read, createdAt: r.created_at
         }));
         
         AppState.data.settings = results[5]?.[0] ? 
@@ -3661,13 +3662,33 @@ function pgSms() {
     </div>`;
 }
 
-window.sendBulkSms = function() {
+window.sendBulkSms = async function() {
     const body = UIUtils.getValue('sms-body');
-    if (!body) {
-        toast('Mesaj içeriği giriniz!', 'e');
-        return;
+    const group = UIUtils.getValue('sms-group') || 'all';
+    if (!body) { toast('Mesaj içeriği giriniz!', 'e'); return; }
+
+    let athletes = AppState.data.athletes.filter(a => a.st === 'active' && a.ph);
+    if (group === 'overdue') {
+        const overdueIds = new Set(AppState.data.payments.filter(p => p.st === 'overdue').map(p => p.aid));
+        athletes = athletes.filter(a => overdueIds.has(a.id));
     }
-    toast('SMS gönderimi simüle edildi', 'g');
+
+    if (athletes.length === 0) { toast('Gönderilecek telefon numarası olan sporcu bulunamadı!', 'e'); return; }
+
+    const sb = getSupabase();
+    if (!sb) { toast('Bağlantı hatası!', 'e'); return; }
+
+    let sent = 0, errors = 0;
+    for (const a of athletes) {
+        try {
+            const { error } = await sb.functions.invoke('send-sms', { body: { phone: a.ph, message: body } });
+            if (error) errors++;
+            else sent++;
+        } catch(e) { errors++; }
+    }
+
+    if (sent > 0) toast(`✅ ${sent} sporcuya SMS gönderildi!`, 'g');
+    if (errors > 0) toast(`⚠️ ${errors} SMS gönderilemedi. NetGSM ayarlarını kontrol edin.`, 'e');
 };
 
 function pgSettings() {
