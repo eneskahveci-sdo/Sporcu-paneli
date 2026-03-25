@@ -219,7 +219,10 @@ Deno.serve(async (req: Request) => {
 
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
-    catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200), version: "v12" }, 502); }
+    catch (_e) {
+      console.error("[v12] PayTR JSON parse hatası:", resText.substring(0, 200));
+      return jsonResp({ error: "PayTR JSON parse hatası", version: "v12" }, 502);
+    }
 
     if (data.status === "success") {
       return jsonResp({ token: data.token, version: "v12" }, 200);

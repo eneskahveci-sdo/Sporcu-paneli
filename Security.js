@@ -181,7 +181,6 @@ function _securityDoNormalLogin(role) {
         // Girdi doğrulandı
 
         function showErr(msg) {
-            console.warn('⚠️ Hata mesajı:', msg);
             if (errEl) { errEl.textContent = msg; errEl.classList.remove('dn'); }
             else alert(msg);
         }
