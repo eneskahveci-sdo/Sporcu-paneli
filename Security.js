@@ -135,25 +135,27 @@ function getAuthClient() {
 // Security modülü aktif (v6.1)
 
 async function resolveAuthEmails(sb, role, tc) {
-    const tableName = role === 'coach' ? 'coaches' : 'athletes';
     const fallback = tc + '@dragosfk.com';
     const candidates = [];
 
+    // get_auth_email RPC: sadece email döndürür, tablo içeriği sızmaz
     try {
-        const { data, error } = await sb
-            .from(tableName)
-            .select('em')
-            .eq('tc', tc)
-            .maybeSingle();
+        const rpcRole = role === 'coach' ? 'coach' : 'sporcu';
+        const { data, error } = await sb.rpc('get_auth_email', {
+            p_tc: tc,
+            p_role: rpcRole
+        });
 
-        if (!error && data && typeof data.em === 'string') {
-            const dbEmail = data.em.trim().toLowerCase();
-            if (dbEmail && dbEmail.includes('@')) candidates.push(dbEmail);
+        if (!error && data && typeof data === 'string' && data.includes('@')) {
+            const dbEmail = data.trim().toLowerCase();
+            // Fallback değilse öne ekle (önce denensin)
+            if (dbEmail && dbEmail !== fallback) candidates.push(dbEmail);
         }
     } catch (e) {
         console.warn('email resolve warning:', e);
     }
 
+    // Fallback her zaman eklenir — RPC hata verse bile giriş çalışır
     if (!candidates.includes(fallback)) candidates.push(fallback);
     return candidates;
 }
@@ -181,7 +183,6 @@ function _securityDoNormalLogin(role) {
         // Girdi doğrulandı
 
         function showErr(msg) {
-            console.warn('⚠️ Hata mesajı:', msg);
             if (errEl) { errEl.textContent = msg; errEl.classList.remove('dn'); }
             else alert(msg);
         }

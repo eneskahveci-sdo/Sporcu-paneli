@@ -219,7 +219,10 @@ Deno.serve(async (req: Request) => {
 
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
-    catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200), version: "v12" }, 502); }
+    catch (_e) {
+      console.error("[v12] PayTR JSON parse hatası:", resText.substring(0, 200));
+      return jsonResp({ error: "PayTR JSON parse hatası", version: "v12" }, 502);
+    }
 
     if (data.status === "success") {
       return jsonResp({ token: data.token, version: "v12" }, 200);
@@ -244,7 +247,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Hata detayları sadece sunucu loglarına yazılır, client'a gönderilmez
-    console.error("[v12] HATA DEBUG — merchant_id:", MERCHANT_ID, "source:", idSource,
+    console.error("[v12] HATA DEBUG — merchant_id:", MERCHANT_ID,
       "key_len:", MERCHANT_KEY.length, "salt_len:", MERCHANT_SALT.length,
       "key_fp:", fingerprint(MERCHANT_KEY), "salt_fp:", fingerprint(MERCHANT_SALT),
       "key_hash:", keyHash, "salt_hash:", saltHash,
