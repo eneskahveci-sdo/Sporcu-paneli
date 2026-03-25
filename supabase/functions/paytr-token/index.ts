@@ -244,7 +244,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Hata detayları sadece sunucu loglarına yazılır, client'a gönderilmez
-    console.error("[v12] HATA DEBUG — merchant_id:", MERCHANT_ID, "source:", idSource,
+    console.error("[v12] HATA DEBUG — merchant_id:", MERCHANT_ID,
       "key_len:", MERCHANT_KEY.length, "salt_len:", MERCHANT_SALT.length,
       "key_fp:", fingerprint(MERCHANT_KEY), "salt_fp:", fingerprint(MERCHANT_SALT),
       "key_hash:", keyHash, "salt_hash:", saltHash,
