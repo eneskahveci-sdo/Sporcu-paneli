@@ -132,7 +132,7 @@ function getAuthClient() {
 // Her sporcu/antrenör için Auth e-postası farklı olabilir:
 // önce tablodaki e-posta, sonra TC tabanlı fallback denenir.
 
-console.log('🛡️ Dragos Güvenlik Kalkanı v6.1 Aktif!');
+// Security modülü aktif (v6.1)
 
 async function resolveAuthEmails(sb, role, tc) {
     const tableName = role === 'coach' ? 'coaches' : 'athletes';
@@ -160,7 +160,7 @@ async function resolveAuthEmails(sb, role, tc) {
 
 function _securityDoNormalLogin(role) {
     return async function() {
-        console.log('🔐 Security v6.1 doNormalLogin başladı — role:', role);
+        // Giriş başlatıldı
 
         const tcInputId   = role === 'coach' ? 'lc-tc'   : 'ls-tc';
         const passInputId = role === 'coach' ? 'lc-pass'  : 'ls-pass';
@@ -178,7 +178,7 @@ function _securityDoNormalLogin(role) {
         const tc   = tcEl.value.replace(/\D/g, '').slice(0, 11);
         const pass = passEl.value.trim();
 
-        console.log('📝 TC:', tc.substring(0, 3) + '***', 'Pass length:', pass.length, 'Role:', role);
+        // Girdi doğrulandı
 
         function showErr(msg) {
             console.warn('⚠️ Hata mesajı:', msg);
@@ -202,13 +202,13 @@ function _securityDoNormalLogin(role) {
                 showErr('Bağlantı hatası. Sayfayı yenileyip tekrar deneyin.');
                 return;
             }
-            console.log('✅ Supabase client hazır');
+            // Supabase client hazır;
 
             // Eski oturum varsa temizle — stale JWT yeni login'i engeller
             try {
                 var _sess = await sb.auth.getSession();
                 if (_sess?.data?.session) {
-                    console.log('🔑 Mevcut oturum temizleniyor...');
+                    // Mevcut oturum temizleniyor
                     await sb.auth.signOut();
                 }
             } catch(e) { console.warn('signOut check:', e); }
@@ -223,7 +223,7 @@ function _securityDoNormalLogin(role) {
             let usedEmail = '';
 
             for (const email of authEmails) {
-                console.log('📡 signInWithPassword deneniyor:', email);
+                // Auth deneniyor
                 const { data, error } = await sb.auth.signInWithPassword({
                     email,
                     password: pass
@@ -238,7 +238,6 @@ function _securityDoNormalLogin(role) {
             }
 
             if (!authError && authData?.user) {
-                console.log('✅ Auth giriş başarılı. Kullanılan email:', usedEmail);
                 const { data: userData, error: fetchError } = await sb
                     .from(tableName)
                     .select('*')
@@ -265,7 +264,7 @@ function _securityDoNormalLogin(role) {
                     return;
                 }
 
-                console.warn('⚠️ Auth altyapı hatası, RPC fallback deneniyor...');
+                // Auth altyapı hatası, RPC fallback deneniyor
                 const rpcRole = role === 'coach' ? 'coach' : 'sporcu';
                 const { data: rpcData, error: rpcError } = await sb.rpc('login_with_tc', {
                     p_tc: tc,
@@ -275,7 +274,6 @@ function _securityDoNormalLogin(role) {
 
                 if (!rpcError && rpcData?.ok && rpcData?.data) {
                     row = rpcData.data;
-                    console.log('✅ RPC fallback ile giriş doğrulandı!');
                 } else {
                     const rpcMsg = rpcError?.message || rpcData?.error || '';
                     console.error('🔴 Auth hatası:', authError || 'unknown');
@@ -290,7 +288,6 @@ function _securityDoNormalLogin(role) {
             }
             // AppState yoksa oluştur
             if (!window.AppState) {
-                console.log('AppState yoktu, oluşturuluyor...');
                 window.AppState = {
                     sb: sb,
                     currentUser: null,
@@ -307,7 +304,6 @@ function _securityDoNormalLogin(role) {
 
 
             if (role === 'coach') {
-                console.log('✅ Coach bulundu:', row.fn, row.ln);
 
                 AppState.currentUser = {
                     id: row.id,
@@ -342,10 +338,9 @@ function _securityDoNormalLogin(role) {
                 if (typeof window.go === 'function') {
                     window.go('attendance');
                 }
-                console.log('✅ Antrenör paneline giriş BAŞARILI!');
+                // Antrenör girişi tamamlandı
 
             } else {
-                console.log('✅ Sporcu bulundu:', row.fn, row.ln);
 
                 if (window.DB && window.DB.mappers && typeof window.DB.mappers.toAthlete === 'function') {
                     AppState.currentSporcu = DB.mappers.toAthlete(row);
@@ -396,7 +391,7 @@ function _securityDoNormalLogin(role) {
                 }
                 if (typeof window.spTab === 'function') spTab('profil');
 
-                console.log('✅ Sporcu portaline giriş BAŞARILI!');
+                // Sporcu girişi tamamlandı
             }
 
         } catch (err) {
@@ -419,6 +414,6 @@ document.addEventListener('DOMContentLoaded', function() {
         window.doNormalLogin = function(role) {
             return _securityDoNormalLogin(role)();
         };
-        console.log('🛡️ doNormalLogin override tamamlandı (v6.1)');
+        // doNormalLogin hazır (v6.1)
     }, 200);
 }, { once: true });

@@ -96,13 +96,11 @@ Deno.serve(async (req: Request) => {
     const rawMerchantKey = Deno.env.get("PAYTR_MERCHANT_KEY")  ?? "";
     const rawMerchantSalt = Deno.env.get("PAYTR_MERCHANT_SALT") ?? "";
 
-    const MERCHANT_ID   = cleanSecret(rawMerchantId || body.merchant_id || "");
+    const MERCHANT_ID   = cleanSecret(rawMerchantId || "");
     const MERCHANT_KEY  = cleanSecret(rawMerchantKey);
     const MERCHANT_SALT = cleanSecret(rawMerchantSalt);
 
-    // Credential kaynağını logla
-    const idSource = rawMerchantId ? "env" : "body";
-    console.error(`[v12] MERCHANT_ID: ${MERCHANT_ID} (source: ${idSource}), KEY len: ${MERCHANT_KEY.length}, SALT len: ${MERCHANT_SALT.length}`);
+    console.error(`[v12] Credentials yüklendi — KEY len: ${MERCHANT_KEY.length}, SALT len: ${MERCHANT_SALT.length}`);
 
     // Temizlik sonrası uzunluk kontrolü — cleanSecret karakter kırpmış olabilir
     if (rawMerchantKey && MERCHANT_KEY.length !== rawMerchantKey.length) {
@@ -181,15 +179,7 @@ Deno.serve(async (req: Request) => {
       return jsonResp({ error: "HMAC hesaplama hatası — token oluşturulamadı", version: "v12" }, 500);
     }
 
-    // Self-test: HMAC fonksiyonunun çalıştığını doğrula (sabit test verisiyle)
-    // Not: Bu test sadece crypto API'nin çalışıp çalışmadığını kontrol eder,
-    //      credential doğrulaması YAPMAZ. Sonuç sadece sunucu loglarında görünür.
-    const selfTest = await paytrHmac("paytr_selftest", "test_key");
-    console.error("[v12] HMAC self-test:", selfTest ? "OK" : "FAIL");
-    console.error("[v12] hash_str:", hashStr.substring(0, 100) + "...");
-    console.error("[v12] paytr_token:", paytrToken.substring(0, 10) + "...");
-    console.error("[v12] notify_url:", notifyUrl);
-    console.error("[v12] credential fingerprints — KEY:", fingerprint(MERCHANT_KEY), "SALT:", fingerprint(MERCHANT_SALT));
+    // Token oluşturuldu, PayTR'a gönderiliyor
 
     // ─── PayTR API POST (URLSearchParams — application/x-www-form-urlencoded) ───
     const formData = new URLSearchParams();
@@ -200,7 +190,7 @@ Deno.serve(async (req: Request) => {
     formData.append("payment_amount", payment_amount);
     formData.append("paytr_token", paytrToken);
     formData.append("user_basket", user_basket);
-    formData.append("debug_on", "1");
+    formData.append("debug_on", "0");
     formData.append("no_installment", no_installment);
     formData.append("max_installment", max_installment);
     formData.append("user_name", (user_name || "Musteri").substring(0, 60));
@@ -214,7 +204,7 @@ Deno.serve(async (req: Request) => {
     formData.append("test_mode", test_mode);
     formData.append("lang", lang);
 
-    console.error("[v12] PayTR API'ye istek gönderiliyor...");
+    // PayTR API isteği gönderiliyor
 
     const res = await fetch("https://www.paytr.com/odeme/api/get-token", {
       method: "POST",
@@ -225,14 +215,13 @@ Deno.serve(async (req: Request) => {
     });
 
     const resText = await res.text();
-    console.error("[v12] PayTR response:", res.status, resText.substring(0, 300));
+    // PayTR yanıtı alındı
 
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
     catch (_e) { return jsonResp({ error: "PayTR JSON parse hatası", raw: resText.substring(0, 200), version: "v12" }, 502); }
 
     if (data.status === "success") {
-      console.error("[v12] BAŞARILI! Token alındı.");
       return jsonResp({ token: data.token, version: "v12" }, 200);
     }
 
@@ -240,7 +229,7 @@ Deno.serve(async (req: Request) => {
     const reason = data.reason || "Token alınamadı";
     const isTokenError = reason.includes("paytr_token");
 
-    console.error("[v12] BAŞARISIZ:", reason);
+    console.error("[v12] PayTR token alınamadı:", reason);
 
     // Çözüm önerileri
     const troubleshooting: string[] = [];
@@ -254,35 +243,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Hata detayları sadece sunucu loglarına yazılır, client'a gönderilmez
+    console.error("[v12] HATA DEBUG — merchant_id:", MERCHANT_ID, "source:", idSource,
+      "key_len:", MERCHANT_KEY.length, "salt_len:", MERCHANT_SALT.length,
+      "key_fp:", fingerprint(MERCHANT_KEY), "salt_fp:", fingerprint(MERCHANT_SALT),
+      "key_hash:", keyHash, "salt_hash:", saltHash,
+      "user_ip:", userIp, "merchant_oid:", merchant_oid,
+      "hash_str_preview:", hashStr.substring(0, 120) + "...",
+    );
+
     return jsonResp({
       error: reason,
       version: "v12",
-      debug: {
-        merchant_id: MERCHANT_ID,
-        merchant_id_source: idSource,
-        key_len: MERCHANT_KEY.length,
-        salt_len: MERCHANT_SALT.length,
-        key_fingerprint: fingerprint(MERCHANT_KEY),
-        salt_fingerprint: fingerprint(MERCHANT_SALT),
-        key_hash: keyHash,
-        salt_hash: saltHash,
-        user_ip: userIp,
-        raw_ip: rawIp,
-        merchant_oid,
-        email,
-        payment_amount,
-        user_basket_len: user_basket.length,
-        no_installment,
-        max_installment,
-        currency,
-        test_mode,
-        notify_url: notifyUrl,
-        hash_str_preview: hashStr.substring(0, 120) + "...",
-        token_preview: paytrToken.substring(0, 10) + "...",
-        self_test: selfTest ? "OK" : "FAIL",
-      },
       troubleshooting: isTokenError ? troubleshooting : undefined,
-      paytr_response: data,
     }, 400);
 
   } catch (err) {
