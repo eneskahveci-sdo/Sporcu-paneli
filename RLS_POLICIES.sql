@@ -156,11 +156,14 @@ CREATE POLICY "attendance_insert" ON attendance FOR INSERT TO authenticated WITH
 CREATE POLICY "attendance_update" ON attendance FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "attendance_delete" ON attendance FOR DELETE TO authenticated USING (true);
 
--- Messages (anon SELECT+UPDATE: sporcu mesaj görüntüleme ve okundu işaretleme için gerekli)
+-- Messages (anon SELECT: sporcu mesaj görüntüleme için gerekli)
+-- anon UPDATE: sadece is_read kolonu — sporcu "okundu" işaretleyebilir, içerik değiştiremez
+-- Kolon düzeyinde kısıtlama Migration 007'de: REVOKE UPDATE ON messages FROM anon;
+--                                             GRANT UPDATE (is_read) ON messages TO anon;
 CREATE POLICY "messages_select" ON messages FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "messages_insert" ON messages FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "messages_update" ON messages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "messages_update_anon" ON messages FOR UPDATE TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "messages_update_anon" ON messages FOR UPDATE TO anon USING (true) WITH CHECK (is_read = true);
 CREATE POLICY "messages_delete" ON messages FOR DELETE TO authenticated USING (true);
 
 -- Sports (anon SELECT: sporcu paneli spor bilgisi için gerekli)
@@ -380,9 +383,12 @@ GRANT EXECUTE ON FUNCTION verify_user_credentials(TEXT, TEXT, TEXT) TO service_r
 --   6. login_with_tc() ile güvenli TC girişi sağlandı (SECURITY DEFINER).
 --   7. verify_user_credentials() geriye dönük uyumluluk için korundu.
 --   8. Sequence erişim hakları verildi (INSERT + auto-increment).
---   9. Başarılı girişte plaintext şifreler otomatik SHA-256 hash'lenir.
---      (pgcrypto yüklüyse). pgcrypto yoksa giriş çalışır, hash atlanır.
+--   9. Başarılı girişte şifreler otomatik bcrypt'e yükseltilir (Migration 007).
+--  10. get_auth_email() ile email sorgusu güvenli RPC üzerinden yapılır (Migration 007).
+--  11. messages anon UPDATE sadece is_read kolonuyla kısıtlıdır (Migration 007).
 -- ============================================================
+-- NOT: Bu ana betik Migration 001-006'yı kapsar.
+--      Migration 007 (007_security_hardening.sql) ayrıca çalıştırılmalıdır.
 
 -- ── Classes Schedule Alanları ───────────────────────────
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS schedule_days jsonb DEFAULT '[]';
