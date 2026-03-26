@@ -30,17 +30,19 @@ CREATE POLICY "coaches_select" ON coaches
 
 -- ── 2. payments — anon INSERT doğrulama ──────────────────────
 -- Öncesi: WITH CHECK (true) — herhangi bir veriyle ödeme bildirimi eklenebilir
--- Sonrası: athlete_id zorunlu, amount > 0, type boş olamaz
+-- Sonrası: aid (athlete_id) zorunlu, amt > 0, ty boş olamaz
+-- NOT: payments tablosunda kısa kolon adları kullanılmaktadır:
+--      aid = athlete_id, amt = amount, ty = type
 
 DROP POLICY IF EXISTS "payments_insert_anon" ON payments;
 CREATE POLICY "payments_insert_anon" ON payments
   FOR INSERT TO anon
   WITH CHECK (
-    athlete_id IS NOT NULL
-    AND amount IS NOT NULL
-    AND amount > 0
-    AND type IS NOT NULL
-    AND type <> ''
+    aid IS NOT NULL
+    AND amt IS NOT NULL
+    AND amt > 0
+    AND ty IS NOT NULL
+    AND ty <> ''
   );
 
 -- ── TAMAMLANDI ────────────────────────────────────────────────
