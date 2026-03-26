@@ -84,6 +84,12 @@ GRANT SELECT ON classes    TO anon;
 GRANT SELECT ON branches   TO anon;
 GRANT SELECT ON orgs       TO anon;
 
+-- on_kayitlar: anon SELECT+INSERT (kamuya açık ön kayıt formu).
+-- anon UPDATE: KVKK consent güncellemesi.
+GRANT SELECT, INSERT, UPDATE, DELETE ON on_kayitlar TO authenticated, service_role;
+GRANT SELECT, INSERT ON on_kayitlar TO anon;
+GRANT UPDATE ON on_kayitlar TO anon;
+
 -- Sequence erişim hakları (INSERT + auto-increment id'ler için)
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
@@ -106,6 +112,7 @@ ALTER TABLE classes    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE branches   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orgs       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE on_kayitlar ENABLE ROW LEVEL SECURITY;
 
 -- ── ADIM 3: POLİTİKALAR ──────────────────────────────────────────
 --
@@ -187,6 +194,17 @@ CREATE POLICY "branches_update" ON branches FOR UPDATE TO authenticated USING (t
 CREATE POLICY "orgs_select" ON orgs FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "orgs_insert" ON orgs FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "orgs_update" ON orgs FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+-- On Kayitlar (kamuya açık ön kayıt formu — anon SELECT+INSERT)
+CREATE POLICY "onkayitlar_select" ON on_kayitlar FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "onkayitlar_insert_anon" ON on_kayitlar FOR INSERT TO anon
+  WITH CHECK (student_name IS NOT NULL AND student_name <> '' AND parent_phone IS NOT NULL AND parent_phone <> '');
+CREATE POLICY "onkayitlar_insert_auth" ON on_kayitlar FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "onkayitlar_update_anon" ON on_kayitlar FOR UPDATE TO anon
+  USING (kvkk_consent IS NULL OR kvkk_consent = false)
+  WITH CHECK (kvkk_consent IS NOT NULL AND kvkk_consent = true AND consent_date IS NOT NULL);
+CREATE POLICY "onkayitlar_update_auth" ON on_kayitlar FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "onkayitlar_delete_auth" ON on_kayitlar FOR DELETE TO authenticated USING (true);
 
 -- ── ADIM 4: PGCRYPTO UZANTISI (hash karşılaştırma için) ──────────
 -- Eğer coach_pass veya sp_pass alanında SHA-256 hash varsa,

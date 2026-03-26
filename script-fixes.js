@@ -813,7 +813,7 @@ async function loadOnKayitlar() {
                 .order('created_at', { ascending: false });
             data = r3.data; error = r3.error;
         }
-        if (error) { if (error.message && error.message.includes('on_kayitlar')) console.warn('on_kayitlar tablosu bulunamadı'); return; }
+        if (error) { console.warn('loadOnKayitlar query error:', error.message || error); return; }
         if (data) {
             AppState.data.onKayitlar = data.map(function(r) { return { id: r.id, studentName: r.student_name || ((r.fn || '') + ' ' + (r.ln || '')).trim(), fn: r.fn || '', ln: r.ln || '', bd: r.bd || '', tc: r.tc || '', clsId: r.cls_id || '', className: r.class_name || '', parentName: r.parent_name || '', parentPhone: r.parent_phone || '', status: r.status || 'new', createdAt: r.created_at || '', orgId: r.org_id || '', branchId: r.branch_id || '' }; });
             var nc = AppState.data.onKayitlar.filter(function(o) { return o.status === 'new'; }).length;
@@ -849,7 +849,7 @@ window.refreshOnKayitlar = async function() {
     if (btn) { btn.textContent = '↻ Yenile'; btn.disabled = false; }
     if (AppState.ui && AppState.ui.curPage === 'athletes') go('athletes');
     else if (AppState.ui && AppState.ui.curPage === 'onkayit') go('onkayit');
-    else if (AppState.ui && AppState.ui.curPage === 'settings') __origGo.call(window, 'settings');
+    else if (AppState.ui && AppState.ui.curPage === 'settings') go('settings');
 };
 
 window.convertOnKayit = async function(id) {
@@ -954,14 +954,33 @@ window.submitOnKayit = async function() {
     var id = generateId();
     var sName = fn + ' ' + ln;
     var pName = psn ? (pn + ' ' + psn) : pn;
+    var insertOk = false;
     try {
         var sb = getSupabase();
-        if (sb) await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: DateUtils.today(), org_id: rOrg || null, branch_id: rBranch || null });
-    } catch(e) { console.error('submitOnKayit:', e); }
-    if (!AppState.data.onKayitlar) AppState.data.onKayitlar = [];
-    AppState.data.onKayitlar.unshift({ id: id, studentName: sName, fn: fn, ln: ln, bd: bd, tc: tc, clsId: clsId, className: clsName, parentName: pName, parentPhone: pph, status: 'new', createdAt: DateUtils.today(), orgId: rOrg, branchId: rBranch });
-    var m = document.getElementById('onkayit-modal'); if (m) m.remove();
-    toast('✅ Ön kayıt başarıyla alındı!', 'g');
+        if (sb) {
+            var res = await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: new Date().toISOString(), org_id: rOrg || null, branch_id: rBranch || null });
+            if (res.error) {
+                console.error('submitOnKayit DB error:', res.error);
+                toast('Ön kayıt kaydedilemedi: ' + (res.error.message || 'Veritabanı hatası'), 'e');
+                return;
+            }
+            insertOk = true;
+        } else {
+            console.error('submitOnKayit: Supabase client yok');
+            toast('Bağlantı hatası. Lütfen sayfayı yenileyip tekrar deneyin.', 'e');
+            return;
+        }
+    } catch(e) {
+        console.error('submitOnKayit:', e);
+        toast('Ön kayıt kaydedilemedi: ' + (e.message || 'Bağlantı hatası'), 'e');
+        return;
+    }
+    if (insertOk) {
+        if (!AppState.data.onKayitlar) AppState.data.onKayitlar = [];
+        AppState.data.onKayitlar.unshift({ id: id, studentName: sName, fn: fn, ln: ln, bd: bd, tc: tc, clsId: clsId, className: clsName, parentName: pName, parentPhone: pph, status: 'new', createdAt: new Date().toISOString(), orgId: rOrg, branchId: rBranch });
+        var m = document.getElementById('onkayit-modal'); if (m) m.remove();
+        toast('✅ Ön kayıt başarıyla alındı!', 'g');
+    }
 };
 
 // ────────────────────────────────────────────────────────
@@ -1795,12 +1814,15 @@ console.log('✅ H2: showLegal dinamik override aktif');
 
 // ── H4: ÖN KAYIT KVKK RIZASI ─────────────────────────────────────────────
 var _origShowOnKayitForm = window.showOnKayitForm;
-window.showOnKayitForm = function() {
-    _origShowOnKayitForm && _origShowOnKayitForm.apply(this, arguments);
-    // Form render edildikten sonra KVKK checkbox ekle
-    setTimeout(function() {
+window.showOnKayitForm = async function() {
+    if (_origShowOnKayitForm) await _origShowOnKayitForm.apply(this, arguments);
+    // Form render edildikten sonra KVKK checkbox ekle (retry ile)
+    var _tryAddKvkk = function(attempt) {
         var formBody = document.querySelector('#onkayit-modal [style*="overflow-y:auto"]');
-        if (!formBody || document.getElementById('ok-kvkk-consent')) return;
+        if (!formBody || document.getElementById('ok-kvkk-consent')) {
+            if (!formBody && attempt < 10) setTimeout(function() { _tryAddKvkk(attempt + 1); }, 200);
+            return;
+        }
         var div = document.createElement('div');
         div.style.cssText = 'margin-top:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)';
         div.innerHTML = '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;line-height:1.5">'
@@ -1809,7 +1831,8 @@ window.showOnKayitForm = function() {
             + '<a href="#" onclick="showLegal(\'kvkk\');return false;" style="color:var(--blue2)">Kişisel Verilerin Korunması Kanunu Aydınlatma Metni</a>\'ni okudum ve kişisel verilerimin işlenmesine <b>açık rıza</b> veriyorum.</span>'
             + '</label>';
         formBody.appendChild(div);
-    }, 100);
+    };
+    setTimeout(function() { _tryAddKvkk(0); }, 100);
 };
 
 var _origSubmitOnKayit = window.submitOnKayit;
