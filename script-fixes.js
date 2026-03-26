@@ -1608,9 +1608,9 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
 window.showLegal = function(type) {
     var s = (AppState && AppState.data && AppState.data.settings) || {};
     var ctrl = s.dataControllerName || 'Dragos Futbol Akademisi';
-    var addr = s.dataControllerAddr || '';
-    var phone = s.dataControllerPhone || '';
-    var email = s.dataControllerEmail || '';
+    var addr = s.dataControllerAddr || 'Cevizli, Hacılar Cd. No:72, 34846 Maltepe/İstanbul';
+    var phone = s.dataControllerPhone || '0549 514 72 27';
+    var email = s.dataControllerEmail || 'dragosfutbolakademisi@gmail.com';
     var years = s.dataRetentionYears || 5;
 
     var defaultKvkk = '<div style="line-height:1.8;font-size:13px;color:var(--text2);max-height:60vh;overflow-y:auto;padding-right:8px">'
