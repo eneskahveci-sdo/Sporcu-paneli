@@ -978,7 +978,7 @@ window.spOdemeler = function() {
 
     var completed = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
     var pending = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
-    var pendingPayments = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return (x.dt || '').localeCompare(y.dt || ''); });
+    var pendingPayments = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { if (!x.dt && !y.dt) return 0; if (!x.dt) return 1; if (!y.dt) return -1; return x.dt.localeCompare(y.dt); });
     var totalPaid = completed.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var totalDebt = pendingPayments.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
@@ -1449,7 +1449,10 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
 
     window.addEventListener('message', async function(event) {
         // Güvenlik: sadece PayTR'dan gelen mesajları kabul et
-        if (!event.origin || !(event.origin === 'https://www.paytr.com' || event.origin === 'https://paytr.com' || event.origin.endsWith('.paytr.com'))) return;
+        if (!event.origin) return;
+        var validOrigins = ['https://www.paytr.com', 'https://paytr.com'];
+        var isPayTR = validOrigins.indexOf(event.origin) !== -1 || /^https:\/\/[a-z0-9-]+\.paytr\.com$/.test(event.origin);
+        if (!isPayTR) return;
 
         var data = event.data;
         if (!data) return;
@@ -2052,19 +2055,25 @@ window.loadDeletionRequests = async function() {
 };
 
 window.completeDeletionRequest = function(reqId, athleteId) {
-    if (typeof confirm2 !== 'function') { if (!confirm('Sporcu verileri kalıcı olarak silinecek. Emin misiniz?')) return; }
     var doDelete = async function() {
         var sb = typeof getSupabase === 'function' ? getSupabase() : null;
         if (!sb) return;
-        if (athleteId) await sb.from('athletes').delete().eq('id', athleteId);
-        await sb.from('deletion_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', reqId);
-        toast('✅ Sporcu verileri silindi', 'g');
-        loadDeletionRequests();
+        try {
+            if (athleteId) await sb.from('athletes').delete().eq('id', athleteId);
+            await sb.from('deletion_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', reqId);
+            toast('✅ Sporcu verileri silindi', 'g');
+            loadDeletionRequests();
+        } catch(e) {
+            console.error('Deletion error:', e);
+            toast('Silme hatası: ' + (e.message || e), 'e');
+        }
     };
     if (typeof confirm2 === 'function') {
         confirm2('Veri Silme', 'Sporcu verileri kalıcı olarak silinecek. Emin misiniz?', doDelete);
     } else {
-        doDelete();
+        if (confirm('Sporcu verileri kalıcı olarak silinecek. Emin misiniz?')) {
+            doDelete().catch(function(e) { console.error('Deletion error:', e); });
+        }
     }
 };
 
@@ -3685,7 +3694,7 @@ window.spOdemeler = function() {
 
     var completed = typePayments.filter(function(p) { return p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
     var pending = typePayments.filter(function(p) { return p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
-    var pendingPayments = typePayments.filter(function(p) { return p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return (x.dt || '').localeCompare(y.dt || ''); });
+    var pendingPayments = typePayments.filter(function(p) { return p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { if (!x.dt && !y.dt) return 0; if (!x.dt) return 1; if (!y.dt) return -1; return x.dt.localeCompare(y.dt); });
     var totalPaid = completed.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var totalDebt = pendingPayments.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
