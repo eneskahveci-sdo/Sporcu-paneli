@@ -667,8 +667,8 @@ window.editPay = function(id) {
 
             var result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
             if (result) {
-                if (isNew) { AppState.data.payments.push(obj); }
-                else { var idx = AppState.data.payments.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.payments[idx] = obj; }
+                if (isNew) { if (!AppState.data.payments) AppState.data.payments = []; AppState.data.payments.push(obj); }
+                else { var idx = (AppState.data.payments || []).findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.payments[idx] = obj; }
                 toast(i18n[AppState.lang].saveSuccess, 'g');
                 closeModal();
                 go('payments');
@@ -911,6 +911,11 @@ window.editOnKayit = function(id) {
 var __origSwitchTab = window.switchLoginTab;
 window.switchLoginTab = function(tab) {
     if (__origSwitchTab) __origSwitchTab(tab);
+    // Hata mesajlarını temizle
+    ['lerr', 'ls-err', 'lc-err'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.classList.add('dn'); }
+    });
     var btn = document.getElementById('on-kayit-btn');
     if (btn) { var adm = document.getElementById('login-admin'); btn.style.display = (adm && !adm.classList.contains('dn')) ? 'none' : 'block'; }
 };
@@ -1298,13 +1303,13 @@ window.initiatePayTRPayment = async function(amt, desc) {
         console.log('[PayTR v4] basket:', { amtTL: amtTL, amtKurus: amtKurus, basketJson: basketJson });
 
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
-        var userName = (a.fn + ' ' + a.ln).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
+        var userName = ((a.fn || '') + ' ' + (a.ln || '')).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
             return map[ch] || '';
         });
 
         // v4 FIX: Email — .local domain PayTR tarafından reddedilebilir
-        var email = a.em;
+        var email = a.em || '';
         if (!email || email.indexOf('@') === -1 || email.endsWith('.local')) {
             email = 'musteri@dragosakademi.com';
         }
@@ -1444,7 +1449,7 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
 
     window.addEventListener('message', async function(event) {
         // Güvenlik: sadece PayTR'dan gelen mesajları kabul et
-        if (!event.origin || !event.origin.includes('paytr.com')) return;
+        if (!event.origin || !(event.origin === 'https://www.paytr.com' || event.origin === 'https://paytr.com' || event.origin.endsWith('.paytr.com'))) return;
 
         var data = event.data;
         if (!data) return;
@@ -2200,7 +2205,7 @@ function initCalendarChart() {
     if (hasSchedule) {
         var startD = new Date(); startD.setDate(startD.getDate() - 60);
         var endD = new Date(); endD.setDate(endD.getDate() + 90);
-        AppState.data.classes.forEach(function(cls, ci) {
+        (AppState.data.classes || []).forEach(function(cls, ci) {
             if (!cls.scheduleDays || !cls.scheduleDays.length) return;
             var color = colors[ci % colors.length];
             var ts = (cls.scheduleTime && cls.scheduleTimeEnd) ? cls.scheduleTime + '-' + cls.scheduleTimeEnd : (cls.scheduleTime || '');
@@ -2321,8 +2326,8 @@ window.registerGoHook('after', function(page) {
         div.className = 'card mt3 yoklama-gecmis';
         div.innerHTML = '<div class="tw6 tsm mb2">📅 Son 10 Günlük Geçmiş</div>'
             + allDates.map(function(d) {
-                var dayData = AppState.data.attendance[d];
-                var list = AppState.data.athletes.filter(function(a) {
+                var dayData = (AppState.data.attendance || {})[d] || {};
+                var list = (AppState.data.athletes || []).filter(function(a) {
                     return a.st === 'active' && (!atcls || a.clsId === atcls);
                 });
                 var p = list.filter(function(a) { return dayData[a.id] === 'P'; }).length;
@@ -2539,8 +2544,8 @@ window.editClass = function(id) {
                 };
                 var result = await DB.upsert('classes', DB.mappers.fromClass(obj));
                 if (result) {
-                    if (isNew) { AppState.data.classes.push(obj); }
-                    else { var idx = AppState.data.classes.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.classes[idx] = obj; }
+                    if (isNew) { if (!AppState.data.classes) AppState.data.classes = []; AppState.data.classes.push(obj); }
+                    else { var idx = (AppState.data.classes || []).findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.classes[idx] = obj; }
                     toast(i18n[AppState.lang].saveSuccess, 'g');
                     closeModal();
                     go('classes');
@@ -2806,6 +2811,7 @@ window.takeLessonAttendance = function(date, classId) {
         var date = AppState.ui.atd || DateUtils.today();
         var classId = AppState.ui.atcls || null;
 
+        if (!AppState.data.attendance) AppState.data.attendance = {};
         if (!AppState.data.attendance[date]) {
             AppState.data.attendance[date] = {};
         }
@@ -2814,13 +2820,18 @@ window.takeLessonAttendance = function(date, classId) {
             delete AppState.data.attendance[date][aid];
             var sb = getSupabase();
             if (sb) {
-                var q = sb.from('attendance')
-                    .delete()
-                    .eq('athlete_id', aid)
-                    .eq('att_date', date)
-                    .eq('org_id', AppState.currentOrgId);
-                if (classId) q = q.eq('class_id', classId);
-                await q;
+                try {
+                    var q = sb.from('attendance')
+                        .delete()
+                        .eq('athlete_id', aid)
+                        .eq('att_date', date)
+                        .eq('org_id', AppState.currentOrgId);
+                    if (classId) q = q.eq('class_id', classId);
+                    await q;
+                } catch(e) {
+                    console.error('Attendance delete error:', e);
+                    toast('Yoklama silinemedi: ' + (e.message || e), 'e');
+                }
             }
         } else {
             AppState.data.attendance[date][aid] = status;
