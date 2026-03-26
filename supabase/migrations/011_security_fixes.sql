@@ -14,6 +14,20 @@
 --   Supabase Dashboard → SQL Editor'e yapıştır ve çalıştır.
 -- ============================================================
 
+-- ── users.pass kolonunu nullable yap (plaintext şifre kaldırıldı) ─
+-- pass kolonu artık kullanılmıyor. NOT NULL kısıtı varsa yeni admin
+-- kaydı oluşturulurken hata vermemesi için default '' eklenir.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'pass'
+    ) THEN
+        ALTER TABLE users ALTER COLUMN pass SET DEFAULT '';
+        UPDATE users SET pass = '' WHERE pass IS NULL;
+    END IF;
+END $$;
+
 -- ── Anon UPDATE politikasını güvenli hale getir ───────────────
 -- Sadece henüz KVKK onayı verilmemiş kayıtlara uygulansın.
 DROP POLICY IF EXISTS "onkayitlar_update_anon" ON on_kayitlar;
