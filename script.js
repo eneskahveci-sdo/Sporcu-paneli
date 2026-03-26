@@ -473,6 +473,10 @@ window.showLegal = function(type) {
                     <li>Verileriniz 3. şahıslarla paylaşılmaz.</li>
                     <li>Veri saklama süresi: Kayıt tarihinden itibaren 10 yıl.</li>
                 </ul>
+                <p class="mb2"><strong>Veri Sorumlusu İletişim Bilgileri:</strong></p>
+                <p class="mb2">📍 Cevizli, Hacılar Cd. No:72, 34846 Maltepe/İstanbul</p>
+                <p class="mb2">📞 <a href="tel:+905495147227" style="color:inherit">0549 514 72 27</a></p>
+                <p>✉️ <a href="mailto:dragosfutbolakademisi@gmail.com" style="color:inherit">dragosfutbolakademisi@gmail.com</a></p>
             </div>`
         },
         kullanim: {
