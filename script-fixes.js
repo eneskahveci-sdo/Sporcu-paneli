@@ -1613,35 +1613,123 @@ window.showLegal = function(type) {
     var email = s.dataControllerEmail || 'dragosfutbolakademisi@gmail.com';
     var years = s.dataRetentionYears || 5;
 
-    var defaultKvkk = '<div style="line-height:1.8;font-size:13px;color:var(--text2);max-height:60vh;overflow-y:auto;padding-right:8px">'
-        + '<p><b>VERİ SORUMLUSU:</b> ' + FormatUtils.escape(ctrl) + '</p>'
-        + (addr ? '<p><b>Adres:</b> ' + FormatUtils.escape(addr) + '</p>' : '')
-        + (phone ? '<p><b>Telefon:</b> ' + FormatUtils.escape(phone) + '</p>' : '')
-        + (email ? '<p><b>E-posta:</b> ' + FormatUtils.escape(email) + '</p>' : '')
-        + '<p style="margin-top:12px"><b>İŞLENEN KİŞİSEL VERİLER:</b> Ad-soyad, TC kimlik numarası, doğum tarihi, telefon numarası, e-posta, veli bilgileri, ödeme kayıtları, yoklama verileri.</p>'
-        + '<p><b>İŞLEME AMACI:</b> Sporcu kayıt ve takibi, aidat tahsilatı, devam takibi, veli bildirimleri.</p>'
-        + '<p><b>SAKLAMA SÜRESİ:</b> Aktif sporcu verileri üyelik süresince, pasif sporcu verileri üyelik sona erişinden itibaren ' + years + ' yıl saklanır.</p>'
-        + '<p><b>ÜÇÜNCÜ TARAFLARLA PAYLAŞIM:</b> Ödeme işlemleri PayTR Bilişim Hizmetleri A.Ş. altyapısı üzerinden gerçekleştirilir — kart bilgileri tarafımızca saklanmaz. SMS bildirimleri NetGSM altyapısı üzerinden iletilir.</p>'
-        + '<p><b>VERİ DEPOLAMA:</b> Verileriniz Supabase (Frankfurt, AB) sunucularında saklanır. Yurt dışı aktarım KVKK Madde 9 kapsamında açık rızanıza dayalıdır.</p>'
-        + '<p style="margin-top:12px"><b>HAKLARINIZ (KVKK Madde 11):</b></p>'
-        + '<ul style="margin-left:16px;margin-top:4px">'
-        + '<li>Verilerinizin işlenip işlenmediğini öğrenme</li>'
+    var defaultKvkk = '<div style="line-height:1.8;font-size:13px;color:var(--text2);overflow-y:auto;padding-right:8px">'
+        + '<p style="margin-bottom:14px"><b>KİŞİSEL VERİLERİN KORUNMASI KANUNU AYDINLATMA METNİ</b></p>'
+
+        + '<p style="margin-bottom:6px"><b>1. VERİ SORUMLUSU</b></p>'
+        + '<p style="margin-bottom:4px"><b>' + FormatUtils.escape(ctrl) + '</b></p>'
+        + (addr  ? '<p style="margin-bottom:2px">📍 ' + FormatUtils.escape(addr)  + '</p>' : '')
+        + (phone ? '<p style="margin-bottom:2px">📞 ' + FormatUtils.escape(phone) + '</p>' : '')
+        + (email ? '<p style="margin-bottom:12px">✉️ ' + FormatUtils.escape(email) + '</p>' : '')
+
+        + '<p style="margin-bottom:6px"><b>2. İŞLENEN KİŞİSEL VERİLER</b></p>'
+        + '<p style="margin-bottom:12px">Ad-soyad, TC kimlik numarası, doğum tarihi, cinsiyet, telefon numarası, e-posta adresi, veli/vasi adı ve iletişim bilgileri, ödeme kayıtları, aidat bilgileri, yoklama ve devam verileri, spor dalı ve kategori bilgileri.</p>'
+
+        + '<p style="margin-bottom:6px"><b>3. İŞLEME AMACI VE HUKUKİ DAYANAK</b></p>'
+        + '<p style="margin-bottom:4px">Kişisel verileriniz aşağıdaki amaçlarla işlenmektedir:</p>'
+        + '<ul style="margin-left:16px;margin-bottom:12px">'
+        + '<li>Sporcu kaydı ve üyelik yönetimi (KVKK Madde 5/2-c — sözleşmenin ifası)</li>'
+        + '<li>Aidat tahsilatı ve ödeme takibi (KVKK Madde 5/2-c — sözleşmenin ifası)</li>'
+        + '<li>Yoklama ve devam takibi (KVKK Madde 5/2-c — sözleşmenin ifası)</li>'
+        + '<li>Veli bilgilendirme ve SMS bildirimleri (KVKK Madde 5/2-a — açık rıza)</li>'
+        + '<li>Yasal yükümlülüklerin yerine getirilmesi (KVKK Madde 5/2-ç — kanuni yükümlülük)</li>'
+        + '</ul>'
+
+        + '<p style="margin-bottom:6px"><b>4. VERİLERİN AKTARILDIĞI TARAFLAR</b></p>'
+        + '<p style="margin-bottom:4px">Kişisel verileriniz aşağıdaki üçüncü taraflarla paylaşılmaktadır:</p>'
+        + '<ul style="margin-left:16px;margin-bottom:12px">'
+        + '<li><b>PayTR Bilişim Hizmetleri A.Ş.</b> — online ödeme altyapısı (kart bilgileri tarafımızca saklanmaz)</li>'
+        + '<li><b>NetGSM</b> — SMS bildirim altyapısı</li>'
+        + '<li><b>Supabase Inc.</b> — veri tabanı altyapısı (Frankfurt, Almanya — AB GDPR kapsamında)</li>'
+        + '<li><b>Vercel Inc.</b> — web uygulama barındırma (ABD — SCCs kapsamında)</li>'
+        + '</ul>'
+        + '<p style="margin-bottom:12px">Yurt dışına aktarım KVKK Madde 9 kapsamında açık rızanıza veya yeterli koruma güvencesine dayalı olarak gerçekleştirilmektedir.</p>'
+
+        + '<p style="margin-bottom:6px"><b>5. VERİ SAKLAMA SÜRESİ</b></p>'
+        + '<p style="margin-bottom:12px">Aktif sporcu verileri üyelik süresince; üyelik sona erişinden itibaren ' + years + ' yıl süreyle saklanır. Ödeme kayıtları Vergi Usul Kanunu gereği 5 yıl muhafaza edilir. Süre sonunda veriler güvenli şekilde imha edilir.</p>'
+
+        + '<p style="margin-bottom:6px"><b>6. GÜVENLİK ÖNLEMLERİ</b></p>'
+        + '<p style="margin-bottom:12px">Verileriniz şifreli bağlantı (HTTPS/TLS) ile iletilir; şifreler bcrypt algoritmasıyla hash\'lenerek saklanır. Yetkisiz erişime karşı erişim kontrolü ve rol tabanlı yetkilendirme uygulanmaktadır.</p>'
+
+        + '<p style="margin-bottom:6px"><b>7. HAKLARINIZ (KVKK Madde 11)</b></p>'
+        + '<p style="margin-bottom:4px">Veri sorumlusuna başvurarak aşağıdaki haklarınızı kullanabilirsiniz:</p>'
+        + '<ul style="margin-left:16px;margin-bottom:12px">'
+        + '<li>Kişisel verilerinizin işlenip işlenmediğini öğrenme</li>'
+        + '<li>İşlenmişse buna ilişkin bilgi talep etme</li>'
         + '<li>İşlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme</li>'
         + '<li>Yurt içi veya yurt dışında aktarıldığı üçüncü kişileri öğrenme</li>'
-        + '<li>Eksik veya yanlış işlenmiş verilerin düzeltilmesini isteme</li>'
-        + '<li>KVKK Madde 7 çerçevesinde silinmesini veya yok edilmesini isteme</li>'
-        + '<li>İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz etme</li>'
+        + '<li>Eksik veya yanlış işlenmişse düzeltilmesini isteme</li>'
+        + '<li>KVKK Madde 7 kapsamında silinmesini veya yok edilmesini isteme</li>'
+        + '<li>Düzeltme/silme işlemlerinin üçüncü kişilere bildirilmesini isteme</li>'
+        + '<li>Otomatik sistemlerle analiz sonucu aleyhinize çıkan karara itiraz etme</li>'
+        + '<li>Kanuna aykırı işleme nedeniyle uğradığınız zararın giderilmesini talep etme</li>'
         + '</ul>'
-        + '<p style="margin-top:12px">Veri silme talebiniz için sporcu profilinizden "Verilerimi Sil" butonunu kullanabilir veya <b>' + FormatUtils.escape(email || ctrl) + '</b> adresine yazabilirsiniz. Talepler 30 gün içinde yanıtlanır.</p>'
+
+        + '<p style="margin-bottom:6px"><b>8. BAŞVURU YÖNTEMİ</b></p>'
+        + '<p style="margin-bottom:4px">Haklarınızı kullanmak için aşağıdaki kanallardan başvurabilirsiniz:</p>'
+        + '<ul style="margin-left:16px;margin-bottom:4px">'
+        + (email ? '<li>E-posta: <b>' + FormatUtils.escape(email) + '</b></li>' : '')
+        + (addr  ? '<li>Yazılı başvuru: <b>' + FormatUtils.escape(addr) + '</b></li>' : '')
+        + '</ul>'
+        + '<p style="margin-bottom:12px">Başvurularınızda kimliğinizi doğrulayan bilgiler (ad-soyad, TC kimlik numarası) bulunmalıdır. Talepler 30 gün içinde ücretsiz olarak yanıtlanır. Sporcu profilinizden de "Verilerimi Sil" butonunu kullanabilirsiniz.</p>'
+
+        + '<p style="font-size:11px;color:var(--text3)">Son güncelleme: Mart 2026</p>'
         + '</div>';
 
-    var defaultTerms = '<div style="line-height:1.8;font-size:13px;color:var(--text2);max-height:60vh;overflow-y:auto;padding-right:8px">'
-        + '<p><b>' + FormatUtils.escape(ctrl) + '</b> sporcu yönetim sistemini kullanarak aşağıdaki şartları kabul etmiş sayılırsınız.</p>'
-        + '<p><b>1. HİZMET KAPSAMI:</b> Bu sistem sporcu kayıt, yoklama takibi ve aidat yönetimi amacıyla kullanılır.</p>'
-        + '<p><b>2. GİZLİLİK:</b> Sisteme giriş bilgilerinizi kimseyle paylaşmayınız. Hesabınızdan yapılan işlemlerden sorumlusunuz.</p>'
-        + '<p><b>3. ÖDEME:</b> Online ödemeler PayTR güvenli ödeme altyapısı üzerinden gerçekleştirilir.</p>'
-        + '<p><b>4. VERİ DOĞRULUĞU:</b> Girdiğiniz bilgilerin doğruluğundan siz sorumlusunuz.</p>'
-        + '<p><b>5. DEĞİŞİKLİKLER:</b> Kullanım şartları önceden bildirilmeksizin güncellenebilir.</p>'
+    var defaultTerms = '<div style="line-height:1.8;font-size:13px;color:var(--text2);overflow-y:auto;padding-right:8px">'
+        + '<p style="margin-bottom:14px"><b>KULLANIM ŞARTLARI</b></p>'
+        + '<p style="margin-bottom:12px"><b>' + FormatUtils.escape(ctrl) + '</b> sporcu yönetim sistemini kullanarak aşağıdaki şartları okuduğunuzu ve kabul ettiğinizi beyan etmiş sayılırsınız.</p>'
+
+        + '<p style="margin-bottom:6px"><b>1. HİZMET KAPSAMI</b></p>'
+        + '<p style="margin-bottom:12px">Bu sistem; sporcu kaydı, yoklama takibi, aidat yönetimi, veli bilgilendirme ve antrenman programı görüntüleme amacıyla sunulmaktadır. Hizmet yalnızca kayıtlı sporcu ve antrenörlere yöneliktir.</p>'
+
+        + '<p style="margin-bottom:6px"><b>2. HESAP GÜVENLİĞİ</b></p>'
+        + '<p style="margin-bottom:4px">Sisteme giriş bilgileriniz (TC kimlik numarası ve şifre) size özeldir. Şifrenizi:</p>'
+        + '<ul style="margin-left:16px;margin-bottom:8px">'
+        + '<li>Kimseyle paylaşmayınız</li>'
+        + '<li>Başkasının cihazında kaydetmeyiniz</li>'
+        + '<li>Düzenli aralıklarla değiştiriniz</li>'
+        + '</ul>'
+        + '<p style="margin-bottom:12px">Hesabınızdan gerçekleştirilen tüm işlemlerden siz sorumlusunuz. Yetkisiz erişim şüphesi durumunda derhal ' + (email ? FormatUtils.escape(email) : 'akademi yetkilisi') + ' ile iletişime geçiniz.</p>'
+
+        + '<p style="margin-bottom:6px"><b>3. YASAKLI KULLANIMLAR</b></p>'
+        + '<p style="margin-bottom:4px">Aşağıdaki kullanımlar kesinlikle yasaktır:</p>'
+        + '<ul style="margin-left:16px;margin-bottom:12px">'
+        + '<li>Başkasının TC kimlik numarası veya bilgileriyle sisteme giriş yapmak</li>'
+        + '<li>Sistemi kötüye kullanmak, test etmek veya açıklarını araştırmak</li>'
+        + '<li>Diğer kullanıcıların verilerine yetkisiz erişmeye çalışmak</li>'
+        + '<li>Otomatik araçlar (bot, scraper vb.) ile sistemi kullanmak</li>'
+        + '<li>Sisteme zarar verecek yazılım veya kod çalıştırmak</li>'
+        + '</ul>'
+
+        + '<p style="margin-bottom:6px"><b>4. ÖDEME KOŞULLARI</b></p>'
+        + '<p style="margin-bottom:12px">Online ödemeler <b>PayTR</b> güvenli ödeme altyapısı üzerinden gerçekleştirilir; kart bilgileri tarafımızca saklanmaz. Ödeme onaylandıktan sonra sistem kaydı otomatik güncellenir. Ödeme anlaşmazlıklarında önce akademiyle, çözüm sağlanamazsa PayTR ile iletişime geçilmelidir.</p>'
+
+        + '<p style="margin-bottom:6px"><b>5. İADE POLİTİKASI</b></p>'
+        + '<p style="margin-bottom:12px">Aidat ödemeleri ilgili ay başlamadan önce iptal bildiriminde bulunulması halinde iade edilebilir. Ay başladıktan sonra yapılan iptallerde iade yapılmaz. İade talepleri ' + (email ? FormatUtils.escape(email) : 'akademi yönetimine') + ' iletilmelidir; talepler 5 iş günü içinde değerlendirilir.</p>'
+
+        + '<p style="margin-bottom:6px"><b>6. VERİ DOĞRULUĞU</b></p>'
+        + '<p style="margin-bottom:12px">Sisteme girdiğiniz bilgilerin (ad, soyad, TC numarası, iletişim bilgileri vb.) doğruluğundan siz sorumlusunuz. Yanlış bilgi nedeniyle yaşanan sorunlardan akademi sorumlu tutulamaz.</p>'
+
+        + '<p style="margin-bottom:6px"><b>7. HİZMET KESİNTİSİ</b></p>'
+        + '<p style="margin-bottom:12px">Planlı bakım, teknik arıza veya üçüncü taraf altyapı sorunları nedeniyle hizmette geçici kesintiler yaşanabilir. Bu durumlarda önceden bildirim yapılmaya çalışılır; ancak kesintilerden doğan zararlar için sorumluluk kabul edilmez.</p>'
+
+        + '<p style="margin-bottom:6px"><b>8. FİKRİ MÜLKİYET</b></p>'
+        + '<p style="margin-bottom:12px">Sistemdeki tüm içerik, tasarım ve yazılım <b>' + FormatUtils.escape(ctrl) + '</b>\'ne aittir. İzinsiz kopyalanamaz, dağıtılamaz veya ticari amaçla kullanılamaz.</p>'
+
+        + '<p style="margin-bottom:6px"><b>9. UYGULANACAK HUKUK VE YETKİLİ MAHKEME</b></p>'
+        + '<p style="margin-bottom:12px">Bu şartlar Türkiye Cumhuriyeti hukukuna tabidir. Uyuşmazlıklarda İstanbul mahkemeleri ve icra daireleri yetkilidir.</p>'
+
+        + '<p style="margin-bottom:6px"><b>10. İLETİŞİM VE ŞİKAYET</b></p>'
+        + '<p style="margin-bottom:4px">Kullanım şartlarına ilişkin sorularınız ve şikayetleriniz için:</p>'
+        + (email ? '<p style="margin-bottom:2px">✉️ ' + FormatUtils.escape(email) + '</p>' : '')
+        + (phone ? '<p style="margin-bottom:2px">📞 ' + FormatUtils.escape(phone) + '</p>' : '')
+        + (addr  ? '<p style="margin-bottom:12px">📍 ' + FormatUtils.escape(addr)  + '</p>' : '')
+
+        + '<p style="margin-bottom:6px"><b>11. DEĞİŞİKLİKLER</b></p>'
+        + '<p style="margin-bottom:12px">Kullanım şartları önceden bildirim yapılmaksızın güncellenebilir. Güncel metin her zaman sistem üzerinden erişilebilir durumdadır. Sistemi kullanmaya devam etmeniz güncel şartları kabul ettiğiniz anlamına gelir.</p>'
+
+        + '<p style="font-size:11px;color:var(--text3)">Son güncelleme: Mart 2026</p>'
         + '</div>';
 
     var kvkkBody  = s.kvkkText  || defaultKvkk;
