@@ -54,11 +54,38 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // Manual API-key check — verify_jwt is disabled so the gateway lets
-  // OPTIONS preflight through, but we still validate real requests.
-  const apikey = req.headers.get('apikey') || req.headers.get('authorization')?.replace('Bearer ', '');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  if (!apikey || !supabaseAnonKey || apikey !== supabaseAnonKey) {
+  // JWT doğrulama — sadece authenticated (giriş yapmış) kullanıcılar SMS gönderebilir.
+  // Anon key ile çağrı reddedilir; admin panelinden yapılan çağrılar her zaman
+  // authenticated JWT taşıdığından bu kontrol mevcut kullanımı bozmaz.
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+  if (!token) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return new Response(
+      JSON.stringify({ error: 'Sunucu yapılandırma hatası' }),
+      { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Token'ın gerçek bir oturum JWT'si olduğunu doğrula (anon key değil)
+  const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': serviceRoleKey,
+    },
+  });
+
+  if (!userResp.ok) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }

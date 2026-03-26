@@ -4875,7 +4875,8 @@ async function initiatePayTRPayment(amt, desc) {
             notifStatus: '',
             payMethod: 'paytr'
         };
-        await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
+        const { error: insertErr } = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
+        if (insertErr) throw insertErr;
         AppState.data.payments.push(pendingPay);
         
         // PayTR iframe aç
