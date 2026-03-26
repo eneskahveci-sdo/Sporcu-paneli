@@ -109,7 +109,7 @@
 
 function getAuthClient() {
     if (window.getSupabase) {
-        try { return window.getSupabase(); } catch(e) {}
+        try { return window.getSupabase(); } catch(e) { console.warn('getAuthClient: getSupabase hatası:', e); }
     }
     return window.AppState && window.AppState.sb ? window.AppState.sb : null;
 }
@@ -174,6 +174,9 @@ function _securityDoNormalLogin(role) {
 
         if (!tcEl || !passEl) {
             console.error('🔴 Input elementleri bulunamadı:', tcInputId, passInputId);
+            var loadMsg = 'Giriş formu yüklenemedi. Sayfayı yenileyip tekrar deneyin.';
+            if (errEl) { errEl.textContent = loadMsg; errEl.classList.remove('dn'); }
+            else alert(loadMsg);
             return;
         }
 
@@ -308,7 +311,7 @@ function _securityDoNormalLogin(role) {
 
                 AppState.currentUser = {
                     id: row.id,
-                    name: row.fn + ' ' + row.ln,
+                    name: (row.fn || '') + ' ' + (row.ln || ''),
                     role: 'coach',
                     tc: tc
                 };
@@ -381,11 +384,11 @@ function _securityDoNormalLogin(role) {
 
                 if (lboxWrap)     lboxWrap.style.display = 'none';
                 if (sporcuPortal) sporcuPortal.style.display = 'flex';
-                if (spName)       spName.textContent = row.fn + ' ' + row.ln;
+                if (spName)       spName.textContent = (row.fn || '') + ' ' + (row.ln || '');
                 if (spOrgname)    spOrgname.textContent = AppState.data?.settings?.schoolName || 'Dragos Futbol Akademisi';
 
                 if (window.FormatUtils && window.UIUtils) {
-                    UIUtils.setElementAvatar('sp-avatar', null, FormatUtils.initials(row.fn, row.ln));
+                    UIUtils.setElementAvatar('sp-avatar', null, FormatUtils.initials(row.fn || '', row.ln || ''));
                 }
                 if (typeof window.applyLogoEverywhere === 'function') {
                     applyLogoEverywhere(AppState.data?.settings?.logoUrl || '');
@@ -408,13 +411,3 @@ function _securityDoNormalLogin(role) {
 window.doNormalLogin = function(role) {
     return _securityDoNormalLogin(role)();
 };
-
-// DOMContentLoaded'da tekrar override et (diğer script'lerin üzerine yaz)
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        window.doNormalLogin = function(role) {
-            return _securityDoNormalLogin(role)();
-        };
-        // doNormalLogin hazır (v6.1)
-    }, 200);
-}, { once: true });

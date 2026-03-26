@@ -149,7 +149,7 @@ function getExpenseCategoryIcon(catId) {
 // 3) MAKBUZ SİSTEMİ
 // ────────────────────────────────────────────────────────
 window.generateReceipt = function(paymentId) {
-    var p = AppState.data.payments.find(function(x) { return x.id === paymentId; });
+    var p = (AppState.data.payments || []).find(function(x) { return x.id === paymentId; });
     if (!p) { toast('Ödeme bulunamadı!', 'e'); return; }
 
     var s = AppState.data.settings || {};
@@ -283,7 +283,7 @@ async function _saveReceiptNo(paymentId, receiptNo, counter) {
         // Ödemeye makbuz no kaydet
         await sb.from('payments').update({ receipt_no: receiptNo }).eq('id', paymentId);
         // AppState güncelle
-        var idx = AppState.data.payments.findIndex(function(p) { return p.id === paymentId; });
+        var idx = (AppState.data.payments || []).findIndex(function(p) { return p.id === paymentId; });
         if (idx >= 0) AppState.data.payments[idx].receiptNo = receiptNo;
         // Sayacı güncelle
         if (AppState.data.settings) {
@@ -327,7 +327,7 @@ window.showCashTransferModal = function() {
 
 function getCashBankBalances() {
     var cashIn = 0, cashOut = 0, bankIn = 0, bankOut = 0;
-    AppState.data.payments.filter(function(p) { return p.st === 'completed'; }).forEach(function(p) {
+    (AppState.data.payments || []).filter(function(p) { return p.st === 'completed'; }).forEach(function(p) {
         var isCash = p.payMethod === 'nakit';
         if (p.ty === 'income') {
             if (isCash) cashIn += (p.amt || 0); else bankIn += (p.amt || 0);
@@ -387,11 +387,11 @@ window.sendBulkWhatsApp = async function() {
 
     var targets = [];
     if (group === 'all') {
-        targets = AppState.data.athletes.filter(function(a) { return a.st === 'active' && (a.pph || a.ph); });
+        targets = (AppState.data.athletes || []).filter(function(a) { return a.st === 'active' && (a.pph || a.ph); });
     } else if (group === 'overdue') {
         var overdueIds = {};
-        AppState.data.payments.filter(function(p) { return p.st === 'overdue'; }).forEach(function(p) { overdueIds[p.aid] = true; });
-        targets = AppState.data.athletes.filter(function(a) { return overdueIds[a.id] && (a.pph || a.ph); });
+        (AppState.data.payments || []).filter(function(p) { return p.st === 'overdue'; }).forEach(function(p) { overdueIds[p.aid] = true; });
+        targets = (AppState.data.athletes || []).filter(function(a) { return overdueIds[a.id] && (a.pph || a.ph); });
     }
 
     if (targets.length === 0) { toast('Gönderilecek kişi bulunamadı!', 'e'); return; }
@@ -399,7 +399,7 @@ window.sendBulkWhatsApp = async function() {
     var sent = 0, failed = 0;
     for (var i = 0; i < targets.length; i++) {
         var phone = targets[i].pph || targets[i].ph;
-        var personMsg = msg.replace('{sporcu_adi}', targets[i].fn + ' ' + targets[i].ln).replace('{tutar}', FormatUtils.currency(targets[i].fee));
+        var personMsg = msg.replace('{sporcu_adi}', (targets[i].fn || '') + ' ' + (targets[i].ln || '')).replace('{tutar}', FormatUtils.currency(targets[i].fee));
         var ok = await sendWhatsAppMessage(phone, personMsg);
         if (ok) sent++; else failed++;
     }
@@ -414,7 +414,7 @@ function getMonthlyData(year) {
     for (var m = 0; m < 12; m++) {
         var monthStr = year + '-' + String(m + 1).padStart(2, '0');
         var inc = 0, exp = 0;
-        AppState.data.payments.filter(function(p) { return p.st === 'completed' && p.dt && p.dt.startsWith(monthStr); }).forEach(function(p) {
+        (AppState.data.payments || []).filter(function(p) { return p.st === 'completed' && p.dt && p.dt.startsWith(monthStr); }).forEach(function(p) {
             if (p.ty === 'income') inc += (p.amt || 0); else exp += (p.amt || 0);
         });
         months.push({ month: m, income: inc, expense: exp, label: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][m] });
@@ -436,9 +436,9 @@ function isInPeriod(dateStr) {
 
 function getBranchIncomeDistribution() {
     var dist = {};
-    AppState.data.payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).filter(function(p){ return isInPeriod(p.dt); }).forEach(function(p) {
+    (AppState.data.payments || []).filter(function(p) { return p.ty === 'income' && p.st === 'completed'; }).filter(function(p){ return isInPeriod(p.dt); }).forEach(function(p) {
         if (p.aid) {
-            var ath = AppState.data.athletes.find(function(a) { return a.id === p.aid; });
+            var ath = (AppState.data.athletes || []).find(function(a) { return a.id === p.aid; });
             var sp = ath ? (ath.sp || 'Belirtilmedi') : 'Belirtilmedi';
             dist[sp] = (dist[sp] || 0) + (p.amt || 0);
         }
@@ -448,7 +448,7 @@ function getBranchIncomeDistribution() {
 
 function getExpenseCategoryDistribution() {
     var dist = {};
-    AppState.data.payments.filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).filter(function(p){ return isInPeriod(p.dt); }).forEach(function(p) {
+    (AppState.data.payments || []).filter(function(p) { return p.ty === 'expense' && p.st === 'completed'; }).filter(function(p){ return isInPeriod(p.dt); }).forEach(function(p) {
         var cat = p.cat || 'diger';
         dist[cat] = (dist[cat] || 0) + (p.amt || 0);
     });
@@ -540,7 +540,7 @@ window.pgAccountingV8 = function() {
     // Günlük kasa
     var todayStr = DateUtils.today();
     var todayCashIn = 0, todayCashOut = 0;
-    AppState.data.payments.filter(function(p) { return p.st === 'completed' && p.dt === todayStr && p.payMethod === 'nakit'; }).forEach(function(p) {
+    (AppState.data.payments || []).filter(function(p) { return p.st === 'completed' && p.dt === todayStr && p.payMethod === 'nakit'; }).forEach(function(p) {
         if (p.ty === 'income') todayCashIn += (p.amt || 0); else todayCashOut += (p.amt || 0);
     });
 
@@ -627,14 +627,14 @@ window.pgSmsV8 = function() {
 // ────────────────────────────────────────────────────────
 var _origEditPay = window.editPay;
 window.editPay = function(id) {
-    var p = id ? AppState.data.payments.find(function(x) { return x.id === id; }) : null;
+    var p = id ? (AppState.data.payments || []).find(function(x) { return x.id === id; }) : null;
     var isNew = !p;
 
     var catOpts = EXPENSE_CATEGORIES.map(function(c) {
         return '<option value="' + c.id + '"' + (p && p.cat === c.id ? ' selected' : '') + '>' + c.icon + ' ' + c.name + '</option>';
     }).join('');
 
-    modal(isNew ? 'Yeni Finansal İşlem' : 'İşlem Detayı', '<div class="fgr mb2"><label>Sporcu / Kişi</label><select id="p-aid"><option value="">Bağımsız İşlem</option>' + AppState.data.athletes.map(function(a) { return '<option value="' + FormatUtils.escape(a.id) + '"' + (p && p.aid === a.id ? ' selected' : '') + '>' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</option>'; }).join('') + '</select></div>'
+    modal(isNew ? 'Yeni Finansal İşlem' : 'İşlem Detayı', '<div class="fgr mb2"><label>Sporcu / Kişi</label><select id="p-aid"><option value="">Bağımsız İşlem</option>' + (AppState.data.athletes || []).map(function(a) { return '<option value="' + FormatUtils.escape(a.id) + '"' + (p && p.aid === a.id ? ' selected' : '') + '>' + FormatUtils.escape((a.fn || '') + ' ' + (a.ln || '')) + '</option>'; }).join('') + '</select></div>'
     + '<div class="g21"><div class="fgr"><label>Tutar (₺) *</label><input id="p-amt" type="number" value="' + (p ? p.amt : '') + '"/></div><div class="fgr"><label>İşlem Türü</label><select id="p-ty" onchange="document.getElementById(\'p-cat-row\').style.display=this.value===\'expense\'?\'block\':\'none\'"><option value="income"' + (p && p.ty === 'income' ? ' selected' : '') + '>Gelir (Tahsilat)</option><option value="expense"' + (p && p.ty === 'expense' ? ' selected' : '') + '>Gider (Ödeme)</option></select></div></div>'
     + '<div id="p-cat-row" style="display:' + (p && p.ty === 'expense' ? 'block' : 'none') + '" class="mt2"><div class="fgr"><label>Gider Kategorisi</label><select id="p-cat"><option value="">Kategori Seçin</option>' + catOpts + '</select></div></div>'
     + '<div class="fgr mt2"><label>Açıklama / Hizmet Adı</label><input id="p-ds" value="' + FormatUtils.escape(p ? (p.ds || '') : '') + '" placeholder="Örn: Ekim Ayı Aidatı"/></div>'
@@ -645,14 +645,14 @@ window.editPay = function(id) {
         ...(p && p.st === 'completed' ? [{ lbl: '🧾 Makbuz', cls: 'bpur', fn: function() { closeModal(); generateReceipt(p.id); } }] : []),
         { lbl: 'Kaydet', cls: 'bp', fn: async function() {
             var aid = UIUtils.getValue('p-aid');
-            var ath = AppState.data.athletes.find(function(a) { return a.id === aid; });
+            var ath = (AppState.data.athletes || []).find(function(a) { return a.id === aid; });
             var ds = UIUtils.getValue('p-ds');
             var ty = UIUtils.getValue('p-ty');
 
             var obj = {
                 id: p ? p.id : generateId(),
                 aid: aid,
-                an: ath ? (ath.fn + ' ' + ath.ln) : (ds || 'Bilinmiyor'),
+                an: ath ? ((ath.fn || '') + ' ' + (ath.ln || '')) : (ds || 'Bilinmiyor'),
                 amt: UIUtils.getNumber('p-amt'),
                 ds: ds,
                 st: UIUtils.getValue('p-st'),
@@ -667,8 +667,8 @@ window.editPay = function(id) {
 
             var result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
             if (result) {
-                if (isNew) { AppState.data.payments.push(obj); }
-                else { var idx = AppState.data.payments.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.payments[idx] = obj; }
+                if (isNew) { if (!AppState.data.payments) AppState.data.payments = []; AppState.data.payments.push(obj); }
+                else { var idx = (AppState.data.payments || []).findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.payments[idx] = obj; }
                 toast(i18n[AppState.lang].saveSuccess, 'g');
                 closeModal();
                 go('payments');
@@ -688,7 +688,7 @@ function __renderAthletesInPlace() {
     var main = document.getElementById('main');
     if (!main) { go('athletes'); return; }
     var f = AppState.filters.athletes;
-    var list = AppState.data.athletes.slice();
+    var list = (AppState.data.athletes || []).slice();
     if (f.st && f.st !== 'all') list = list.filter(function(a) { return a.st === f.st; });
     if (f.sp) list = list.filter(function(a) { return a.sp === f.sp; });
     if (f.cls) list = list.filter(function(a) { return a.clsId === f.cls; });
@@ -718,14 +718,14 @@ function __renderAthletesInPlace() {
 window.__renderAthletesInPlace = __renderAthletesInPlace;
 
 function __renderAthletes() {
-    var list = AppState.data.athletes.slice();
+    var list = (AppState.data.athletes || []).slice();
     var f = AppState.filters.athletes;
     if (f.st === undefined || f.st === null || f.st === '') {
         f.st = 'active';
         AppState.filters.athletes.st = 'active';
     }
-    var totalActive   = AppState.data.athletes.filter(function(a){ return a.st === 'active'; }).length;
-    var totalInactive = AppState.data.athletes.filter(function(a){ return a.st === 'inactive'; }).length;
+    var totalActive   = (AppState.data.athletes || []).filter(function(a){ return a.st === 'active'; }).length;
+    var totalInactive = (AppState.data.athletes || []).filter(function(a){ return a.st === 'inactive'; }).length;
     var currentTab    = f.st;
 
     if (f.sp) list = list.filter(function(a) { return a.sp === f.sp; });
@@ -734,8 +734,8 @@ function __renderAthletes() {
     if (f.q) { var q = f.q.toLowerCase(); list = list.filter(function(a) { return (a.fn + ' ' + a.ln).toLowerCase().includes(q) || a.tc.includes(q); }); }
 
     var isAdmin = AppState.currentUser && AppState.currentUser.role === 'admin';
-    var spOpts = AppState.data.sports.map(function(s) { return '<option value="' + FormatUtils.escape(s.name) + '"' + (f.sp === s.name ? ' selected' : '') + '>' + FormatUtils.escape(s.name) + '</option>'; }).join('');
-    var clOpts = AppState.data.classes.map(function(c) { return '<option value="' + FormatUtils.escape(c.id) + '"' + (f.cls === c.id ? ' selected' : '') + '>' + FormatUtils.escape(c.name) + '</option>'; }).join('');
+    var spOpts = (AppState.data.sports || []).map(function(s) { return '<option value="' + FormatUtils.escape(s.name) + '"' + (f.sp === s.name ? ' selected' : '') + '>' + FormatUtils.escape(s.name) + '</option>'; }).join('');
+    var clOpts = (AppState.data.classes || []).map(function(c) { return '<option value="' + FormatUtils.escape(c.id) + '"' + (f.cls === c.id ? ' selected' : '') + '>' + FormatUtils.escape(c.name) + '</option>'; }).join('');
 
     var trows = list.map(function(a) {
         var del = isAdmin ? '<button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button>' : '';
@@ -855,10 +855,10 @@ window.refreshOnKayitlar = async function() {
 window.convertOnKayit = async function(id) {
     var ok = (AppState.data.onKayitlar || []).find(function(x) { return x.id === id; });
     if (!ok) return;
-    if (ok.tc) { var existing = AppState.data.athletes.find(function(a) { return a.tc === ok.tc; }); if (existing) { toast('Bu TC zaten kayıtlı!', 'e'); return; } }
-    var cls = AppState.data.classes.find(function(c) { return c.id === ok.clsId || c.name === ok.className; });
+    if (ok.tc) { var existing = (AppState.data.athletes || []).find(function(a) { return a.tc === ok.tc; }); if (existing) { toast('Bu TC zaten kayıtlı!', 'e'); return; } }
+    var cls = (AppState.data.classes || []).find(function(c) { return c.id === ok.clsId || c.name === ok.className; });
     var sp = '';
-    if (cls) { var sport = AppState.data.sports.find(function(s) { return s.id === cls.spId; }); if (sport) sp = sport.name; }
+    if (cls) { var sport = (AppState.data.sports || []).find(function(s) { return s.id === cls.spId; }); if (sport) sp = sport.name; }
     var athleteObj = { id: generateId(), fn: ok.fn || '', ln: ok.ln || '', tc: ok.tc || '', bd: ok.bd || null, gn: 'E', ph: '', em: '', sp: sp, cat: '', lic: '', rd: DateUtils.today(), st: 'active', fee: 0, vd: null, nt: '', clsId: cls ? cls.id : (ok.clsId || ''), pn: ok.parentName || '', pph: ok.parentPhone || '', pem: '', spPass: '', orgId: ok.orgId || AppState.currentOrgId || '', branchId: ok.branchId || AppState.currentBranchId || '', address: '', city: '', emergency: '', blood: '', height: '', weight: '', health: '', school: '' };
     try {
         var result = await DB.upsert('athletes', DB.mappers.fromAthlete(athleteObj));
@@ -911,6 +911,11 @@ window.editOnKayit = function(id) {
 var __origSwitchTab = window.switchLoginTab;
 window.switchLoginTab = function(tab) {
     if (__origSwitchTab) __origSwitchTab(tab);
+    // Hata mesajlarını temizle
+    ['lerr', 'ls-err', 'lc-err'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.classList.add('dn'); }
+    });
     var btn = document.getElementById('on-kayit-btn');
     if (btn) { var adm = document.getElementById('login-admin'); btn.style.display = (adm && !adm.classList.contains('dn')) ? 'none' : 'block'; }
 };
@@ -971,9 +976,9 @@ window.spOdemeler = function() {
     var hasPayTR = s && s.paytrActive && s.paytrMerchantId;
     var hasBank = s && (s.iban || s.bankName);
 
-    var completed = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
-    var pending = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
-    var pendingPayments = AppState.data.payments.filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return x.dt.localeCompare(y.dt); });
+    var completed = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
+    var pending = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
+    var pendingPayments = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id && p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { if (!x.dt && !y.dt) return 0; if (!x.dt) return 1; if (!y.dt) return -1; return x.dt.localeCompare(y.dt); });
     var totalPaid = completed.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var totalDebt = pendingPayments.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
@@ -1067,8 +1072,8 @@ window.spOdemeler = function() {
 // ────────────────────────────────────────────────────────
 window.saveWhatsAppSettings = async function() {
     var obj = Object.assign({}, AppState.data.settings || {}, {
-        waApiToken: UIUtils.getValue('s-wa-token').trim(),
-        waPhoneId: UIUtils.getValue('s-wa-phone').trim(),
+        waApiToken: (UIUtils.getValue('s-wa-token') || '').trim(),
+        waPhoneId: (UIUtils.getValue('s-wa-phone') || '').trim(),
         waReminderDay: parseInt(UIUtils.getValue('s-wa-day')) || 1,
         waActive: document.getElementById('s-wa-active')?.checked || false
     });
@@ -1205,7 +1210,7 @@ window.submitSpPayment = async function() {
 
     if (!method) { toast('Lütfen ödeme yöntemi seçiniz!', 'e'); return; }
 
-    var plans = planIds.map(function(id) { return AppState.data.payments.find(function(p) { return p.id === id; }); }).filter(Boolean);
+    var plans = planIds.map(function(id) { return (AppState.data.payments || []).find(function(p) { return p.id === id; }); }).filter(Boolean);
     var totalAmt = plans.length > 0 ? plans.reduce(function(s, p) { return s + (p.amt || 0); }, 0) : (a.fee || 0);
     if (!totalAmt || totalAmt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
 
@@ -1298,13 +1303,13 @@ window.initiatePayTRPayment = async function(amt, desc) {
         console.log('[PayTR v4] basket:', { amtTL: amtTL, amtKurus: amtKurus, basketJson: basketJson });
 
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
-        var userName = (a.fn + ' ' + a.ln).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
+        var userName = ((a.fn || '') + ' ' + (a.ln || '')).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
             var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
             return map[ch] || '';
         });
 
         // v4 FIX: Email — .local domain PayTR tarafından reddedilebilir
-        var email = a.em;
+        var email = a.em || '';
         if (!email || email.indexOf('@') === -1 || email.endsWith('.local')) {
             email = 'musteri@dragosakademi.com';
         }
@@ -1444,7 +1449,10 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
 
     window.addEventListener('message', async function(event) {
         // Güvenlik: sadece PayTR'dan gelen mesajları kabul et
-        if (!event.origin || !event.origin.includes('paytr.com')) return;
+        if (!event.origin) return;
+        var validOrigins = ['https://www.paytr.com', 'https://paytr.com'];
+        var isPayTR = validOrigins.indexOf(event.origin) !== -1 || /^https:\/\/[a-z0-9-]+\.paytr\.com$/.test(event.origin);
+        if (!isPayTR) return;
 
         var data = event.data;
         if (!data) return;
@@ -2047,14 +2055,26 @@ window.loadDeletionRequests = async function() {
 };
 
 window.completeDeletionRequest = function(reqId, athleteId) {
-    confirm2('Veri Silme', 'Sporcu verileri kalıcı olarak silinecek. Emin misiniz?', async function() {
+    var doDelete = async function() {
         var sb = typeof getSupabase === 'function' ? getSupabase() : null;
         if (!sb) return;
-        if (athleteId) await sb.from('athletes').delete().eq('id', athleteId);
-        await sb.from('deletion_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', reqId);
-        toast('✅ Sporcu verileri silindi', 'g');
-        loadDeletionRequests();
-    });
+        try {
+            if (athleteId) await sb.from('athletes').delete().eq('id', athleteId);
+            await sb.from('deletion_requests').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', reqId);
+            toast('✅ Sporcu verileri silindi', 'g');
+            loadDeletionRequests();
+        } catch(e) {
+            console.error('Deletion error:', e);
+            toast('Silme hatası: ' + (e.message || e), 'e');
+        }
+    };
+    if (typeof confirm2 === 'function') {
+        confirm2('Veri Silme', 'Sporcu verileri kalıcı olarak silinecek. Emin misiniz?', doDelete);
+    } else {
+        if (confirm('Sporcu verileri kalıcı olarak silinecek. Emin misiniz?')) {
+            doDelete().catch(function(e) { console.error('Deletion error:', e); });
+        }
+    }
 };
 
 window.rejectDeletionRequest = async function(reqId) {
@@ -2072,7 +2092,7 @@ window.loadConsentStats = async function() {
     if (!sb || !el) return;
     el.innerHTML = '<p class="ts tm">Yükleniyor...</p>';
     var res = await sb.from('on_kayitlar').select('kvkk_consent, consent_date').order('created_at', { ascending: false });
-    if (res.error) { el.innerHTML = '<p class="ts tm">Veri alınamadı.</p>'; return; }
+    if (res.error || !res.data) { el.innerHTML = '<p class="ts tm">Veri alınamadı.</p>'; return; }
     var total = res.data.length;
     var approved = res.data.filter(function(r) { return r.kvkk_consent; }).length;
     el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
@@ -2089,7 +2109,7 @@ function buildAutoAlerts() {
     var alerts = [];
     var today = DateUtils.today();
 
-    var dueTodayList = AppState.data.payments.filter(function(p) {
+    var dueTodayList = (AppState.data.payments || []).filter(function(p) {
         return (p.st === 'pending' || p.st === 'overdue') && p.dt === today;
     });
     if (dueTodayList.length > 0) {
@@ -2098,11 +2118,11 @@ function buildAutoAlerts() {
 
     var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
     var weekAgoStr = weekAgo.toISOString().split('T')[0];
-    var recentDates = Object.keys(AppState.data.attendance).filter(function(d) { return d >= weekAgoStr; });
-    var noAttClasses = AppState.data.classes.filter(function(cls) {
+    var recentDates = Object.keys(AppState.data.attendance || {}).filter(function(d) { return d >= weekAgoStr; });
+    var noAttClasses = (AppState.data.classes || []).filter(function(cls) {
         return !recentDates.some(function(d) {
             return Object.keys(AppState.data.attendance[d] || {}).some(function(aid) {
-                var a = AppState.data.athletes.find(function(x) { return x.id === aid; });
+                var a = (AppState.data.athletes || []).find(function(x) { return x.id === aid; });
                 return a && a.clsId === cls.id;
             });
         });
@@ -2111,7 +2131,7 @@ function buildAutoAlerts() {
         alerts.push({ type: 'info', icon: '📋', msg: noAttClasses.map(function(c) { return c.name; }).join(', ') + ' grubunda 7+ gündür yoklama girilmedi.', action: "go('attendance')" });
     }
 
-    var riskAthletes = AppState.data.athletes.filter(function(a) {
+    var riskAthletes = (AppState.data.athletes || []).filter(function(a) {
         if (a.st !== 'active') return false;
         var stats = getAttendanceStats(a.id);
         return stats.total > 5 && stats.rate < 30;
@@ -2138,7 +2158,7 @@ function initDashboardChart() {
         var ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
         months.push(['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()]);
         var inc = 0, exp = 0;
-        AppState.data.payments.forEach(function(p) {
+        (AppState.data.payments || []).forEach(function(p) {
             if (p.st==='completed' && p.dt && p.dt.startsWith(ym)) { if(p.ty==='income') inc+=(p.amt||0); else exp+=(p.amt||0); }
         });
         incomes.push(inc); expenses.push(exp);
@@ -2188,13 +2208,13 @@ function initCalendarChart() {
 
     var dayNames = ['pazar','pazartesi','salı','çarşamba','perşembe','cuma','cumartesi'];
     var events = [];
-    var hasSchedule = AppState.data.classes.some(function(c) { return c.scheduleDays && c.scheduleDays.length > 0; });
+    var hasSchedule = (AppState.data.classes || []).some(function(c) { return c.scheduleDays && c.scheduleDays.length > 0; });
     var colors = ['#3b82f6','#8b5cf6','#06b6d4','#f97316','#22c55e'];
 
     if (hasSchedule) {
         var startD = new Date(); startD.setDate(startD.getDate() - 60);
         var endD = new Date(); endD.setDate(endD.getDate() + 90);
-        AppState.data.classes.forEach(function(cls, ci) {
+        (AppState.data.classes || []).forEach(function(cls, ci) {
             if (!cls.scheduleDays || !cls.scheduleDays.length) return;
             var color = colors[ci % colors.length];
             var ts = (cls.scheduleTime && cls.scheduleTimeEnd) ? cls.scheduleTime + '-' + cls.scheduleTimeEnd : (cls.scheduleTime || '');
@@ -2203,8 +2223,8 @@ function initCalendarChart() {
                 var dn = dayNames[cur.getDay()];
                 if (cls.scheduleDays.indexOf(dn) > -1) {
                     var ds = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0');
-                    var dayAtt = AppState.data.attendance[ds] || {};
-                    var athInCls = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; });
+                    var dayAtt = (AppState.data.attendance || {})[ds] || {};
+                    var athInCls = (AppState.data.athletes || []).filter(function(a) { return a.clsId === cls.id && a.st === 'active'; });
                     var p = athInCls.filter(function(a) { return dayAtt[a.id] === 'P'; }).length;
                     var ab = athInCls.filter(function(a) { return dayAtt[a.id] === 'A'; }).length;
                     var hasAtt = athInCls.some(function(a) { return dayAtt[a.id]; });
@@ -2225,8 +2245,8 @@ function initCalendarChart() {
             }
         });
     } else {
-        Object.keys(AppState.data.attendance).forEach(function(date) {
-            var dayData = AppState.data.attendance[date];
+        Object.keys(AppState.data.attendance || {}).forEach(function(date) {
+            var dayData = (AppState.data.attendance || {})[date] || {};
             var p = 0, ab = 0, ex = 0;
             Object.values(dayData).forEach(function(st) { if(st==='P') p++; else if(st==='A') ab++; else if(st==='E') ex++; });
             var total = p + ab + ex;
@@ -2260,7 +2280,7 @@ function initCalendarChart() {
         height: 'auto',
         dayCellDidMount: function(arg) {
             var dn = dayNames[arg.date.getDay()];
-            var isTraining = AppState.data.classes.some(function(c) { return c.scheduleDays && c.scheduleDays.indexOf(dn) > -1; });
+            var isTraining = (AppState.data.classes || []).some(function(c) { return c.scheduleDays && c.scheduleDays.indexOf(dn) > -1; });
             if (isTraining) arg.el.style.backgroundColor = 'rgba(59,130,246,0.05)';
         }
     });
@@ -2301,9 +2321,9 @@ window.registerGoHook('after', function(page) {
         if (!main) return;
         if (main.querySelector('.yoklama-gecmis')) return;
         var atcls = AppState.ui.atcls || '';
-        var allDates = Object.keys(AppState.data.attendance).filter(function(d) {
-            var dayData = AppState.data.attendance[d];
-            var list = AppState.data.athletes.filter(function(a) {
+        var allDates = Object.keys(AppState.data.attendance || {}).filter(function(d) {
+            var dayData = (AppState.data.attendance || {})[d] || {};
+            var list = (AppState.data.athletes || []).filter(function(a) {
                 return a.st === 'active' && (!atcls || a.clsId === atcls);
             });
             return list.some(function(a) { return dayData[a.id]; });
@@ -2315,8 +2335,8 @@ window.registerGoHook('after', function(page) {
         div.className = 'card mt3 yoklama-gecmis';
         div.innerHTML = '<div class="tw6 tsm mb2">📅 Son 10 Günlük Geçmiş</div>'
             + allDates.map(function(d) {
-                var dayData = AppState.data.attendance[d];
-                var list = AppState.data.athletes.filter(function(a) {
+                var dayData = (AppState.data.attendance || {})[d] || {};
+                var list = (AppState.data.athletes || []).filter(function(a) {
                     return a.st === 'active' && (!atcls || a.clsId === atcls);
                 });
                 var p = list.filter(function(a) { return dayData[a.id] === 'P'; }).length;
@@ -2344,18 +2364,18 @@ window.registerGoHook('after', function(page) {
         if (main.querySelector('#dash-ozet')) return;
 
         var todayStr = DateUtils.today();
-        var attToday = AppState.data.attendance[todayStr] || {};
-        var activeAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active'; });
+        var attToday = (AppState.data.attendance || {})[todayStr] || {};
+        var activeAthletes = (AppState.data.athletes || []).filter(function(a) { return a.st === 'active'; });
         var todayPresent = activeAthletes.filter(function(a) { return attToday[a.id] === 'P'; }).length;
         var todayAbsent  = activeAthletes.filter(function(a) { return attToday[a.id] === 'A'; }).length;
         var attEntered   = activeAthletes.filter(function(a) { return attToday[a.id]; }).length;
-        var overdueList  = AppState.data.payments.filter(function(p) { return p.st === 'overdue'; });
+        var overdueList  = (AppState.data.payments || []).filter(function(p) { return p.st === 'overdue'; });
         var overdueNames = overdueList.slice(0, 3).map(function(p) {
-            var a = AppState.data.athletes.find(function(x) { return x.id === p.aid; });
-            return a ? a.fn + ' ' + a.ln : null;
+            var a = (AppState.data.athletes || []).find(function(x) { return x.id === p.aid; });
+            return a ? ((a.fn || '') + ' ' + (a.ln || '')) : null;
         }).filter(Boolean);
         var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-        var newThisWeek = AppState.data.athletes.filter(function(a) { return a.rd && new Date(a.rd) >= weekAgo; }).length;
+        var newThisWeek = (AppState.data.athletes || []).filter(function(a) { return a.rd && new Date(a.rd) >= weekAgo; }).length;
 
         var div = document.createElement('div');
         div.id = 'dash-ozet';
@@ -2386,12 +2406,12 @@ window.registerGoHook('after', function(page) {
         var main = document.getElementById('main');
         if (!main || main.querySelector('#coach-panel')) return;
 
-        var coachRecord = AppState.data.coaches.find(function(c) { return c.id === AppState.currentUser.id; })
-            || AppState.data.coaches.find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
+        var coachRecord = (AppState.data.coaches || []).find(function(c) { return c.id === AppState.currentUser.id; })
+            || (AppState.data.coaches || []).find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
             || null;
-        var myClassIds = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
-        var myAthletes = AppState.data.athletes.filter(function(a) { return a.st === 'active' && myClassIds.indexOf(a.clsId) > -1; });
-        var todayAtt = AppState.data.attendance[DateUtils.today()] || {};
+        var myClassIds = (AppState.data.classes || []).filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
+        var myAthletes = (AppState.data.athletes || []).filter(function(a) { return a.st === 'active' && myClassIds.indexOf(a.clsId) > -1; });
+        var todayAtt = (AppState.data.attendance || {})[DateUtils.today()] || {};
         var presentToday = myAthletes.filter(function(a) { return todayAtt[a.id] === 'P'; }).length;
         var absentToday  = myAthletes.filter(function(a) { return todayAtt[a.id] === 'A'; }).length;
         var notEntered   = myAthletes.filter(function(a) { return !todayAtt[a.id]; }).length;
@@ -2399,7 +2419,7 @@ window.registerGoHook('after', function(page) {
             var stats = getAttendanceStats(a.id);
             return stats.total > 5 && stats.rate < 50;
         });
-        var myClasses = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; });
+        var myClasses = (AppState.data.classes || []).filter(function(c) { return coachRecord && c.coachId === coachRecord.id; });
 
         main.innerHTML = '<div class="ph"><div class="stit">🏃 Antrenör Paneli</div></div>'
             + '<div class="g3 mb3" id="coach-panel">'
@@ -2410,11 +2430,11 @@ window.registerGoHook('after', function(page) {
             + (notEntered > 0 ? '<div class="al al-y mb3">⚠️ ' + notEntered + ' sporcu için yoklama girilmedi. <button class="btn btn-sm bp" onclick="go(\'attendance\')" style="margin-left:8px">Yoklamaya Git →</button></div>' : '')
             + (lowAtt.length > 0
                 ? '<div class="card mb3" style="border-left:4px solid var(--red)"><div class="tw6 tsm mb2">⚠️ Devamsızlık Riski</div>'
-                    + lowAtt.map(function(a) { var s = getAttendanceStats(a.id); return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span class="tw6 tsm">' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</span><span class="badge badge-red">%' + s.rate + '</span></div>'; }).join('')
+                    + lowAtt.map(function(a) { var s = getAttendanceStats(a.id); return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span class="tw6 tsm">' + FormatUtils.escape((a.fn || '') + ' ' + (a.ln || '')) + '</span><span class="badge badge-red">%' + s.rate + '</span></div>'; }).join('')
                     + '</div>'
                 : '<div class="al al-g mb3">✅ Tüm sporcular düzenli devam ediyor.</div>')
             + '<div class="card"><div class="tw6 tsm mb2">📋 Grubum</div>'
-            + myClasses.map(function(cls) { var cnt = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length; return '<div class="ts mb1">🏫 ' + FormatUtils.escape(cls.name) + ' — ' + cnt + ' sporcu</div>'; }).join('')
+            + myClasses.map(function(cls) { var cnt = (AppState.data.athletes || []).filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length; return '<div class="ts mb1">🏫 ' + FormatUtils.escape(cls.name) + ' — ' + cnt + ' sporcu</div>'; }).join('')
             + '</div>';
     }
 
@@ -2428,14 +2448,14 @@ window.registerGoHook('after', function(page) {
         var spContent = document.getElementById('sp-content');
         if (spContent && !spContent.querySelector('#coach-contact-card')) {
             var a = AppState.currentSporcu;
-            var cls = AppState.data.classes.find(function(c) { return c.id === a.clsId; });
-            var coach = cls ? AppState.data.coaches.find(function(c) { return c.id === cls.coachId; }) : null;
+            var cls = (AppState.data.classes || []).find(function(c) { return c.id === a.clsId; });
+            var coach = cls ? (AppState.data.coaches || []).find(function(c) { return c.id === cls.coachId; }) : null;
             if (coach && coach.ph) {
                 var card = document.createElement('div');
                 card.id = 'coach-contact-card';
                 card.className = 'info-card';
                 card.innerHTML = '<div class="info-card-title">📞 Antrenörümle İletişim</div>'
-                    + '<div class="info-row"><span class="info-label">Antrenör</span><span class="info-value tw6">' + FormatUtils.escape(coach.fn + ' ' + coach.ln) + '</span></div>'
+                    + '<div class="info-row"><span class="info-label">Antrenör</span><span class="info-value tw6">' + FormatUtils.escape((coach.fn || '') + ' ' + (coach.ln || '')) + '</span></div>'
                     + (coach.ph ? '<div class="info-row"><span class="info-label">Telefon</span><a href="tel:' + FormatUtils.escape(coach.ph) + '" class="info-value tb">' + FormatUtils.escape(coach.ph) + '</a></div>' : '')
                     + (coach.ph ? '<div class="mt2"><a href="https://wa.me/90' + coach.ph.replace(/\D/g,'').slice(-10) + '" target="_blank" rel="noopener" class="btn w100" style="background:#25d366;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">💬 WhatsApp ile Yaz</a></div>' : '');
 
@@ -2492,7 +2512,7 @@ window.registerGoHook('after', function(page) {
 // ── EDIT CLASS OVERRIDE — gün ve saat alanları ──────────────
 var _origEditClass = window.editClass;
 window.editClass = function(id) {
-    var c = id ? AppState.data.classes.find(function(x) { return x.id === id; }) : null;
+    var c = id ? (AppState.data.classes || []).find(function(x) { return x.id === id; }) : null;
     var isNew = !c;
     var days = ['pazartesi','salı','çarşamba','perşembe','cuma','cumartesi','pazar'];
     var dayLabels = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
@@ -2506,8 +2526,8 @@ window.editClass = function(id) {
     modal(isNew ? 'Yeni Sınıf' : 'Sınıf Düzenle',
         '<div class="fgr mb2"><label>Sınıf Adı *</label><input id="c-name" value="' + FormatUtils.escape(c ? c.name : '') + '"/></div>'
         + '<div class="g21 mb2">'
-        + '<div class="fgr"><label>Branş</label><select id="c-sp">' + AppState.data.sports.map(function(s) { return '<option value="' + s.id + '"' + (c && c.spId === s.id ? ' selected' : '') + '>' + FormatUtils.escape(s.name) + '</option>'; }).join('') + '</select></div>'
-        + '<div class="fgr"><label>Antrenör</label><select id="c-coach"><option value="">Seçiniz</option>' + AppState.data.coaches.map(function(co) { return '<option value="' + co.id + '"' + (c && c.coachId === co.id ? ' selected' : '') + '>' + FormatUtils.escape(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div>'
+        + '<div class="fgr"><label>Branş</label><select id="c-sp">' + (AppState.data.sports || []).map(function(s) { return '<option value="' + s.id + '"' + (c && c.spId === s.id ? ' selected' : '') + '>' + FormatUtils.escape(s.name) + '</option>'; }).join('') + '</select></div>'
+        + '<div class="fgr"><label>Antrenör</label><select id="c-coach"><option value="">Seçiniz</option>' + (AppState.data.coaches || []).map(function(co) { return '<option value="' + co.id + '"' + (c && c.coachId === co.id ? ' selected' : '') + '>' + FormatUtils.escape((co.fn || '') + ' ' + (co.ln || '')) + '</option>'; }).join('') + '</select></div>'
         + '</div>'
         + '<div class="fgr mb2"><label>Antrenman Günleri</label><div style="padding:8px 0">' + dayCheckboxes + '</div></div>'
         + '<div class="g21 mb2">'
@@ -2533,8 +2553,8 @@ window.editClass = function(id) {
                 };
                 var result = await DB.upsert('classes', DB.mappers.fromClass(obj));
                 if (result) {
-                    if (isNew) { AppState.data.classes.push(obj); }
-                    else { var idx = AppState.data.classes.findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.classes[idx] = obj; }
+                    if (isNew) { if (!AppState.data.classes) AppState.data.classes = []; AppState.data.classes.push(obj); }
+                    else { var idx = (AppState.data.classes || []).findIndex(function(x) { return x.id === obj.id; }); if (idx >= 0) AppState.data.classes[idx] = obj; }
                     toast(i18n[AppState.lang].saveSuccess, 'g');
                     closeModal();
                     go('classes');
@@ -2552,7 +2572,7 @@ window.editClass = function(id) {
         var d = new Date(dateStr + 'T12:00:00');
         var dayNames = ['pazar','pazartesi','salı','çarşamba','perşembe','cuma','cumartesi'];
         var dayName = dayNames[d.getDay()];
-        return AppState.data.classes.filter(function(cls) {
+        return (AppState.data.classes || []).filter(function(cls) {
             return cls.scheduleDays && cls.scheduleDays.indexOf(dayName) > -1;
         });
     }
@@ -2572,7 +2592,7 @@ window.editClass = function(id) {
     }
 
     window.pgAttendance = function() {
-        var hasSchedule = AppState.data.classes.some(function(c) { return c.scheduleDays && c.scheduleDays.length > 0; });
+        var hasSchedule = (AppState.data.classes || []).some(function(c) { return c.scheduleDays && c.scheduleDays.length > 0; });
         if (!hasSchedule && _origPgAttendance) return _origPgAttendance();
 
         var today = AppState.ui.atd || DateUtils.today();
@@ -2594,11 +2614,11 @@ window.editClass = function(id) {
         }
 
         var selClsId = AppState.ui.atcls || '';
-        var list = AppState.data.athletes.filter(function(a) {
+        var list = (AppState.data.athletes || []).filter(function(a) {
             return a.st === 'active' && (!selClsId || a.clsId === selClsId);
         });
 
-        var attDay = AppState.data.attendance[today] || {};
+        var attDay = (AppState.data.attendance || {})[today] || {};
         var totalActive = list.length;
         var filled  = list.filter(function(a) { return attDay[a.id]; }).length;
         var present = list.filter(function(a) { return attDay[a.id] === 'P'; }).length;
@@ -2734,7 +2754,7 @@ window.registerGoHook('after', function(page) {
         var match = onclickStr.match(/editClass\('([^']+)'\)/);
         if (!match) return;
         var clsId = match[1];
-        var cls = AppState.data.classes.find(function(c) { return c.id === clsId; });
+        var cls = (AppState.data.classes || []).find(function(c) { return c.id === clsId; });
         if (!cls || !cls.scheduleDays || !cls.scheduleDays.length) return;
         var dayMap = { pazartesi:'Pzt', salı:'Sal', çarşamba:'Çar', perşembe:'Per', cuma:'Cum', cumartesi:'Cmt', pazar:'Paz' };
         var dayStr = cls.scheduleDays.map(function(d) { return dayMap[d] || d; }).join(', ');
@@ -2764,12 +2784,12 @@ window.checkLessonExists = function(date, classId) {
     var dayName = dayNames[d.getDay()];
 
     if (classId) {
-        var cls = AppState.data.classes.find(function(c) { return c.id === classId; });
+        var cls = (AppState.data.classes || []).find(function(c) { return c.id === classId; });
         if (!cls || !cls.scheduleDays || cls.scheduleDays.indexOf(dayName) < 0) return null;
         return cls;
     }
     // classId verilmezse o gün dersi olan tüm sınıfları döndür
-    var classes = AppState.data.classes.filter(function(c) {
+    var classes = (AppState.data.classes || []).filter(function(c) {
         return c.scheduleDays && c.scheduleDays.indexOf(dayName) > -1;
     });
     return classes.length > 0 ? classes : null;
@@ -2800,6 +2820,7 @@ window.takeLessonAttendance = function(date, classId) {
         var date = AppState.ui.atd || DateUtils.today();
         var classId = AppState.ui.atcls || null;
 
+        if (!AppState.data.attendance) AppState.data.attendance = {};
         if (!AppState.data.attendance[date]) {
             AppState.data.attendance[date] = {};
         }
@@ -2808,13 +2829,18 @@ window.takeLessonAttendance = function(date, classId) {
             delete AppState.data.attendance[date][aid];
             var sb = getSupabase();
             if (sb) {
-                var q = sb.from('attendance')
-                    .delete()
-                    .eq('athlete_id', aid)
-                    .eq('att_date', date)
-                    .eq('org_id', AppState.currentOrgId);
-                if (classId) q = q.eq('class_id', classId);
-                await q;
+                try {
+                    var q = sb.from('attendance')
+                        .delete()
+                        .eq('athlete_id', aid)
+                        .eq('att_date', date)
+                        .eq('org_id', AppState.currentOrgId);
+                    if (classId) q = q.eq('class_id', classId);
+                    await q;
+                } catch(e) {
+                    console.error('Attendance delete error:', e);
+                    toast('Yoklama silinemedi: ' + (e.message || e), 'e');
+                }
             }
         } else {
             AppState.data.attendance[date][aid] = status;
@@ -2865,7 +2891,7 @@ window.takeLessonAttendance = function(date, classId) {
 
         // Takvime Ders Ekleme kartı oluştur
         var dayMap = { pazartesi:'Pzt', salı:'Sal', çarşamba:'Çar', perşembe:'Per', cuma:'Cum', cumartesi:'Cmt', pazar:'Paz' };
-        var scheduledClasses = AppState.data.classes.filter(function(c) {
+        var scheduledClasses = (AppState.data.classes || []).filter(function(c) {
             return c.scheduleDays && c.scheduleDays.length > 0;
         });
 
@@ -2887,7 +2913,7 @@ window.takeLessonAttendance = function(date, classId) {
                 classRows += '<div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:10px">';
                 classRows += '<div style="font-weight:600;font-size:13px;color:var(--blue2);margin-bottom:8px">📅 ' + FormatUtils.escape(groupKey) + '</div>';
                 groups[groupKey].forEach(function(cls) {
-                    var athCount = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length;
+                    var athCount = (AppState.data.athletes || []).filter(function(a) { return a.clsId === cls.id && a.st === 'active'; }).length;
                     var coachStr = cls.coachId ? coachName(cls.coachId) : '-';
                     classRows += '<div class="flex fjb fca" style="padding:6px 0;border-bottom:1px solid var(--border)">'
                         + '<div>'
@@ -3037,8 +3063,8 @@ window.showAddLessonToCalendarModal = function() {
         '<div class="al al-b mb3" style="font-size:12px">Ders eklemek için sınıf adı, antrenman günleri ve saat aralığını belirleyin. Her sınıf grubu ve saat dilimi için ayrı yoklama alınacaktır.</div>'
         + '<div class="fgr mb2"><label>Ders / Sınıf Adı *</label><input id="lesson-name" placeholder="Örn: CMT-PZR 09:00-10:00"/></div>'
         + '<div class="g21 mb2">'
-        + '<div class="fgr"><label>Branş</label><select id="lesson-sp">' + AppState.data.sports.map(function(s) { return '<option value="' + s.id + '">' + FormatUtils.escape(s.name) + '</option>'; }).join('') + '</select></div>'
-        + '<div class="fgr"><label>Antrenör</label><select id="lesson-coach"><option value="">Seçiniz</option>' + AppState.data.coaches.map(function(co) { return '<option value="' + co.id + '">' + FormatUtils.escape(co.fn + ' ' + co.ln) + '</option>'; }).join('') + '</select></div>'
+        + '<div class="fgr"><label>Branş</label><select id="lesson-sp">' + (AppState.data.sports || []).map(function(s) { return '<option value="' + s.id + '">' + FormatUtils.escape(s.name) + '</option>'; }).join('') + '</select></div>'
+        + '<div class="fgr"><label>Antrenör</label><select id="lesson-coach"><option value="">Seçiniz</option>' + (AppState.data.coaches || []).map(function(co) { return '<option value="' + co.id + '">' + FormatUtils.escape((co.fn || '') + ' ' + (co.ln || '')) + '</option>'; }).join('') + '</select></div>'
         + '</div>'
         + '<div class="fgr mb2"><label>Antrenman Günleri *</label><div style="padding:8px 0">' + dayCheckboxes + '</div></div>'
         + '<div class="g21 mb2">'
@@ -3081,7 +3107,7 @@ window.showAddLessonToCalendarModal = function() {
 
 // ── DERSİ TAKVİMDEN SİL ────────────────────────────────────
 window.deleteLessonFromCalendar = async function(classId) {
-    var cls = AppState.data.classes.find(function(c) { return c.id === classId; });
+    var cls = (AppState.data.classes || []).find(function(c) { return c.id === classId; });
     if (!cls) { toast('Sınıf bulunamadı!', 'e'); return; }
 
     modal('⚠️ Ders Silme Onayı',
@@ -3092,7 +3118,7 @@ window.deleteLessonFromCalendar = async function(classId) {
             { lbl: '🗑️ Sil', cls: 'bd', fn: async function() {
                 var result = await DB.remove('classes', { id: classId });
                 if (result) {
-                    AppState.data.classes = AppState.data.classes.filter(function(c) { return c.id !== classId; });
+                    AppState.data.classes = (AppState.data.classes || []).filter(function(c) { return c.id !== classId; });
                     toast('🗑️ "' + cls.name + '" dersi takvimden silindi.', 'g');
                     closeModal();
                     go('settings');
@@ -3118,10 +3144,10 @@ window.registerGoHook('after', function(page) {
     // Birden fazla ders varsa, her biri için özet göster
     var summary = '<div class="per-class-summary card mt3" style="border-left:4px solid var(--blue2)">';
     summary += '<div class="tw6 tsm mb2">📊 Günün Tüm Dersleri — ' + DateUtils.format(today) + '</div>';
-    var attDay = AppState.data.attendance[today] || {};
+    var attDay = (AppState.data.attendance || {})[today] || {};
 
     lessons.forEach(function(cls) {
-        var athInCls = AppState.data.athletes.filter(function(a) { return a.clsId === cls.id && a.st === 'active'; });
+        var athInCls = (AppState.data.athletes || []).filter(function(a) { return a.clsId === cls.id && a.st === 'active'; });
         var present = athInCls.filter(function(a) { return attDay[a.id] === 'P'; }).length;
         var absent = athInCls.filter(function(a) { return attDay[a.id] === 'A'; }).length;
         var filled = athInCls.filter(function(a) { return attDay[a.id]; }).length;
@@ -3193,19 +3219,19 @@ window.pgNotificationsPage = function() {
     var senderName = AppState.currentUser ? AppState.currentUser.name : 'Yönetici';
 
     // Sporcu listesi — antrenör sadece kendi sınıflarındaki sporcuları görsün
-    var athletes = AppState.data.athletes.filter(function(a) { return a.st === 'active'; });
+    var athletes = (AppState.data.athletes || []).filter(function(a) { return a.st === 'active'; });
     if (isCoach) {
-        var coachRecord = AppState.data.coaches.find(function(c) { return c.id === AppState.currentUser.id; })
-            || AppState.data.coaches.find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
+        var coachRecord = (AppState.data.coaches || []).find(function(c) { return c.id === AppState.currentUser.id; })
+            || (AppState.data.coaches || []).find(function(c) { return AppState.currentUser.tc && c.tc === AppState.currentUser.tc; })
             || null;
-        var myClassIds = AppState.data.classes.filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
+        var myClassIds = (AppState.data.classes || []).filter(function(c) { return coachRecord && c.coachId === coachRecord.id; }).map(function(c) { return c.id; });
         athletes = athletes.filter(function(a) { return myClassIds.indexOf(a.clsId) > -1; });
     }
 
     var athleteItems = athletes.map(function(a) {
-        return '<label class="ms-item" data-name="' + FormatUtils.escape((a.fn + ' ' + a.ln).toLowerCase()) + '">'
+        return '<label class="ms-item" data-name="' + FormatUtils.escape(((a.fn || '') + ' ' + (a.ln || '')).toLowerCase()) + '">'
             + '<input type="checkbox" class="notif-ath-cb" value="' + FormatUtils.escape(a.id) + '"/>'
-            + '<span>' + FormatUtils.escape(a.fn + ' ' + a.ln) + '</span></label>';
+            + '<span>' + FormatUtils.escape((a.fn || '') + ' ' + (a.ln || '')) + '</span></label>';
     }).join('');
 
     var html = '<div class="ph"><div class="stit">📨 Bildirimler</div>'
@@ -3298,8 +3324,8 @@ window.sendNotifMessage = async function() {
 
     for (var i = 0; i < checked.length; i++) {
         var cb = checked[i];
-        var ath = AppState.data.athletes.find(function(a) { return a.id === cb.value; });
-        var recipientName = ath ? ath.fn + ' ' + ath.ln : '';
+        var ath = (AppState.data.athletes || []).find(function(a) { return a.id === cb.value; });
+        var recipientName = ath ? ((ath.fn || '') + ' ' + (ath.ln || '')) : '';
 
         var msgObj = {
             org_id: AppState.currentOrgId || '',
@@ -3663,12 +3689,12 @@ window.spOdemeler = function() {
     var hasPayTR = s && s.paytrActive && s.paytrMerchantId;
     var hasBank = s && (s.iban || s.bankName);
 
-    var allPayments = AppState.data.payments.filter(function(p) { return p.aid === a.id; });
+    var allPayments = (AppState.data.payments || []).filter(function(p) { return p.aid === a.id; });
     var typePayments = allPayments.filter(function(p) { return (p.paymentType || 'aidat') === activeSubTab; });
 
     var completed = typePayments.filter(function(p) { return p.st === 'completed'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
     var pending = typePayments.filter(function(p) { return p.notifStatus === 'pending_approval'; }).sort(function(x, y) { return new Date(y.dt) - new Date(x.dt); });
-    var pendingPayments = typePayments.filter(function(p) { return p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { return x.dt.localeCompare(y.dt); });
+    var pendingPayments = typePayments.filter(function(p) { return p.st !== 'completed' && p.notifStatus !== 'pending_approval'; }).sort(function(x, y) { if (!x.dt && !y.dt) return 0; if (!x.dt) return 1; if (!y.dt) return -1; return x.dt.localeCompare(y.dt); });
     var totalPaid = completed.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var totalDebt = pendingPayments.reduce(function(s, p) { return s + (p.amt || 0); }, 0);
     var mIcon = function(m) { return ({ nakit: '💵', kredi_karti: '💳', havale: '🏦', paytr: '🔵' })[m] || '💰'; };
@@ -3806,12 +3832,12 @@ window.createPaymentPlan = async function() {
 
     for (var i = 0; i < selectedIds.length; i++) {
         var aid = selectedIds[i];
-        var ath = AppState.data.athletes.find(function(a) { return a.id === aid; });
+        var ath = (AppState.data.athletes || []).find(function(a) { return a.id === aid; });
         if (!ath) continue;
-        var exists = AppState.data.payments.find(function(p) { return p.source === 'plan' && p.aid === aid && p.dt === dt && (p.paymentType || 'aidat') === paymentType; });
+        var exists = (AppState.data.payments || []).find(function(p) { return p.source === 'plan' && p.aid === aid && p.dt === dt && (p.paymentType || 'aidat') === paymentType; });
         if (exists) { skipped++; continue; }
         var obj = {
-            id: generateId(), aid: aid, an: ath.fn + ' ' + ath.ln,
+            id: generateId(), aid: aid, an: (ath.fn || '') + ' ' + (ath.ln || ''),
             amt: amt, dt: dt, ty: 'income', st: 'pending',
             ds: autoDesc, serviceName: autoDesc,
             source: 'plan', notifStatus: '', payMethod: '',
@@ -3870,17 +3896,17 @@ window.showBulkPlanModal = function() {
             var typeLabel = paymentType === 'spor_malzemesi' ? 'Spor Malzemesi' : 'Aidatı';
             for (var j = 0; j < selectedIds.length; j++) {
                 var aid = selectedIds[j];
-                var ath = AppState.data.athletes.find(function(a) { return a.id === aid; });
+                var ath = (AppState.data.athletes || []).find(function(a) { return a.id === aid; });
                 if (!ath) continue;
                 for (var i = 0; i < count; i++) {
                     var d = new Date(sy, sm - 1 + i, 1);
                     var yy = d.getFullYear(), mm = d.getMonth();
                     var dt = yy + '-' + String(mm+1).padStart(2,'0') + '-01';
-                    var exists = AppState.data.payments.find(function(p) { return p.source === 'plan' && p.aid === aid && p.dt === dt && (p.paymentType || 'aidat') === paymentType; });
+                    var exists = (AppState.data.payments || []).find(function(p) { return p.source === 'plan' && p.aid === aid && p.dt === dt && (p.paymentType || 'aidat') === paymentType; });
                     if (exists) continue;
                     var autoDesc = months[mm] + ' ' + yy + ' ' + typeLabel;
                     var obj = {
-                        id: generateId(), aid: aid, an: ath.fn + ' ' + ath.ln,
+                        id: generateId(), aid: aid, an: (ath.fn || '') + ' ' + (ath.ln || ''),
                         amt: amt, dt: dt, ty: 'income', st: 'pending',
                         ds: autoDesc, serviceName: autoDesc,
                         source: 'plan', notifStatus: '', payMethod: '',
@@ -4356,7 +4382,7 @@ window.showInventoryMovements = function() {
 // ── Sporcu profiline envanter satışı: addPaymentForAthlete override
 var _origAddPaymentForAthlete = window.addPaymentForAthlete;
 window.addPaymentForAthlete = function(aid) {
-    var a = AppState.data.athletes.find(function(x) { return x.id === aid; });
+    var a = (AppState.data.athletes || []).find(function(x) { return x.id === aid; });
     if (!a) return;
 
     var invItems = (AppState.data.inventoryItems || []).filter(function(i) { return i.status === 'active' && i.stockQty > 0; });
@@ -4364,7 +4390,7 @@ window.addPaymentForAthlete = function(aid) {
         return '<option value="' + FormatUtils.escape(i.id) + '">' + FormatUtils.escape(i.name) + ' (' + i.stockQty + ' ' + FormatUtils.escape(i.unit) + ' — ' + FormatUtils.currency(i.unitPrice) + ')</option>';
     }).join('');
 
-    modal('Yeni Ödeme Ekle', '<div class="fgr mb2"><label>Sporcu</label><input value="' + FormatUtils.escape(a.fn + ' ' + a.ln) + '" disabled/></div>'
+    modal('Yeni Ödeme Ekle', '<div class="fgr mb2"><label>Sporcu</label><input value="' + FormatUtils.escape((a.fn || '') + ' ' + (a.ln || '')) + '" disabled/></div>'
         + '<div class="fgr mb3"><label>Ödeme Tipi</label><select id="p-payment-type" onchange="togglePaymentTypeFields()" style="padding:10px 12px">'
         + '<option value="aidat">💰 Aidat</option>'
         + '<option value="spor_malzemesi">🏋️ Spor Malzemesi</option>'
@@ -4552,7 +4578,7 @@ window.pgAccountingV8 = function() {
     var baseHtml = _origPgAccountingV8();
 
     // Aidat vs Envanter gelir ayrımı
-    var allCompleted = AppState.data.payments.filter(function(p) { return p.ty === 'income' && p.st === 'completed'; });
+    var allCompleted = (AppState.data.payments || []).filter(function(p) { return p.ty === 'income' && p.st === 'completed'; });
     var aidatIncome = 0, envIncome = 0;
     allCompleted.forEach(function(p) {
         if ((p.paymentType || 'aidat') === 'spor_malzemesi') {
@@ -4634,7 +4660,7 @@ window.pgAccountingV8 = function() {
 // generatePaymentHistory override — spor malzemesi kayıtlarını farklı göster
 var _origGeneratePaymentHistory = typeof generatePaymentHistory === 'function' ? generatePaymentHistory : null;
 window.generatePaymentHistory = function(athleteId) {
-    var payments = AppState.data.payments.filter(function(p) { return p.aid === athleteId; });
+    var payments = (AppState.data.payments || []).filter(function(p) { return p.aid === athleteId; });
     if (payments.length === 0) {
         return '<div class="empty-state" style="padding:32px;text-align:center"><div style="font-size:44px;margin-bottom:10px">📭</div><div class="tw6 ts">Henüz ödeme kaydı yok</div></div>';
     }

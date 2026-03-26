@@ -14,6 +14,7 @@ if ('serviceWorker' in navigator) {
                 console.log('✅ Service Worker kayıtlı — scope:', reg.scope);
                 reg.addEventListener('updatefound', function() {
                     var newWorker = reg.installing;
+                    if (!newWorker) return;
                     newWorker.addEventListener('statechange', function() {
                         if (newWorker.state === 'activated') {
                             if (typeof toast === 'function') toast('🔄 Uygulama güncellendi!', 'g');
