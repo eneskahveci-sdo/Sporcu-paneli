@@ -793,10 +793,26 @@ async function loadOnKayitlar() {
         var sb = getSupabase(); if (!sb) return;
         var bid = AppState.currentBranchId;
         var oid = AppState.currentOrgId;
-        if (!bid && !oid) return;
+        // bid/oid yoksa bile devam et — org/branch bilgisi olmadan kaydedilen
+        // ön kayıtları da çekebilmek için filtresiz sorgu yapılır.
         var data = null, error = null;
-        if (bid) { var r = await sb.from('on_kayitlar').select('*').eq('branch_id', bid).order('created_at', { ascending: false }); data = r.data; error = r.error; }
-        if ((!data || data.length === 0) && oid) { var r2 = await sb.from('on_kayitlar').select('*').eq('org_id', oid).order('created_at', { ascending: false }); data = r2.data; error = r2.error; }
+        if (bid) {
+            // branch_id eşleşen VEYA hiç org/branch kaydedilmemiş kayıtları getir
+            var r = await sb.from('on_kayitlar').select('*')
+                .or('branch_id.eq.' + bid + ',and(branch_id.is.null,org_id.is.null)')
+                .order('created_at', { ascending: false });
+            data = r.data; error = r.error;
+        } else if (oid) {
+            var r2 = await sb.from('on_kayitlar').select('*')
+                .or('org_id.eq.' + oid + ',and(branch_id.is.null,org_id.is.null)')
+                .order('created_at', { ascending: false });
+            data = r2.data; error = r2.error;
+        } else {
+            // org/branch bilgisi yoksa tüm kayıtları getir (yeni kurulum)
+            var r3 = await sb.from('on_kayitlar').select('*')
+                .order('created_at', { ascending: false });
+            data = r3.data; error = r3.error;
+        }
         if (error) { if (error.message && error.message.includes('on_kayitlar')) console.warn('on_kayitlar tablosu bulunamadı'); return; }
         if (data) {
             AppState.data.onKayitlar = data.map(function(r) { return { id: r.id, studentName: r.student_name || ((r.fn || '') + ' ' + (r.ln || '')).trim(), fn: r.fn || '', ln: r.ln || '', bd: r.bd || '', tc: r.tc || '', clsId: r.cls_id || '', className: r.class_name || '', parentName: r.parent_name || '', parentPhone: r.parent_phone || '', status: r.status || 'new', createdAt: r.created_at || '', orgId: r.org_id || '', branchId: r.branch_id || '' }; });
@@ -927,15 +943,15 @@ window.submitOnKayit = async function() {
     var psn = (document.getElementById('ok-psn') || {}).value?.trim() || '';
     var pph = (document.getElementById('ok-pph') || {}).value?.trim() || '';
     if (!fn || !ln || !bd || !clsId || !pn || !pph) { toast('Zorunlu alanları doldurun!', 'e'); return; }
-    var rOrg = AppState.currentOrgId || (document.getElementById('ok-org-id') || {}).value || '';
-    var rBranch = AppState.currentBranchId || (document.getElementById('ok-branch-id') || {}).value || '';
-    if (!rOrg && !rBranch) { toast('Kurum bilgisi alınamadı.', 'e'); return; }
+    var rOrg = AppState.currentOrgId || (document.getElementById('ok-org-id') || {}).value || null;
+    var rBranch = AppState.currentBranchId || (document.getElementById('ok-branch-id') || {}).value || null;
+    // Kurum bilgisi yoksa null ile kaydet — admin "org/branch bilgisi olmayan" filtresiyle görecek
     var id = generateId();
     var sName = fn + ' ' + ln;
     var pName = psn ? (pn + ' ' + psn) : pn;
     try {
         var sb = getSupabase();
-        if (sb) await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: DateUtils.today(), org_id: rOrg, branch_id: rBranch });
+        if (sb) await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: DateUtils.today(), org_id: rOrg || null, branch_id: rBranch || null });
     } catch(e) { console.error('submitOnKayit:', e); }
     if (!AppState.data.onKayitlar) AppState.data.onKayitlar = [];
     AppState.data.onKayitlar.unshift({ id: id, studentName: sName, fn: fn, ln: ln, bd: bd, tc: tc, clsId: clsId, className: clsName, parentName: pName, parentPhone: pph, status: 'new', createdAt: DateUtils.today(), orgId: rOrg, branchId: rBranch });

@@ -864,7 +864,6 @@ window.doLogin = async function() {
                     id: userData.id,
                     email: userData.email,
                     name: userData.name,
-                    pass: password,
                     role: userData.role,
                     org_id: userData.org_id,
                     branch_id: userData.branch_id
@@ -904,7 +903,7 @@ window.doLogin = async function() {
     } catch (err) {
         console.error('Login error:', err);
         if (errEl) {
-            errEl.textContent = `Giriş hatası: ${err.message || 'Bilinmeyen hata'}`;
+            errEl.textContent = 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.';
             errEl.classList.remove('dn');
         }
     } finally {
