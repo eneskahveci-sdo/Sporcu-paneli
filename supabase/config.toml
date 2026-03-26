@@ -1,9 +1,6 @@
 [db]
 major_version = 15
 
-[functions.send-sms]
-verify_jwt = false
-
 [functions.paytr-token]
 verify_jwt = false
 
