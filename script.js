@@ -641,7 +641,7 @@ const DB = {
                 id: r.id, schoolName: r.school_name, logoUrl: r.logo_url,
                 bankName: r.bank_name, accountName: r.account_name,
                 iban: r.iban, ownerPhone: r.owner_phone,
-                address: r.address, netgsmHeader: r.netgsm_header,
+                address: r.address,
                 paytrActive: r.paytr_active || false,
                 paytrMerchantId: r.paytr_merchant_id || ''
                 // paytrMerchantKey ve paytrMerchantSalt kasıtlı olarak frontend'e çekilmiyor
@@ -655,7 +655,7 @@ const DB = {
                 school_name: s.schoolName, logo_url: s.logoUrl,
                 bank_name: s.bankName, account_name: s.accountName,
                 iban: s.iban, owner_phone: s.ownerPhone,
-                address: s.address, netgsm_header: s.netgsmHeader,
+                address: s.address,
                 paytr_active: s.paytrActive || false,
                 paytr_merchant_id: s.paytrMerchantId || ''
                 // paytr_merchant_key ve paytr_merchant_salt DB'ye frontend üzerinden yazılmıyor
@@ -3645,54 +3645,17 @@ window.delCoach = function(id) {
 function pgSms() {
     return `
     <div class="ph">
-        <div class="stit" data-i18n="menuSms">SMS Duyuru</div>
+        <div class="stit" data-i18n="menuSms">Bildirimler</div>
     </div>
     <div class="card">
-        <div class="al al-y mb3">
-            <strong>Bilgi:</strong> SMS gönderimi için NetGSM entegrasyonu gereklidir.
+        <div class="al al-y">
+            SMS özelliği devre dışı bırakıldı.
         </div>
-        <div class="fgr mb2">
-            <label>Alıcı Grubu</label>
-            <select id="sms-group">
-                <option value="all">Tüm Aktif Sporcular</option>
-                <option value="overdue">Gecikmiş Ödemesi Olanlar</option>
-            </select>
-        </div>
-        <div class="fgr mb2">
-            <label>Mesaj İçeriği</label>
-            <textarea id="sms-body" rows="4" maxlength="160" placeholder="Mesajınızı yazın..."></textarea>
-        </div>
-        <button class="btn bp w100" onclick="sendBulkSms()">Gönder</button>
     </div>`;
 }
 
 window.sendBulkSms = async function() {
-    const body = UIUtils.getValue('sms-body');
-    const group = UIUtils.getValue('sms-group') || 'all';
-    if (!body) { toast('Mesaj içeriği giriniz!', 'e'); return; }
-
-    let athletes = AppState.data.athletes.filter(a => a.st === 'active' && a.ph);
-    if (group === 'overdue') {
-        const overdueIds = new Set(AppState.data.payments.filter(p => p.st === 'overdue').map(p => p.aid));
-        athletes = athletes.filter(a => overdueIds.has(a.id));
-    }
-
-    if (athletes.length === 0) { toast('Gönderilecek telefon numarası olan sporcu bulunamadı!', 'e'); return; }
-
-    const sb = getSupabase();
-    if (!sb) { toast('Bağlantı hatası!', 'e'); return; }
-
-    let sent = 0, errors = 0;
-    for (const a of athletes) {
-        try {
-            const { error } = await sb.functions.invoke('send-sms', { body: { phone: a.ph, message: body } });
-            if (error) errors++;
-            else sent++;
-        } catch(e) { errors++; }
-    }
-
-    if (sent > 0) toast(`✅ ${sent} sporcuya SMS gönderildi!`, 'g');
-    if (errors > 0) toast(`⚠️ ${errors} SMS gönderilemedi. NetGSM ayarlarını kontrol edin.`, 'e');
+    toast('SMS özelliği devre dışı.', 'e');
 };
 
 function pgSettings() {
@@ -3798,18 +3761,6 @@ function pgSettings() {
         <button class="btn bp mt2" onclick="saveGeneralSettings()">Genel Ayarları Kaydet</button>
     </div>
 
-    <div class="card mb3" style="border-left: 4px solid var(--green)">
-        <div class="tw6 tsm mb2">&#x1F4F1; SMS Entegrasyonu (NetGSM)</div>
-        <div class="al al-b mb3" style="font-size:12px">
-            &#x2139;&#xFE0F; NetGSM kullanıcı adı ve şifresi güvenlik için Supabase Edge Function ortam değişkenlerinde saklanır.<br>
-            <strong>Ayarlama:</strong> <code style="font-size:11px">supabase secrets set NETGSM_USER=xxx NETGSM_PASS=xxx NETGSM_HEADER=xxx</code>
-        </div>
-        <div class="fgr mb2">
-            <label>SMS Başlığı (Header)</label>
-            <input id="s-smsheader" value="${FormatUtils.escape(s?.netgsmHeader || '')}" placeholder="Örn: AKADEMI"/>
-        </div>
-        <button class="btn bp mt2" onclick="saveSmsSettings()">SMS Başlığını Kaydet</button>
-    </div>
 
     <div class="card mb3" style="border-left: 4px solid #0070f3">
         <div class="flex fjb fca mb2">
@@ -3911,17 +3862,6 @@ window.saveGeneralSettings = async function() {
     }
 };
 
-window.saveSmsSettings = async function() {
-    const obj = {
-        ...(AppState.data.settings || {}),
-        netgsmHeader: UIUtils.getValue('s-smsheader')
-    };
-    const result = await DB.upsert('settings', DB.mappers.fromSettings(obj));
-    if (result) {
-        AppState.data.settings = obj;
-        toast('SMS başlığı kaydedildi!', 'g');
-    }
-};
 
 window.savePayTRSettings = async function() {
     const mid    = document.getElementById('s-paytr-mid')?.value.trim() || '';
@@ -5096,10 +5036,9 @@ window.showOnKayitForm = async function() {
                     <div class="fgr"><label>Veli Soyadı</label><input id="ok-psn" placeholder="Soyadı"/></div>
                 </div>
                 <div class="fgr mb2">
-                    <label>Veli Telefon * (SMS gönderilecek)</label>
+                    <label>Veli Telefon *</label>
                     <input id="ok-pph" type="tel" placeholder="05XX XXX XX XX"/>
                 </div>
-                <div style="font-size:12px;color:var(--text3)">📱 Kayıt onayı SMS olarak gönderilecektir.</div>
             </div>
             <div style="padding:16px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end;background:var(--bg3);border-radius:0 0 16px 16px">
                 <button class="btn bs" onclick="document.getElementById('onkayit-modal').remove()">İptal</button>
@@ -5167,42 +5106,10 @@ window.submitOnKayit = async function() {
         }
     } catch(e) { console.warn('On kayit db error:', e); }
     
-    // SMS gönder
-    await sendOnKayitSms(pph, fn, ln, clsName);
-    
     document.getElementById('onkayit-modal')?.remove();
-    toast(`✅ Ön kayıt alındı! ${pph} numarasına SMS gönderildi.`, 'g');
+    toast('✅ Ön kayıt alındı!', 'g');
 };
 
-async function sendOnKayitSms(phone, fn, ln, clsName) {
-    const settings = AppState.data.settings;
-    
-    const msg = `Sayin veli, ${fn} ${ln} icin ${clsName} sinifina on kayit talebiniz alinmistir. En kisa surede sizinle iletisime gececegiz. ${settings?.schoolName || 'Akademi'}`;
-    
-    try {
-        const sb = AppState.sb;
-        if (!sb || !sb.functions) {
-            console.log('SMS gönderilemedi - Supabase client hazır değil. Mesaj:', msg);
-            return;
-        }
-        const { data, error } = await sb.functions.invoke('send-sms', {
-            body: { phone: phone, message: msg }
-        });
-        if (error) {
-            console.warn('SMS Edge Function hatası:', error);
-            if (typeof toast === 'function') {
-                toast('SMS gönderilemedi. Ön kayıt alındı ancak SMS bilgilendirmesi yapılamadı.', 'e');
-            }
-        } else {
-            console.log('SMS gönderildi:', phone);
-        }
-    } catch(e) {
-        console.warn('SMS gönderim hatası:', e);
-        if (typeof toast === 'function') {
-            toast('SMS gönderilemedi. Ön kayıt alındı ancak SMS bilgilendirmesi yapılamadı.', 'e');
-        }
-    }
-}
 
 // Ön kayıtları admin panelinde yükle
 async function loadOnKayitlar() {

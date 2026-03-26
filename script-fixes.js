@@ -610,14 +610,6 @@ window.pgSmsV8 = function() {
     + '<div class="flex gap2"><button class="btn bsu w100" onclick="sendBulkWhatsApp()" ' + (waActive ? '' : 'disabled') + '>💬 WhatsApp Gönder</button></div>'
     + '</div>'
 
-    // SMS bölümü (mevcut)
-    + '<div class="card" style="border-left:4px solid var(--blue2)">'
-    + '<div class="tw6 tsm mb2">📩 SMS Duyuru (NetGSM)</div>'
-    + '<div class="al al-b mb2" style="font-size:12px">SMS gönderimi için Ayarlar > NetGSM entegrasyonu gereklidir.</div>'
-    + '<div class="fgr mb2"><label>Alıcı Grubu</label><select id="sms-group"><option value="all">Tüm Aktif Sporcular</option><option value="overdue">Gecikmiş Ödemesi Olanlar</option></select></div>'
-    + '<div class="fgr mb2"><label>Mesaj İçeriği</label><textarea id="sms-body" rows="4" maxlength="160" placeholder="Mesajınızı yazın..."></textarea></div>'
-    + '<button class="btn bp w100" onclick="sendBulkSms()">📩 SMS Gönder</button>'
-    + '</div>'
     + '</div>'
 
     // Mesaj şablonları
@@ -947,7 +939,6 @@ window.submitOnKayit = async function() {
     } catch(e) { console.error('submitOnKayit:', e); }
     if (!AppState.data.onKayitlar) AppState.data.onKayitlar = [];
     AppState.data.onKayitlar.unshift({ id: id, studentName: sName, fn: fn, ln: ln, bd: bd, tc: tc, clsId: clsId, className: clsName, parentName: pName, parentPhone: pph, status: 'new', createdAt: DateUtils.today(), orgId: rOrg, branchId: rBranch });
-    try { await sendOnKayitSms(pph, fn, ln, clsName); } catch(e) {}
     var m = document.getElementById('onkayit-modal'); if (m) m.remove();
     toast('✅ Ön kayıt başarıyla alındı!', 'g');
 };
@@ -1640,7 +1631,6 @@ window.showLegal = function(type) {
         + '<p style="margin-bottom:4px">Kişisel verileriniz aşağıdaki üçüncü taraflarla paylaşılmaktadır:</p>'
         + '<ul style="margin-left:16px;margin-bottom:12px">'
         + '<li><b>PayTR Bilişim Hizmetleri A.Ş.</b> — online ödeme altyapısı (kart bilgileri tarafımızca saklanmaz)</li>'
-        + '<li><b>NetGSM</b> — SMS bildirim altyapısı</li>'
         + '<li><b>Supabase Inc.</b> — veri tabanı altyapısı (Frankfurt, Almanya — AB GDPR kapsamında)</li>'
         + '<li><b>Vercel Inc.</b> — web uygulama barındırma (ABD — SCCs kapsamında)</li>'
         + '</ul>'
