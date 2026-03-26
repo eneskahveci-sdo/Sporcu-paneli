@@ -1404,7 +1404,8 @@ window.initiatePayTRPayment = async function(amt, desc) {
             notifStatus: '',
             payMethod: 'paytr'
         };
-        await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
+        var insertResult = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
+        if (insertResult.error) throw insertResult.error;
         AppState.data.payments.push(pendingPay);
 
         // postMessage listener için orderId'yi kaydet
