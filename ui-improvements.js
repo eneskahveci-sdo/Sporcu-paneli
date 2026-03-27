@@ -141,7 +141,7 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
     *:focus-visible { outline: 2px solid var(--blue2, #3b82f6) !important; outline-offset: 2px !important; }
     `;
     document.head.appendChild(style);
-    console.log('✅ Mobil UX CSS enjekte edildi');
+    // Mobil UX CSS enjekte edildi
 })();
 
 // ── 2) BAĞLANTI TAKİBİ ──────────────────────────────────

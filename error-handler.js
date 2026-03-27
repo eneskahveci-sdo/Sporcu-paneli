@@ -11,13 +11,7 @@
   var _prevOnUnhandledRejection = window.onunhandledrejection;
 
   window.onerror = function (message, source, lineno, colno, error) {
-    console.error('[ErrorHandler] Uncaught error:', {
-      message: message,
-      source: source,
-      line: lineno,
-      column: colno,
-      error: error
-    });
+    console.error('[ErrorHandler] Uncaught error:', message);
     if (typeof _prevOnError === 'function') {
       return _prevOnError.apply(this, arguments);
     }
@@ -25,10 +19,7 @@
   };
 
   window.onunhandledrejection = function (event) {
-    console.error('[ErrorHandler] Unhandled promise rejection:', {
-      reason: event && event.reason,
-      promise: event && event.promise
-    });
+    console.error('[ErrorHandler] Unhandled promise rejection:', event && event.reason && event.reason.message || 'unknown');
     if (typeof _prevOnUnhandledRejection === 'function') {
       _prevOnUnhandledRejection.call(this, event);
     }
