@@ -1354,17 +1354,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
         };
 
         // Doğrudan fetch ile Edge Function çağır
-        var supabaseUrl = 'https://wfarbydojxtufnkjuhtc.supabase.co';
-        var supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
-
         // PayTR Edge Function çağrılıyor
 
-        var response = await fetch(supabaseUrl + '/functions/v1/paytr-token', {
+        var response = await fetch(SUPABASE_CONFIG.url + '/functions/v1/paytr-token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': supabaseAnonKey,
-                'Authorization': 'Bearer ' + supabaseAnonKey
+                'apikey': SUPABASE_CONFIG.anonKey,
+                'Authorization': 'Bearer ' + SUPABASE_CONFIG.anonKey
             },
             body: JSON.stringify(requestBody)
         });

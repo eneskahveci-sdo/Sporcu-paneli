@@ -3061,7 +3061,7 @@ function _updatePlanAthTags() {
     const checked = document.querySelectorAll('#plan-ath-list .plan-ath-cb:checked');
     if (checked.length === 0) { container.innerHTML = ''; return; }
     container.innerHTML = Array.from(checked).map(cb =>
-        `<span class="ath-tag">${FormatUtils.escape(cb.dataset.name)} <span class="ath-tag-x" onclick="removePlanAthlete('${FormatUtils.escape(cb.value)}')">✕</span></span>`
+        `<span class="ath-tag">${FormatUtils.escape(cb.dataset.name)} <span class="ath-tag-x" data-id="${FormatUtils.escape(cb.value)}" onclick="removePlanAthlete(this.dataset.id)">✕</span></span>`
     ).join('');
 }
 
