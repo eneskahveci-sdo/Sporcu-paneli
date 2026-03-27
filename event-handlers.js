@@ -28,10 +28,10 @@
         var coachLoginBtn = document.querySelector('#login-coach .btn.bp');
         if (coachLoginBtn) coachLoginBtn.addEventListener('click', function () { doNormalLogin('coach'); });
 
-        // ── Yasal metinler ───────────────────────────────────────
-        var legalBtns = document.querySelectorAll('.login-legal-btn');
-        if (legalBtns[0]) legalBtns[0].addEventListener('click', function () { showLegal('kvkk'); });
-        if (legalBtns[1]) legalBtns[1].addEventListener('click', function () { showLegal('kullanim'); });
+        // ── Yasal metinler (data-legal attribute ile) ────────────
+        document.querySelectorAll('.login-legal-btn[data-legal]').forEach(function (btn) {
+            btn.addEventListener('click', function () { showLegal(this.dataset.legal); });
+        });
 
         // ── Sporcu portalı: bildirim, tema, çıkış ───────────────
         var spNotifBtn = document.getElementById('sp-notif-btn');

@@ -1118,9 +1118,9 @@ document.addEventListener('DOMContentLoaded', function() {
     links.forEach(function(link) {
         link.addEventListener('touchend', function(e) {
             e.preventDefault();
-            var href = link.getAttribute('onclick') || '';
-            if (href.indexOf('kvkk') !== -1) window.showLegal('kvkk');
-            else if (href.indexOf('kullanim') !== -1) window.showLegal('kullanim');
+            var legal = link.getAttribute('data-legal') || link.getAttribute('onclick') || '';
+            if (legal.indexOf('kvkk') !== -1) window.showLegal('kvkk');
+            else if (legal.indexOf('kullanim') !== -1) window.showLegal('kullanim');
         }, { passive: false });
     });
 });
