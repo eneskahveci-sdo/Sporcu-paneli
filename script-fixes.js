@@ -320,7 +320,7 @@ window.showCashTransferModal = function() {
                 toast('✅ Transfer kaydedildi!', 'g');
                 closeModal();
                 go('accounting');
-            } catch (e) { toast('Hata: ' + e.message, 'e'); }
+            } catch (e) { console.error('cashTransfer error:', e.message); toast('Transfer kaydedilemedi. Lütfen tekrar deneyin.', 'e'); }
         }}
     ]);
 };
@@ -869,7 +869,7 @@ window.convertOnKayit = async function(id) {
             toast('✅ ' + athleteObj.fn + ' ' + athleteObj.ln + ' sporcular listesine kaydedildi!', 'g');
             if (AppState.ui.curPage === 'onkayit') go('onkayit'); else if (AppState.ui.curPage === 'athletes') go('athletes');
         }
-    } catch(e) { toast('Hata: ' + (e.message || ''), 'e'); }
+    } catch(e) { console.error('convertOnKayit error:', e.message); toast('İşlem başarısız. Lütfen tekrar deneyin.', 'e'); }
 };
 
 window.editOnKayit = function(id) {
@@ -896,7 +896,7 @@ window.editOnKayit = function(id) {
                 var sb = getSupabase();
                 if (sb) await sb.from('on_kayitlar').update({ student_name: fn + ' ' + ln, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pn, parent_phone: pph }).eq('id', id);
                 toast('✅ Güncellendi!', 'g');
-            } catch(e) { toast('Hata: ' + (e.message || ''), 'e'); }
+            } catch(e) { console.error('editOnKayit save error:', e.message); toast('Güncelleme başarısız. Lütfen tekrar deneyin.', 'e'); }
             closeModal();
             if (AppState.ui.curPage === 'onkayit') go('onkayit');
             else if (AppState.ui.curPage === 'athletes') go('athletes');
@@ -1901,7 +1901,7 @@ window.submitDeletionRequest = async function() {
         });
         toast('✅ Silme talebiniz alındı. 30 gün içinde yanıtlanacaktır.', 'g');
     } catch(e) {
-        toast('Talep gönderilemedi: ' + e.message, 'e');
+        console.error('deletionRequest error:', e.message); toast('Talep gönderilemedi. Lütfen tekrar deneyin.', 'e');
     }
 };
 // H6: Veri silme talebi aktif
@@ -2064,7 +2064,7 @@ window.completeDeletionRequest = function(reqId, athleteId) {
             loadDeletionRequests();
         } catch(e) {
             console.error('Deletion error:', e);
-            toast('Silme hatası: ' + (e.message || e), 'e');
+            console.error('athleteDelete error:', e.message); toast('Silme işlemi başarısız. Lütfen tekrar deneyin.', 'e');
         }
     };
     if (typeof confirm2 === 'function') {
@@ -2838,7 +2838,7 @@ window.takeLessonAttendance = function(date, classId) {
                     await q;
                 } catch(e) {
                     console.error('Attendance delete error:', e);
-                    toast('Yoklama silinemedi: ' + (e.message || e), 'e');
+                    console.error('attendance delete error:', e.message); toast('Yoklama silinemedi. Lütfen tekrar deneyin.', 'e');
                 }
             }
         } else {
@@ -2874,7 +2874,7 @@ window.takeLessonAttendance = function(date, classId) {
                     }
                 } catch(e) {
                     console.error('Attendance save error:', e);
-                    toast('Yoklama kaydedilemedi: ' + (e.message || e), 'e');
+                    console.error('attendance save error:', e.message); toast('Yoklama kaydedilemedi. Lütfen tekrar deneyin.', 'e');
                 }
             }
         }

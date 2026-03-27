@@ -2738,7 +2738,7 @@ window.setAtt = async function(aid, status) {
                 }
             } catch(e) {
                 console.error('Attendance save error:', e);
-                toast('Yoklama kaydedilemedi: ' + (e.message || e), 'e');
+                toast('Yoklama kaydedilemedi. Lütfen tekrar deneyin.', 'e');
             }
         }
     }
@@ -5191,7 +5191,7 @@ window.markOnKayitDone = async function(id) {
         toast('İşaretlendi', 'g');
         const cur = AppState.ui?.curPage;
         go(cur === 'settings' ? 'settings' : 'onkayit');
-    } catch(e) { toast('Hata: ' + e.message, 'e'); }
+    } catch(e) { console.error('markOnKayitDone error:', e.message); toast('İşlem başarısız. Lütfen tekrar deneyin.', 'e'); }
 };
 
 window.delOnKayit = async function(id) {
@@ -5203,7 +5203,7 @@ window.delOnKayit = async function(id) {
             toast('Silindi', 'g');
             const cur = AppState.ui?.curPage;
             go(cur === 'settings' ? 'settings' : 'onkayit');
-        } catch(e) { toast('Hata: ' + e.message, 'e'); }
+        } catch(e) { console.error('delOnKayit error:', e.message); toast('Silme işlemi başarısız. Lütfen tekrar deneyin.', 'e'); }
     });
 };
 
