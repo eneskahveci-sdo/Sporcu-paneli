@@ -961,7 +961,7 @@ window.submitOnKayit = async function() {
             var res = await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: new Date().toISOString(), org_id: rOrg || null, branch_id: rBranch || null });
             if (res.error) {
                 console.error('submitOnKayit DB error');
-                toast('Ön kayıt kaydedilemedi: ' + (res.error.message || 'Veritabanı hatası'), 'e');
+                toast('Ön kayıt kaydedilemedi. Lütfen tekrar deneyin.', 'e');
                 return;
             }
             insertOk = true;
@@ -1412,7 +1412,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
             payMethod: 'paytr'
         };
         var insertResult = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
-        if (insertResult.error) throw insertResult.error;
+        if (insertResult.error) { console.error('[PayTR] DB insert error:', insertResult.error.message); throw new Error('Ödeme kaydedilemedi. Lütfen tekrar deneyin.'); }
         AppState.data.payments.push(pendingPay);
 
         // postMessage listener için orderId'yi kaydet

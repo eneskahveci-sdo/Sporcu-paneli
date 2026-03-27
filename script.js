@@ -4914,7 +4914,7 @@ window.removeAdmin = function(uid, email) {
             const sb = getSupabase();
             if (!sb) throw new Error('Bağlantı yok');
             const { error } = await sb.from('users').delete().eq('id', uid);
-            if (error) throw error;
+            if (error) { console.error('removeAdmin DB error:', error.message); throw new Error('Yönetici silinemedi.'); }
             toast('Yönetici silindi.', 'g');
             loadAndShowAdmins();
         } catch(e) {
