@@ -231,28 +231,15 @@ Deno.serve(async (req: Request) => {
 
     console.error("[v12] PayTR token alınamadı:", reason);
 
-    // Çözüm önerileri
-    const troubleshooting: string[] = [];
-    if (isTokenError) {
-      troubleshooting.push(
-        "1. Supabase Secrets'ta PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT değerlerinin PayTR panelindeki değerlerle birebir aynı olduğunu kontrol edin.",
-        "2. PayTR panelinden Merchant Key ve Salt'ı kopyalayıp tekrar ayarlayın: supabase secrets set PAYTR_MERCHANT_KEY=... PAYTR_MERCHANT_SALT=...",
-        "3. PayTR panelinde test modunun aktif olduğundan emin olun.",
-        "4. PayTR panelinde API entegrasyonunun aktif olduğundan ve IP kısıtlaması olmadığından emin olun.",
-        "5. Credential fingerprint'leri PayTR panelindeki değerlerle karşılaştırın (aşağıda).",
-      );
-    }
-
-    // Hata detayları sadece sunucu loglarına yazılır
-    console.error("[v12] HATA DEBUG — key_len:", MERCHANT_KEY.length,
+    // Hata detayları sadece sunucu loglarına yazılır — client'a gönderilmez
+    console.error("[v12] PayTR token hatası — reason:", reason,
+      "key_len:", MERCHANT_KEY.length,
       "salt_len:", MERCHANT_SALT.length,
-      "merchant_oid:", merchant_oid,
     );
 
     return jsonResp({
-      error: reason,
+      error: "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
       version: "v12",
-      troubleshooting: isTokenError ? troubleshooting : undefined,
     }, 400, req);
 
   } catch (err) {
