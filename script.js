@@ -4,7 +4,7 @@
    ============================================================ */
 
 window.onerror = function(msg, url, line, col, error) {
-    console.error('Global Error:', { msg, url, line, col, error });
+    console.error('Global Error:', msg);
     if (typeof toast === 'function') {
         toast('Beklenmeyen bir hata oluştu. Sayfa yenilenebilir.', 'e');
     }
@@ -274,7 +274,7 @@ function getSupabase() {
                 }
             });
         } catch (e) {
-            console.error('Supabase init error:', e);
+            console.error('Supabase init error');
             toast(i18n[AppState.lang].connectionError, 'e');
         }
     }
@@ -675,7 +675,7 @@ const DB = {
             if (error) throw error;
             return data || [];
         } catch (e) {
-            console.error(`DB query error (${table}):`, e);
+            console.error(`DB query error (${table})`);
             toast(i18n[AppState.lang].connectionError, 'e');
             return null;
         }
@@ -697,15 +697,14 @@ const DB = {
             
             const { data: result, error } = await sb.from(table).upsert(clean, { onConflict: 'id' }).select();
             if (error) {
-                console.error(`Supabase upsert error (${table}):`, error);
-                const msg = error.message || error.details || JSON.stringify(error);
-                toast(`Kayıt hatası: ${msg}`, 'e');
+                console.error(`Supabase upsert error (${table})`);
+                toast('Kayıt hatası. Lütfen tekrar deneyin.', 'e');
                 return null;
             }
             return result;
         } catch (e) {
-            console.error(`DB upsert exception (${table}):`, e);
-            toast(`Kayıt hatası: ${e.message || 'Bilinmeyen hata'}`, 'e');
+            console.error(`DB upsert exception (${table})`);
+            toast('Kayıt hatası. Lütfen tekrar deneyin.', 'e');
             return null;
         }
     },
@@ -721,7 +720,7 @@ const DB = {
             if (error) throw error;
             return true;
         } catch (e) {
-            console.error(`DB delete error (${table}):`, e);
+            console.error(`DB delete error (${table})`);
             return false;
         }
     }
@@ -797,7 +796,7 @@ window.doLogin = async function() {
             authError = result.error;
         } catch (fetchErr) {
             // Ağ hatası — fetch başarısız, Supabase'e ulaşılamıyor
-            console.error('Supabase auth network error:', fetchErr.message, fetchErr.stack);
+            console.error('Supabase auth network error');
             if (errEl) {
                 errEl.textContent = 'Bağlantı hatası. İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
                 errEl.classList.remove('dn');
@@ -806,7 +805,7 @@ window.doLogin = async function() {
         }
         
         if (authError) {
-            console.error('Supabase auth error:', authError);
+            console.error('Supabase auth error');
             let msg;
             const errMsg = authError.message || '';
             if (/fetch|network|connection/i.test(errMsg)) {
@@ -901,7 +900,7 @@ window.doLogin = async function() {
         go('dashboard');
         
     } catch (err) {
-        console.error('Login error:', err);
+        console.error('Login error');
         if (errEl) {
             errEl.textContent = 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.';
             errEl.classList.remove('dn');
@@ -4793,7 +4792,7 @@ async function initiatePayTRPayment(amt, desc) {
         
         if (error || !tokenData?.token) {
             const errMsg = error?.message || JSON.stringify(error) || 'Token alınamadı.';
-            console.error('PayTR edge function hatası:', error, tokenData);
+            console.error('PayTR edge function hatası');
             throw new Error(errMsg);
         }
         
@@ -4820,7 +4819,7 @@ async function initiatePayTRPayment(amt, desc) {
         showPayTRModal(tokenData.token, orderId);
         
     } catch(e) {
-        console.error('PayTR error:', e);
+        console.error('PayTR error');
         toast('PayTR hatası: ' + e.message, 'e');
     } finally {
         UIUtils.setLoading(false);
@@ -4861,7 +4860,7 @@ window.handlePayTRCallback = async function(orderId, status) {
             toast('❌ Ödeme başarısız. Lütfen tekrar deneyin.', 'e');
         }
         spTab('odemeler');
-    } catch(e) { console.error('PayTR callback error:', e); }
+    } catch(e) { console.error('PayTR callback error'); }
 };
 
 // URL'de PayTR dönüşü varsa işle

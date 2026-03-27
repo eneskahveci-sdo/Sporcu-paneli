@@ -8,7 +8,7 @@
 // - V12 özellikleri korundu (Geliştirme 1-17)
 // ═══════════════════════════════════════════════════════════
 
-console.log('script-fixes.js V13 yukleniyor...');
+// script-fixes.js V13
 
 // ────────────────────────────────────────────────────────
 // CROSS-ORIGIN "Script error." FILTRESİ
@@ -121,7 +121,7 @@ function _openLegalOverlay(title, body) {
     requestAnimationFrame(function() { overlay.style.opacity = '1'; });
 }
 
-function _escHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function _escHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
 // ────────────────────────────────────────────────────────
 // 2) GİDER KATEGORİLERİ
@@ -960,7 +960,7 @@ window.submitOnKayit = async function() {
         if (sb) {
             var res = await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: new Date().toISOString(), org_id: rOrg || null, branch_id: rBranch || null });
             if (res.error) {
-                console.error('submitOnKayit DB error:', res.error);
+                console.error('submitOnKayit DB error');
                 toast('Ön kayıt kaydedilemedi: ' + (res.error.message || 'Veritabanı hatası'), 'e');
                 return;
             }
@@ -1151,7 +1151,7 @@ function _extendMappers() {
     if (window._mappersExtended) return true;
     window._mappersExtended = true;
  
-    console.log('✅ DB.mappers extend ediliyor...');
+    // DB.mappers extend ediliyor
  
     // Extend settings mapper
     var _origFromSettings = DB.mappers.fromSettings;
@@ -1191,27 +1191,27 @@ function _extendMappers() {
         return base;
     };
  
-    console.log('✅ DB.mappers extend tamamlandı!');
+    // DB.mappers extend tamamlandı
     return true;
 }
  
 // Hemen dene
 if (!_extendMappers()) {
-    console.warn('⏳ DB.mappers henüz hazır değil — retry başlatılıyor...');
+    // DB.mappers henüz hazır değil — retry başlatılıyor
     // 100ms, 300ms, 500ms, 1000ms, 2000ms aralıklarla dene
     var _retryDelays = [100, 300, 500, 1000, 2000];
     _retryDelays.forEach(function(delay) {
         setTimeout(function() {
             if (!window._mappersExtended) {
                 if (_extendMappers()) {
-                    console.log('✅ DB.mappers extend ' + delay + 'ms sonra başarılı!');
+                    // DB.mappers extend başarılı
                 }
             }
         }, delay);
     });
 }
  
-console.log('✅ Script-fixes V9.1 yüklendi — DB.mappers retry fix dahil');
+// Script-fixes V9.1 yüklendi
 
 // ────────────────────────────────────────────────────────
 // PayTR FIX: submitSpPayment override
@@ -1319,7 +1319,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         var basketJson = JSON.stringify(basketArr);
         var userBasket = btoa(basketJson);
 
-        console.log('[PayTR v4] basket:', { amtTL: amtTL, amtKurus: amtKurus, basketJson: basketJson });
+        // PayTR basket hazırlandı
 
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
         var userName = ((a.fn || '') + ' ' + (a.ln || '')).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
@@ -1355,15 +1355,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         var supabaseUrl = 'https://wfarbydojxtufnkjuhtc.supabase.co';
         var supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
 
-        console.log('[PayTR v4] Edge Function çağrılıyor:', orderId);
-        console.log('[PayTR v4] İstek özeti:', {
-            merchant_oid: orderId,
-            payment_amount: requestBody.payment_amount,
-            email: requestBody.email,
-            user_basket_len: userBasket.length,
-            currency: requestBody.currency,
-            test_mode: requestBody.test_mode
-        });
+        // PayTR Edge Function çağrılıyor
 
         var response = await fetch(supabaseUrl + '/functions/v1/paytr-token', {
             method: 'POST',
@@ -1375,38 +1367,22 @@ window.initiatePayTRPayment = async function(amt, desc) {
             body: JSON.stringify(requestBody)
         });
 
-        console.log('[PayTR v4] Response status:', response.status);
-
         var textResp = await response.text();
-        console.log('[PayTR v4] Raw response:', textResp.substring(0, 500));
 
         var tokenData;
         try {
             tokenData = JSON.parse(textResp);
         } catch(jsonErr) {
-            console.error('[PayTR v4] Response JSON parse hatası:', textResp);
+            console.error('[PayTR] Yanıt parse hatası');
             throw new Error('Edge Function yanıt parse hatası');
         }
-
-        console.log('[PayTR v4] Parsed response:', tokenData);
 
         if (!response.ok || !tokenData || !tokenData.token) {
             var errMsg = tokenData && tokenData.error ? tokenData.error :
                          tokenData && tokenData.msg ? tokenData.msg :
                          'Token alınamadı (HTTP ' + response.status + ')';
 
-            // Debug bilgisini console'a yaz (sadece geliştirici için)
-            console.error('[PayTR] Edge function version:', tokenData && tokenData.version || 'unknown');
-            if (tokenData && tokenData.debug) {
-                console.error('[PayTR] Debug info:', JSON.stringify(tokenData.debug, null, 2));
-            }
-            if (tokenData && tokenData.paytr_response) {
-                console.error('[PayTR] PayTR response:', JSON.stringify(tokenData.paytr_response, null, 2));
-            }
-            if (tokenData && tokenData.troubleshooting) {
-                console.error('[PayTR] Çözüm önerileri:');
-                tokenData.troubleshooting.forEach(function(t) { console.error('  → ' + t); });
-            }
+            console.error('[PayTR] Token alınamadı');
 
             // Kullanıcıya daha anlaşılır hata mesajı göster
             var userMsg = 'Ödeme sistemi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
@@ -1446,14 +1422,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
         showPayTRModal(tokenData.token, orderId);
 
     } catch (e) {
-        console.error('[PayTR v4] Error:', e);
+        console.error('[PayTR] Ödeme hatası');
         toast('PayTR hatası: ' + e.message, 'e');
     } finally {
         UIUtils.setLoading(false);
     }
 };
 
-console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
+// PayTR initiatePayTRPayment v4 override yüklendi
 
 // ────────────────────────────────────────────────────────
 // PayTR FIX v3: postMessage listener
@@ -1487,7 +1463,7 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
 
         if (!orderId || !status) return;
 
-        console.log('[PayTR postMessage]', status, orderId);
+        // PayTR postMessage alındı
 
         // Modal'ı kapat
         if (typeof closeModal === 'function') closeModal();
@@ -1498,7 +1474,7 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
         }
     });
 
-    console.log('✅ PayTR postMessage listener kuruldu');
+    // PayTR postMessage listener kuruldu
 })();
 
 // ── H1: SETTINGS MAPPER — Hukuki alanlar ────────────────────────────────
@@ -1541,7 +1517,7 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
         base.cookie_banner_enabled  = s.cookieBannerEnabled !== false;
         return base;
     };
-    console.log('✅ H1: Settings mapper genişletildi');
+    // H1: Settings mapper genişletildi
     } // end _applyH1
     _applyH1();
 })();
@@ -1613,7 +1589,7 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
         }
         _try();
     }
-    console.log('✅ T1: Bağlantı hatası handler aktif');
+    // T1: Bağlantı hatası handler aktif
 })();
 
 // ── T2: OFFLINE MOD BANNER ───────────────────────────────────────────────
@@ -1636,7 +1612,7 @@ console.log('✅ PayTR initiatePayTRPayment v4 override yüklendi');
     window.addEventListener('offline', _showOffline);
     window.addEventListener('online', _hideOffline);
     if (!navigator.onLine) _showOffline();
-    console.log('✅ T2: Offline banner aktif');
+    // T2: Offline banner aktif
 })();
 
 // ── H2: showLegal OVERRIDE — Dinamik KVKK/Kullanım Şartları metni ────────
@@ -1786,7 +1762,7 @@ window.showLegal = function(type) {
         + '</div>';
     document.body.appendChild(ov);
 };
-console.log('✅ H2: showLegal dinamik override aktif');
+// H2: showLegal dinamik override aktif
 
 // ── H3: TC KİMLİK MASKELEME ──────────────────────────────────────────────
 // Yönetici athletes listesinde TC maskelenir: 12345678901 → 12345****01
@@ -1809,7 +1785,7 @@ console.log('✅ H2: showLegal dinamik override aktif');
             });
         };
     }
-    console.log('✅ H3: TC maskeleme aktif');
+    // H3: TC maskeleme aktif
 })();
 
 // ── H4: ÖN KAYIT KVKK RIZASI ─────────────────────────────────────────────
@@ -1858,7 +1834,7 @@ window.submitOnKayit = async function() {
         }
     } catch(e) { console.warn('Consent update:', e.message); }
 };
-console.log('✅ H4: Ön kayıt KVKK rızası aktif');
+// H4: Ön kayıt KVKK rızası aktif
 
 // ── H5: ÇEREZ BİLDİRİMİ ─────────────────────────────────────────────────
 (function() {
@@ -1890,7 +1866,7 @@ console.log('✅ H4: Ön kayıt KVKK rızası aktif');
     } else {
         window.addEventListener('load', function() { setTimeout(_showCookieBanner, 1500); });
     }
-    console.log('✅ H5: Çerez bildirimi aktif');
+    // H5: Çerez bildirimi aktif
 })();
 
 // ── H6: VERİ SİLME TALEBİ ───────────────────────────────────────────────
@@ -1928,7 +1904,7 @@ window.submitDeletionRequest = async function() {
         toast('Talep gönderilemedi: ' + e.message, 'e');
     }
 };
-console.log('✅ H6: Veri silme talebi aktif');
+// H6: Veri silme talebi aktif
 
 // ── H7: ADMIN AYARLAR — HUKUKİ GEREKSİNİMLER KARTI ─────────────────────
 var _origPgSettings = window.pgSettings;
@@ -2125,7 +2101,7 @@ window.loadConsentStats = async function() {
         + '<p class="ts tm">' + (total - approved) + ' başvuruda KVKK onayı eksik (eski kayıtlar).</p>';
 };
 
-console.log('✅ H7: Admin hukuki gereksinimler kartı aktif');
+// H7: Admin hukuki gereksinimler kartı aktif
 
 // ── OTOMATİK UYARILAR ──────────────────────────────────────
 function buildAutoAlerts() {
@@ -3217,7 +3193,7 @@ window.registerGoHook('after', function(page) {
             return base;
         };
 
-        console.log('✅ payment_type mapper eklendi');
+        // payment_type mapper eklendi
         return true;
     }
 
@@ -3365,7 +3341,7 @@ window.sendNotifMessage = async function() {
 
         try {
             var result = await sb.from('messages').insert(msgObj);
-            if (result.error) { console.error('Mesaj gönderme hatası:', result.error); errors++; }
+            if (result.error) { console.error('Mesaj gönderme hatası'); errors++; }
             else { sent++; }
         } catch(e) { console.error('Mesaj gönderme exception:', e); errors++; }
     }
@@ -3407,7 +3383,7 @@ function _loadNotifHistory() {
 
         query.then(function(res) {
             if (res.error) {
-                console.warn('_loadNotifHistory sorgu hatası:', res.error.message || res.error);
+                console.warn('_loadNotifHistory sorgu hatası');
                 container.innerHTML = '<div class="al al-r">Mesaj geçmişi yüklenemedi.</div>';
                 return;
             }
@@ -3518,7 +3494,7 @@ function _loadSporcuMessages() {
             .limit(100)
             .then(function(res) {
                 if (res.error) {
-                    console.warn('_loadSporcuMessages sorgu hatası:', res.error.message || res.error);
+                    console.warn('_loadSporcuMessages sorgu hatası');
                     container.innerHTML = '<div class="al al-r" style="margin:20px">Mesajlar yüklenemedi.</div>';
                     _updateMsgBadge(0);
                     return;
@@ -4757,4 +4733,4 @@ window.generatePaymentHistory = function(athleteId) {
     window.history.replaceState({ page: curPage }, '', window.location.pathname);
 })();
 
-console.log('✅ Geliştirme 1-28 uygulandı — script-fixes.js V15');
+// Geliştirme 1-28 uygulandı — script-fixes.js V15

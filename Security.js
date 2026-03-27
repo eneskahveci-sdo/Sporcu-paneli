@@ -13,10 +13,8 @@
     if (window._debugPanelReady) return;
     window._debugPanelReady = true;
 
-    // Production'da debug paneli KAPALI
-    // Açmak için URL'e ?_dbg=dragos_dev_panel ekle (sadece geliştirici bilir)
-    var isDebugMode = window.location.search.includes('_dbg=dragos_dev_panel') ||
-                      window.location.hostname === 'localhost' ||
+    // Debug paneli SADECE localhost'ta aktif
+    var isDebugMode = window.location.hostname === 'localhost' ||
                       window.location.hostname === '127.0.0.1';
     if (!isDebugMode) return;
 
@@ -250,7 +248,7 @@ function _securityDoNormalLogin(role) {
                     .single();
 
                 if (fetchError || !userData) {
-                    console.error('🔴 Kullanıcı verisi çekilemedi:', fetchError);
+                    console.error('🔴 Kullanıcı verisi çekilemedi');
                     showErr('Kullanıcı kaydı bulunamadı. Lütfen yöneticiyle iletişime geçin.');
                     return;
                 }
@@ -281,8 +279,8 @@ function _securityDoNormalLogin(role) {
                     row = rpcData.data;
                 } else {
                     const rpcMsg = rpcError?.message || rpcData?.error || '';
-                    console.error('🔴 Auth hatası:', authError || 'unknown');
-                    console.error('🔴 RPC fallback hatası:', rpcError || rpcData || 'unknown');
+                    console.error('🔴 Auth hatası');
+                    console.error('🔴 RPC fallback hatası');
                     if (rpcMsg) {
                         showErr('Giriş doğrulanamadı: ' + rpcMsg);
                     } else {
@@ -335,7 +333,7 @@ function _securityDoNormalLogin(role) {
 
                 if (typeof window.loadBranchData === 'function') {
                     try { await window.loadBranchData(); }
-                    catch(lbErr) { console.error('🔴 loadBranchData hatası:', lbErr); }
+                    catch(lbErr) { console.error('🔴 loadBranchData hatası'); }
                 }
                 if (typeof window.updateBranchUI === 'function') {
                     try { window.updateBranchUI(); } catch(e) {}
@@ -375,7 +373,7 @@ function _securityDoNormalLogin(role) {
 
                 if (typeof window.loadBranchData === 'function') {
                     try { await window.loadBranchData(); }
-                    catch(lbErr) { console.error('🔴 loadBranchData hatası:', lbErr); }
+                    catch(lbErr) { console.error('🔴 loadBranchData hatası'); }
                 }
 
                 const lboxWrap     = document.getElementById('lbox-wrap');
@@ -400,7 +398,7 @@ function _securityDoNormalLogin(role) {
             }
 
         } catch (err) {
-            console.error('🔴 Beklenmeyen giriş hatası:', err);
+            console.error('🔴 Beklenmeyen giriş hatası');
             showErr('Sistemsel bir hata oluştu. Lütfen tekrar deneyin.');
         } finally {
             if (btn) { btn.innerText = originalText; btn.disabled = false; }
