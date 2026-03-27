@@ -7,16 +7,30 @@
 // v9: fetch'e explicit Content-Type header ve body.toString() eklendi
 // v8: FormData (multipart/form-data) yerine URLSearchParams (x-www-form-urlencoded) kullanılıyor
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://sporcu-paneli.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5500",
+];
 
-function jsonResp(body: Record<string, unknown>, status: number) {
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+function jsonResp(body: Record<string, unknown>, status: number, req?: Request) {
+  const corsHeaders = req ? getCorsHeaders(req) : { "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0], "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -31,20 +45,6 @@ async function paytrHmac(data: string, key: string): Promise<string> {
   );
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
-}
-
-// Credential fingerprint — ilk 2 + son 2 karakter (güvenli kısmi gösterim)
-function fingerprint(val: string): string {
-  if (val.length <= 4) return "***";
-  return val.substring(0, 2) + "..." + val.substring(val.length - 2);
-}
-
-// SHA-256 fingerprint of credential for verification without exposing the actual value
-async function credentialHash(val: string): Promise<string> {
-  const enc = new TextEncoder();
-  const hash = await crypto.subtle.digest("SHA-256", enc.encode(val));
-  const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return hex.substring(0, 8);
 }
 
 // Supabase secret'lardan gelen değerlerdeki tırnak, BOM ve boşluk karakterlerini temizler
@@ -77,19 +77,19 @@ function normalizeIp(ip: string): string {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: getCorsHeaders(req) });
   }
   if (req.method !== "POST") {
-    return jsonResp({ error: "Method not allowed" }, 405);
+    return jsonResp({ error: "Method not allowed" }, 405, req);
   }
 
   try {
     const rawBody = await req.text();
-    if (!rawBody) return jsonResp({ error: "Request body boş." }, 400);
+    if (!rawBody) return jsonResp({ error: "Request body boş." }, 400, req);
 
     let body: Record<string, string>;
     try { body = JSON.parse(rawBody); }
-    catch (e) { return jsonResp({ error: "JSON parse hatası: " + String(e) }, 400); }
+    catch (e) { return jsonResp({ error: "JSON parse hatası: " + String(e) }, 400, req); }
 
     // ─── Credential'ları oku ve temizle ───
     const rawMerchantId  = Deno.env.get("PAYTR_MERCHANT_ID")   ?? "";
@@ -115,12 +115,8 @@ Deno.serve(async (req: Request) => {
         error: "PayTR credentials eksik. Supabase Secrets'ta PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY, PAYTR_MERCHANT_SALT tanımlı olmalı.",
         hint: "supabase secrets set PAYTR_MERCHANT_ID=XXXXXX PAYTR_MERCHANT_KEY=YYYYYYYYYYYYYYYY PAYTR_MERCHANT_SALT=ZZZZZZZZZZZZZZZZ",
         version: "v12",
-      }, 503);
+      }, 503, req);
     }
-
-    // Credential fingerprint — kullanıcı doğrulama için
-    const keyHash = await credentialHash(MERCHANT_KEY);
-    const saltHash = await credentialHash(MERCHANT_SALT);
 
     // Tüm body değerlerini trim et — boşluk hash uyumsuzluğuna neden olabilir
     const merchant_oid    = (body.merchant_oid ?? "").trim();
@@ -143,7 +139,7 @@ Deno.serve(async (req: Request) => {
       merchant_oid, email, payment_amount, user_name, user_basket, merchant_ok_url, merchant_fail_url
     };
     for (const [k, v] of Object.entries(required)) {
-      if (!v) return jsonResp({ error: "Zorunlu alan eksik: " + k, version: "v12" }, 400);
+      if (!v) return jsonResp({ error: "Zorunlu alan eksik: " + k, version: "v12" }, 400, req);
     }
 
     // ─── User IP — IPv6 koruması ───
@@ -158,11 +154,11 @@ Deno.serve(async (req: Request) => {
                    || (SUPABASE_URL ? SUPABASE_URL + "/functions/v1/paytr-webhook" : "");
 
     if (!notifyUrl) {
-      console.error("[v12] HATA: merchant_notify_url oluşturulamadı! SUPABASE_URL:", SUPABASE_URL || "(boş)");
+      console.error("[v12] HATA: merchant_notify_url oluşturulamadı.");
       return jsonResp({
         error: "merchant_notify_url oluşturulamadı. SUPABASE_URL veya PAYTR_NOTIFY_URL ayarlanmalı.",
         version: "v12",
-      }, 503);
+      }, 503, req);
     }
 
     // ─── HASH — PayTR resmi PHP örneğiyle birebir aynı ───
@@ -176,7 +172,7 @@ Deno.serve(async (req: Request) => {
 
     if (!paytrToken) {
       console.error("[v12] HMAC hesaplama başarısız — token boş!");
-      return jsonResp({ error: "HMAC hesaplama hatası — token oluşturulamadı", version: "v12" }, 500);
+      return jsonResp({ error: "HMAC hesaplama hatası — token oluşturulamadı", version: "v12" }, 500, req);
     }
 
     // Token oluşturuldu, PayTR'a gönderiliyor
@@ -220,12 +216,12 @@ Deno.serve(async (req: Request) => {
     let data: Record<string, string>;
     try { data = JSON.parse(resText); }
     catch (_e) {
-      console.error("[v12] PayTR JSON parse hatası:", resText.substring(0, 200));
-      return jsonResp({ error: "PayTR JSON parse hatası", version: "v12" }, 502);
+      console.error("[v12] PayTR JSON parse hatası.");
+      return jsonResp({ error: "PayTR JSON parse hatası", version: "v12" }, 502, req);
     }
 
     if (data.status === "success") {
-      return jsonResp({ token: data.token, version: "v12" }, 200);
+      return jsonResp({ token: data.token, version: "v12" }, 200, req);
     }
 
     // ─── Hata durumunda detaylı diagnostik ───
@@ -246,23 +242,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Hata detayları sadece sunucu loglarına yazılır, client'a gönderilmez
-    console.error("[v12] HATA DEBUG — merchant_id:", MERCHANT_ID,
-      "key_len:", MERCHANT_KEY.length, "salt_len:", MERCHANT_SALT.length,
-      "key_fp:", fingerprint(MERCHANT_KEY), "salt_fp:", fingerprint(MERCHANT_SALT),
-      "key_hash:", keyHash, "salt_hash:", saltHash,
-      "user_ip:", userIp, "merchant_oid:", merchant_oid,
-      "hash_str_preview:", hashStr.substring(0, 120) + "...",
+    // Hata detayları sadece sunucu loglarına yazılır
+    console.error("[v12] HATA DEBUG — key_len:", MERCHANT_KEY.length,
+      "salt_len:", MERCHANT_SALT.length,
+      "merchant_oid:", merchant_oid,
     );
 
     return jsonResp({
       error: reason,
       version: "v12",
       troubleshooting: isTokenError ? troubleshooting : undefined,
-    }, 400);
+    }, 400, req);
 
   } catch (err) {
     console.error("[v12] EXCEPTION:", String(err));
-    return jsonResp({ error: String(err), version: "v12" }, 500);
+    return jsonResp({ error: String(err), version: "v12" }, 500, req);
   }
 });

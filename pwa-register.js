@@ -3,6 +3,19 @@
    Service Worker kaydı + iOS kurulum banner'ı
    ═══════════════════════════════════════════════════════════ */
 
+// ── SPLASH SCREEN KALDIRMA ───────────────────────────────
+// index.html'deki inline script'ten taşındı (CSP unsafe-inline kaldırıldı)
+function removeSplash() {
+    var s = document.getElementById('splash-screen');
+    if (s && !s.dataset.removing) {
+        s.dataset.removing = '1';
+        s.style.opacity = '0';
+        setTimeout(function () { if (s.parentNode) s.remove(); }, 500);
+    }
+}
+window.addEventListener('load', removeSplash);
+setTimeout(removeSplash, 5000);
+
 console.log('📱 PWA Register yükleniyor...');
 
 // ── SERVICE WORKER KAYDI ────────────────────────────────
