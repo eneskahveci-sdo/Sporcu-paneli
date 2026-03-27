@@ -307,6 +307,7 @@ window.showCashTransferModal = function() {
             var desc = UIUtils.getValue('ct-desc') || 'Transfer';
             var dt = UIUtils.getValue('ct-dt') || DateUtils.today();
             if (!amt || amt <= 0) { toast('Tutar giriniz!', 'e'); return; }
+            if (amt > 99999) { toast('Tutar 99.999 TL\'yi geçemez.', 'e'); return; }
             var obj = { id: generateId(), direction: dir, amount: amt, description: desc, dt: dt };
             try {
                 var sb = getSupabase();
@@ -663,7 +664,8 @@ window.editPay = function(id) {
                 payMethod: UIUtils.getValue('p-method') || (p ? p.payMethod : '') || ''
             };
 
-            if (!obj.amt) { toast(i18n[AppState.lang].fillRequired, 'e'); return; }
+            if (!obj.amt || obj.amt <= 0) { toast(i18n[AppState.lang].fillRequired, 'e'); return; }
+            if (obj.amt > 99999) { toast('Tutar 99.999 TL\'yi geçemez.', 'e'); return; }
 
             var result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
             if (result) {
