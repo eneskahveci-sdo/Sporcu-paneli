@@ -2291,8 +2291,7 @@ window.editAth = function(id, prefill) {
             }
             
             const mapped = DB.mappers.fromAthlete(obj);
-            console.log('Saving athlete:', mapped);
-            
+
             const result = await DB.upsert('athletes', mapped);
             if (result) {
                 // If password was changed, also do an explicit update as fallback
@@ -3585,8 +3584,7 @@ window.editCoach = function(id) {
             };
             
             const mapped = DB.mappers.fromCoach(obj);
-            console.log('Saving coach:', mapped);
-            
+
             const result = await DB.upsert('coaches', mapped);
             if (result) {
                 // If password was changed, also do an explicit update as fallback
