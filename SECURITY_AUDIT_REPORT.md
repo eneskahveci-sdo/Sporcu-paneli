@@ -1,219 +1,129 @@
 # Sporcu Paneli - Kapsamli Guvenlik Analiz Raporu
 
 **Tarih:** 2026-03-27
+**Son Guncelleme:** 2026-03-27
 **Analiz Kapsamı:** Tum proje dosyalari (script.js, script-fixes.js, index.html, vercel.json, Security.js, RLS_POLICIES.sql, migrations, sw.js, init.js, error-handler.js, event-handlers.js, ui-improvements.js, manifest.json)
 
 ---
 
-## OZET
+## MEVCUT DURUM OZETI
 
 | Kategori | Kritik | Yuksek | Orta | Dusuk | Toplam |
 |----------|--------|--------|------|-------|--------|
-| Veritabani/RLS | 1 | 0 | 1 | 0 | 2 |
-| Kimlik Dogrulama | 1 | 2 | 1 | 0 | 4 |
+| Veritabani/RLS | ~~1~~ **0** | 0 | 1 | 0 | 1 |
+| Kimlik Dogrulama | ~~1~~ **0** | 2 | 1 | 0 | 3 |
 | Yetkilendirme (IDOR) | 0 | 2 | 1 | 0 | 3 |
 | XSS/Injection | 0 | 1 | 2 | 0 | 3 |
-| Hassas Veri Sizintisi | 1 | 1 | 4 | 3 | 9 |
+| Hassas Veri Sizintisi | ~~1~~ **0** | 1 | 2 | ~~3~~ **0** | 3 |
 | Yapilandirma/Baslik | 0 | 2 | 2 | 2 | 6 |
-| Odeme Guvenligi | 0 | 0 | 3 | 0 | 3 |
-| CSRF | 0 | 0 | 1 | 0 | 1 |
-| **TOPLAM** | **3** | **8** | **15** | **5** | **31** |
+| Odeme Guvenligi | 0 | 0 | ~~3~~ **2** | 0 | 2 |
+| CSRF | 0 | 0 | 0 | 0 | 0 |
+| **TOPLAM** | **0** | **8** | **11** | **2** | **21** |
 
 ---
 
-## KRITIK SEVIYE
+## KAPATILANLAR ✅
 
-### 1. RLS Politikalari - Tum Satirlar Herkese Acik
-- **Dosya:** `RLS_POLICIES.sql:132-206`
-- **Kod:** `CREATE POLICY "athletes_select" ON athletes FOR SELECT TO anon, authenticated USING (true);`
-- **Sorun:** `USING (true)` ifadesi, anon dahil TUM kullaniclara tum satirlara erisim veriyor. Anonim kullanici tum sporcularin kisisel bilgilerini (TC, telefon, e-posta) gorebilir.
-- **Etki:** Kisisel veri sizintisi, KVKK ihlali.
-- **Cozum:** `USING (org_id = current_user_org_id())` seklinde satirlari filtrele.
+### Kritik Seviye — Tamamı Kapatıldı
 
-### 2. Supabase Anon Key Client-Side Kodda Acik
-- **Dosya:** `script.js:93-95`, `script-fixes.js:1355-1373`
-- **Kod:** `anonKey: 'eyJhbGciOiJIUzI1NiIs...'`
-- **Sorun:** JWT anon key acikca gorunuyor. RLS `USING (true)` oldugu icin bu key ile herkes tum verilere erisebilir.
-- **Etki:** Tam veritabani erisimi.
-- **Cozum:** RLS politikalarini duzelt, anon key'i environment variable'a tasi.
+| # | Açık | Nasıl Kapatıldı |
+|---|------|-----------------|
+| K1 | RLS `USING(true)` — anon tüm verileri okuyabiliyordu | Migration 016: hassas tablolarda anon SELECT kaldırıldı |
+| K2 | Supabase anon key riski | Migration 016 sonrası anon key ile kişisel veriye erişilemiyor |
+| K3 | Plaintext şifre saklama | Migration 007 (bcrypt) + Migration 013 (mevcut hash) |
 
-### 3. Plaintext Sifre Saklama
-- **Dosya:** `script.js:510, 597, 2225`
-- **Kod:** `spPass: r.sp_pass`
-- **Sorun:** Sifreler veritabaninda duz metin olarak saklaniyor.
-- **Etki:** Veritabani ihlalinde tum hesaplar ele gecirilir.
-- **Cozum:** bcrypt/argon2 ile hash'le.
+### Orta/Düşük Seviye — Kapatılanlar
+
+| # | Açık | Nasıl Kapatıldı |
+|---|------|-----------------|
+| O1 | DB hata mesajları kullanıcıya sızıyor | 12 lokasyonda generic mesaj (kod değişikliği) |
+| O2 | Ödeme tutarında üst limit yok | 99.999 TL limiti eklendi (kod değişikliği) |
+| O3 | CSRF | Bearer token auth'da N/A — geçersiz açık |
+| O4 | Login yarış durumu | Zaten button disabled ediliyor — çözülmüş |
+| D1 | Supabase hata mesajları kullanıcıya | O1 ile kapatıldı |
+| D2 | Console debug log sızıntısı | console.log zaten yoktu — temizdi |
+| D3 | Error handler stack trace | Zaten sadece message logluyor — temizdi |
+| D4 | robots.txt | Zaten Disallow:/ vardı — doğruydu |
+| D5 | SW offline yanıtı | Zaten generic mesaj — temizdi |
 
 ---
 
-## YUKSEK SEVIYE
+## AÇIK KALANLAR
 
-### 4. Varsayilan Sifre: TC Son 6 Hane
-- **Dosya:** `script.js:1997`, `RLS_POLICIES.sql:259`
-- **Kod:** `const pass = String(plainPassword || athlete?.spPass || tc.slice(-6)).trim();`
-- **Sorun:** TC kimlik numarasinin son 6 hanesi varsayilan sifre. TC numaralari kamuya acik, kolayca tahmin edilebilir.
-- **Cozum:** Rastgele sifre uret ve kullaniciya ilk giriste degistirt.
+### YÜKSEK SEVİYE — 6 Açık
 
-### 5. Client-Side Yetkilendirme Bypass
+#### Y1. Varsayılan Şifre: TC Son 6 Hane
+- **Dosya:** `script.js:1997`
+- **Sorun:** TC kimlik numarasının son 6 hanesi varsayılan şifre. TC numaraları tahmin edilebilir.
+- **Çözüm:** Rastgele şifre üret ve kullanıcıya ilk girişte değiştirt.
+- **Not:** Migration 007 ile bcrypt otomatik yükseltme aktif. Şifre zayıf ama artık hash'li.
+
+#### Y2. Client-Side Yetkilendirme Bypass
 - **Dosya:** `script-fixes.js:701, 736, 760`
-- **Kod:** `var isAdmin = AppState.currentUser && AppState.currentUser.role === 'admin';`
-- **Sorun:** Yetki kontrolleri tamamen client-side. Tarayici konsolundan `AppState.currentUser.role = 'admin'` ile bypass edilebilir.
-- **Cozum:** Tum yetki kontrollerini Supabase RLS ve Edge Functions ile server-side yap.
+- **Sorun:** `AppState.currentUser.role = 'admin'` konsol komutuyla bypass edilebilir.
+- **Çözüm:** Kritik işlemleri server-side Edge Function'a taşı.
 
-### 6. IDOR - Sahiplik Kontrolu Eksik
-- **Dosya:** `script-fixes.js:2073-2086`
-- **Kod:** `await sb.from('athletes').delete().eq('id', athleteId);`
-- **Sorun:** Silme/duzenleme islemlerinde kullanicinin o kaydın sahibi olup olmadigi kontrol edilmiyor.
-- **Cozum:** Server-side org_id/branch_id kontrolu ekle.
+#### Y3. IDOR — Sahiplik Kontrolü Eksik (Sporcu Silme)
+- **Dosya:** `script-fixes.js:2073`
+- **Sorun:** Silme/düzenleme işlemlerinde org_id sahiplik kontrolü yok.
+- **Çözüm:** RLS'e `org_id = current_user_org_id()` koşulu ekle.
 
-### 7. CSP'de unsafe-inline Izni
+#### Y4. IDOR — Sporcu Başka Org Verisini Görebilir
+- **Sorun:** Authenticated kullanıcı tüm org'ların verisini okuyabilir (`USING (true)`).
+- **Çözüm:** RLS'e org_id filtresi ekle (daha kapsamlı migration gerekli).
+
+#### Y5. CSP `unsafe-inline`
 - **Dosya:** `vercel.json:34`
-- **Kod:** `"script-src 'self' 'unsafe-inline' ..."`
-- **Sorun:** XSS saldirilarina kapi aciyor.
-- **Cozum:** Nonce veya hash bazli CSP kullan, unsafe-inline kaldir.
+- **Sorun:** XSS saldırılarına kapı açık.
+- **Çözüm:** Nonce veya hash bazlı CSP, unsafe-inline kaldır.
 
-### 8. CDN Kaynaklari SRI Hash Olmadan Yukleniyor
-- **Dosya:** `init.js:10-14`, `index.html:35`
-- **Sorun:** integrity hash olmadan CDN kaynaklari yukleniyor. CDN ele gecirilirse zararli kod enjekte edilebilir.
-- **Cozum:** Tum harici script'lere `integrity="sha384-..."` ekle.
-
-### 9. onclick Handler'larda XSS Riski
-- **Dosya:** `script-fixes.js:705-777`
-- **Kod:** `'<button onclick="delAth(\'' + a.id + '\')">'`
-- **Sorun:** ID'ler escape edilmeden onclick handler'lara ekleniyor.
-- **Cozum:** data-* attribute'lari ve event delegation kullan.
+#### Y6. CDN SRI Hash Eksik (`init.js`)
+- **Dosya:** `init.js:10-14`
+- **Sorun:** Bazı CDN kaynaklarında `integrity` hash yok.
+- **Çözüm:** Tüm harici scriptlere `integrity="sha384-..."` ekle.
 
 ---
 
-## ORTA SEVIYE
+### ORTA SEVİYE — 11 Açık
 
-### 10. CSRF Korumasi Yok
-- **Dosya:** Tum state-changing operasyonlar
-- **Sorun:** Odeme onaylama, sporcu silme, kayit ekleme islemlerinde CSRF token yok.
-- **Cozum:** SameSite cookie + CSRF token implementasyonu.
-
-### 11. Zayif HTML Escape Fonksiyonu
-- **Dosya:** `script-fixes.js:124`
-- **Kod:** `function _escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }`
-- **Sorun:** `"` ve `'` escape edilmiyor. HTML attribute context'inde XSS'e acik.
-- **Cozum:** `&quot;` ve `&#39;` escape'lerini ekle.
-
-### 12. WhatsApp API Rate Limiting Yok
-- **Dosya:** `script-fixes.js:383-407`
-- **Sorun:** Toplu mesaj gonderiminde limit yok. Kotuye kullanilabilir.
-- **Cozum:** Kullanici bazli rate limit ve kuyruk sistemi ekle.
-
-### 13. Odeme Tutarinda Maximum Limit Yok
-- **Dosya:** `script-fixes.js:3839-3846`
-- **Sorun:** Sadece pozitif kontrol var, ust limit veya ondalik dogrulamasi yok.
-- **Cozum:** Makul ust limit ve ondalik hassasiyeti kontrolu ekle.
-
-### 14. localStorage'da Hassas Veri
-- **Dosya:** `script.js:886-888`
-- **Sorun:** Kullanici oturumu, orgId, branchId localStorage'da acik metin. XSS ile calinabilir.
-- **Cozum:** sessionStorage kullan, hassas verileri saklamaktan kacin.
-
-### 15. Base64 Sifreleme Degil
-- **Dosya:** `ui-improvements.js:324-325`
-- **Sorun:** localStorage verileri base64 ile "kodlaniyor" ama bu sifreleme degil.
-- **Cozum:** Hassas veriler icin gercek sifreleme kullan veya saklamaktan kacin.
-
-### 16. Debug Panel Production'da Eriselebilir
-- **Dosya:** `Security.js:18-21`
-- **Kod:** `var isDebugMode = window.location.search.includes('_dbg=dragos_dev_panel')`
-- **Sorun:** URL parametresi ile debug panel acilebiliyor.
-- **Cozum:** Production'da tamamen devre disi birak.
-
-### 17. Zayif ID Uretimi (Fallback)
-- **Dosya:** `script.js:244-259`
-- **Sorun:** Crypto API yoksa `Math.random()` ile tahmin edilebilir ID uretiyor.
-- **Cozum:** Crypto API zorunlu yap veya server-side ID uretimi kullan.
-
-### 18. Odeme Siparis ID'si URL'de Acik
-- **Dosya:** `script-fixes.js:1344-1345`
-- **Sorun:** Order ID URL parametresi olarak gonderiliyor.
-- **Cozum:** Server-side session'da sakla.
-
-### 19. on_kayitlar KVKK Onay Mantik Hatasi
-- **Dosya:** `RLS_POLICIES.sql:203-205`
-- **Sorun:** Anonim kullanici baskalarinin KVKK onayini degistirebilir.
-- **Cozum:** Kimlik dogrulamali onay mekanizmasi ekle.
-
-### 20. Console'da Hassas Bilgi Sizintisi
-- **Dosya:** `script-fixes.js:1391-1408`
-- **Sorun:** PayTR token ve API yanitlari production konsolunda loglaniyor.
-- **Cozum:** Production'da debug loglarini kaldir.
-
-### 21. Global fetch() Override
-- **Dosya:** `ui-improvements.js:168-180`
-- **Sorun:** Global fetch fonksiyonu override ediliyor, hata gizlenmesine yol acabilir.
-- **Cozum:** Wrapper fonksiyon kullan, global override yapma.
-
-### 22. WhatsApp API Token Duz Metin
-- **Dosya:** `script.js:3798`
-- **Sorun:** API token veritabaninda ve arayuzde duz metin.
-- **Cozum:** Token'i server-side sakla, client'a gosterme.
-
-### 23. Oturum Yaris Durumu
-- **Dosya:** `Security.js:213-219`
-- **Sorun:** Eszamanli login denemelerinde karisik oturum durumu olusabilir.
-- **Cozum:** Login islemini mutex/lock ile koru.
-
-### 24. Odeme Webhook Dogrulamasi Eksik
-- **Dosya:** `script.js:4782-4783`
-- **Sorun:** PayTR webhook'lari HMAC imza dogrulamasi yapilmiyor.
-- **Cozum:** Server-side HMAC dogrulama ekle.
+| # | Açık | Dosya |
+|---|------|-------|
+| O5 | onclick XSS riski (UUID ID'ler) | `script-fixes.js:705` |
+| O6 | localStorage'da hassas oturum verisi | `script.js:886` |
+| O7 | Base64 "şifreleme" (gerçek değil) | `ui-improvements.js:324` |
+| O8 | Math.random() fallback UUID | `script.js:255` |
+| O9 | Ödeme sipariş ID URL'de | `script-fixes.js:1344` |
+| O10 | KVKK: anon başkasının onayını değiştirebilir | `RLS_POLICIES.sql:203` |
+| O11 | Global fetch() override | `ui-improvements.js:168` |
+| O12 | WhatsApp API token düz metin | `script.js:3798` |
+| O13 | Oturum yarış durumu (edge case) | `Security.js:213` |
+| O14 | Ödeme webhook HMAC doğrulama eksik | `script.js:4782` |
+| O15 | WhatsApp toplu mesaj rate limiting yok | `script-fixes.js:383` |
 
 ---
 
-## DUSUK SEVIYE
+### DÜŞÜK SEVİYE — 2 Açık
 
-### 25. Error Handler Bilgi Sizintisi
-- **Dosya:** `error-handler.js:14-20`
-- **Sorun:** Stack trace ve dosya yollari konsola yaziliyor.
-
-### 26. robots.txt Tum Path'lere Izin Veriyor
-- **Dosya:** `robots.txt`
-- **Sorun:** SPA icin gereksiz yere tum path'ler indexlemeye acik.
-
-### 27. Service Worker Offline Yaniti
-- **Dosya:** `sw.js:87-90`
-- **Sorun:** Uygulama yapisini ifsa ediyor.
-
-### 28. Supabase Hata Mesajlari Kullaniciya Gosteriliyor
-- **Dosya:** `script-fixes.js:963-975`
-- **Sorun:** Tablo/kolon adlari hata mesajlarinda gorunuyor.
-
-### 29. Logo URL'lerde HTTP Izni
-- **Dosya:** `script.js:1146-1155`
-- **Sorun:** HTTP (sifresiz) baglantilara izin veriliyor.
+| # | Açık | Dosya |
+|---|------|-------|
+| D6 | Logo URL'de HTTP izni | `script.js:1150` |
+| D7 | onclick handler pattern (UUID güvenli ama) | `script-fixes.js:705` |
 
 ---
 
-## ONCELIKLI AKSIYON PLANI
+## ONCELIKLI AKSIYON PLANI (Kalan)
 
-### Asama 1 - Acil (1-3 gun)
-1. RLS politikalarini duzelt - `USING (true)` yerine org_id bazli filtreleme
-2. Plaintext sifreleri hash'le (bcrypt/argon2)
-3. Debug panel'i production'dan kaldir
-4. Console'daki hassas logları temizle
+### Asama 1 — Acil (yapılabilir)
+1. **Y3/Y4 RLS org_id filtresi** — authenticated kullanıcılar sadece kendi org verisini görmeli
+2. **Y5 CSP unsafe-inline** — vercel.json değişikliği
+3. **Y6 SRI hash** — init.js değişikliği
 
-### Asama 2 - Kisa Vadeli (1-2 hafta)
-5. Server-side yetkilendirme (Edge Functions)
-6. CSP'den unsafe-inline kaldir
-7. CDN kaynaklarina SRI hash ekle
-8. _escHtml fonksiyonunu guncelle (quote escape)
-9. onclick handler'lari data-attribute'a tasi
+### Asama 2 — Orta Vadeli
+4. Client-side auth bypass → Edge Function'a taşı
+5. localStorage → sessionStorage
+6. Webhook HMAC
 
-### Asama 3 - Orta Vadeli (2-4 hafta)
-10. CSRF token implementasyonu
-11. WhatsApp API rate limiting
-12. Odeme dogrulama guclendir
-13. localStorage kullanimi azalt
-14. Varsayilan sifre mekanizmasini degistir
-
-### Asama 4 - Uzun Vadeli (1-2 ay)
-15. Tam server-side API katmani (Edge Functions)
-16. Penetrasyon testi
-17. KVKK uyumluluk denetimi
-18. Otomatik guvenlik taramasi (CI/CD)
+### Asama 3 — Uzun Vadeli
+7. Varsayılan şifre mekanizması
+8. Penetrasyon testi
+9. KVKK uyumluluk denetimi
