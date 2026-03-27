@@ -307,6 +307,7 @@ window.showCashTransferModal = function() {
             var desc = UIUtils.getValue('ct-desc') || 'Transfer';
             var dt = UIUtils.getValue('ct-dt') || DateUtils.today();
             if (!amt || amt <= 0) { toast('Tutar giriniz!', 'e'); return; }
+            if (amt > 99999) { toast('Tutar 99.999 TL\'yi geçemez.', 'e'); return; }
             var obj = { id: generateId(), direction: dir, amount: amt, description: desc, dt: dt };
             try {
                 var sb = getSupabase();
@@ -320,7 +321,7 @@ window.showCashTransferModal = function() {
                 toast('✅ Transfer kaydedildi!', 'g');
                 closeModal();
                 go('accounting');
-            } catch (e) { toast('Hata: ' + e.message, 'e'); }
+            } catch (e) { console.error('cashTransfer error:', e.message); toast('Transfer kaydedilemedi. Lütfen tekrar deneyin.', 'e'); }
         }}
     ]);
 };
@@ -663,7 +664,8 @@ window.editPay = function(id) {
                 payMethod: UIUtils.getValue('p-method') || (p ? p.payMethod : '') || ''
             };
 
-            if (!obj.amt) { toast(i18n[AppState.lang].fillRequired, 'e'); return; }
+            if (!obj.amt || obj.amt <= 0) { toast(i18n[AppState.lang].fillRequired, 'e'); return; }
+            if (obj.amt > 99999) { toast('Tutar 99.999 TL\'yi geçemez.', 'e'); return; }
 
             var result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
             if (result) {
@@ -869,7 +871,7 @@ window.convertOnKayit = async function(id) {
             toast('✅ ' + athleteObj.fn + ' ' + athleteObj.ln + ' sporcular listesine kaydedildi!', 'g');
             if (AppState.ui.curPage === 'onkayit') go('onkayit'); else if (AppState.ui.curPage === 'athletes') go('athletes');
         }
-    } catch(e) { toast('Hata: ' + (e.message || ''), 'e'); }
+    } catch(e) { console.error('convertOnKayit error:', e.message); toast('İşlem başarısız. Lütfen tekrar deneyin.', 'e'); }
 };
 
 window.editOnKayit = function(id) {
@@ -896,7 +898,7 @@ window.editOnKayit = function(id) {
                 var sb = getSupabase();
                 if (sb) await sb.from('on_kayitlar').update({ student_name: fn + ' ' + ln, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pn, parent_phone: pph }).eq('id', id);
                 toast('✅ Güncellendi!', 'g');
-            } catch(e) { toast('Hata: ' + (e.message || ''), 'e'); }
+            } catch(e) { console.error('editOnKayit save error:', e.message); toast('Güncelleme başarısız. Lütfen tekrar deneyin.', 'e'); }
             closeModal();
             if (AppState.ui.curPage === 'onkayit') go('onkayit');
             else if (AppState.ui.curPage === 'athletes') go('athletes');
@@ -961,7 +963,7 @@ window.submitOnKayit = async function() {
             var res = await sb.from('on_kayitlar').insert({ id: id, student_name: sName, fn: fn, ln: ln, bd: bd || null, tc: tc || null, cls_id: clsId || null, class_name: clsName, parent_name: pName, parent_phone: pph, status: 'new', created_at: new Date().toISOString(), org_id: rOrg || null, branch_id: rBranch || null });
             if (res.error) {
                 console.error('submitOnKayit DB error');
-                toast('Ön kayıt kaydedilemedi: ' + (res.error.message || 'Veritabanı hatası'), 'e');
+                toast('Ön kayıt kaydedilemedi. Lütfen tekrar deneyin.', 'e');
                 return;
             }
             insertOk = true;
@@ -1352,17 +1354,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
         };
 
         // Doğrudan fetch ile Edge Function çağır
-        var supabaseUrl = 'https://wfarbydojxtufnkjuhtc.supabase.co';
-        var supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
-
         // PayTR Edge Function çağrılıyor
 
-        var response = await fetch(supabaseUrl + '/functions/v1/paytr-token', {
+        var response = await fetch(SUPABASE_CONFIG.url + '/functions/v1/paytr-token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': supabaseAnonKey,
-                'Authorization': 'Bearer ' + supabaseAnonKey
+                'apikey': SUPABASE_CONFIG.anonKey,
+                'Authorization': 'Bearer ' + SUPABASE_CONFIG.anonKey
             },
             body: JSON.stringify(requestBody)
         });
@@ -1412,7 +1411,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
             payMethod: 'paytr'
         };
         var insertResult = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
-        if (insertResult.error) throw insertResult.error;
+        if (insertResult.error) { console.error('[PayTR] DB insert error:', insertResult.error.message); throw new Error('Ödeme kaydedilemedi. Lütfen tekrar deneyin.'); }
         AppState.data.payments.push(pendingPay);
 
         // postMessage listener için orderId'yi kaydet
@@ -1901,7 +1900,7 @@ window.submitDeletionRequest = async function() {
         });
         toast('✅ Silme talebiniz alındı. 30 gün içinde yanıtlanacaktır.', 'g');
     } catch(e) {
-        toast('Talep gönderilemedi: ' + e.message, 'e');
+        console.error('deletionRequest error:', e.message); toast('Talep gönderilemedi. Lütfen tekrar deneyin.', 'e');
     }
 };
 // H6: Veri silme talebi aktif
@@ -2064,7 +2063,7 @@ window.completeDeletionRequest = function(reqId, athleteId) {
             loadDeletionRequests();
         } catch(e) {
             console.error('Deletion error:', e);
-            toast('Silme hatası: ' + (e.message || e), 'e');
+            console.error('athleteDelete error:', e.message); toast('Silme işlemi başarısız. Lütfen tekrar deneyin.', 'e');
         }
     };
     if (typeof confirm2 === 'function') {
@@ -2838,7 +2837,7 @@ window.takeLessonAttendance = function(date, classId) {
                     await q;
                 } catch(e) {
                     console.error('Attendance delete error:', e);
-                    toast('Yoklama silinemedi: ' + (e.message || e), 'e');
+                    console.error('attendance delete error:', e.message); toast('Yoklama silinemedi. Lütfen tekrar deneyin.', 'e');
                 }
             }
         } else {
@@ -2874,7 +2873,7 @@ window.takeLessonAttendance = function(date, classId) {
                     }
                 } catch(e) {
                     console.error('Attendance save error:', e);
-                    toast('Yoklama kaydedilemedi: ' + (e.message || e), 'e');
+                    console.error('attendance save error:', e.message); toast('Yoklama kaydedilemedi. Lütfen tekrar deneyin.', 'e');
                 }
             }
         }

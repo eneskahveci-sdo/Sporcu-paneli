@@ -102,16 +102,6 @@ Deno.serve(async (req: Request) => {
     const MERCHANT_KEY  = cleanSecret(rawMerchantKey);
     const MERCHANT_SALT = cleanSecret(rawMerchantSalt);
 
-    console.error(`[v12] Credentials yüklendi — KEY len: ${MERCHANT_KEY.length}, SALT len: ${MERCHANT_SALT.length}`);
-
-    // Temizlik sonrası uzunluk kontrolü — cleanSecret karakter kırpmış olabilir
-    if (rawMerchantKey && MERCHANT_KEY.length !== rawMerchantKey.length) {
-      console.error(`[v12] UYARI: MERCHANT_KEY temizlik sonrası kısaldı! Ham: ${rawMerchantKey.length} → Temiz: ${MERCHANT_KEY.length}`);
-    }
-    if (rawMerchantSalt && MERCHANT_SALT.length !== rawMerchantSalt.length) {
-      console.error(`[v12] UYARI: MERCHANT_SALT temizlik sonrası kısaldı! Ham: ${rawMerchantSalt.length} → Temiz: ${MERCHANT_SALT.length}`);
-    }
-
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
       return jsonResp({
         error: "Ödeme servisi şu an kullanılamıyor. Lütfen yönetici ile iletişime geçin.",
