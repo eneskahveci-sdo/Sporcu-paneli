@@ -20,14 +20,16 @@
 
 -- ── 1. login_attempts TABLOSU ────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS login_attempts (
+DROP TABLE IF EXISTS login_attempts CASCADE;
+
+CREATE TABLE login_attempts (
     id           UUID         DEFAULT gen_random_uuid() PRIMARY KEY,
     tc           TEXT         NOT NULL,
     attempted_at TIMESTAMPTZ  DEFAULT NOW() NOT NULL,
     success      BOOLEAN      DEFAULT false NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_login_attempts_tc_time
+CREATE INDEX idx_login_attempts_tc_time
     ON login_attempts(tc, attempted_at);
 
 ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
