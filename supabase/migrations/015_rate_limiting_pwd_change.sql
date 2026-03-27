@@ -1,5 +1,5 @@
 -- ============================================================
--- SPORCU PANELİ — Rate Limiting + Zorunlu Şifre Değişikliği
+-- SPORCU PANELİ — Rate Limiting
 -- Migration 015
 --
 -- DEĞİŞİKLİKLER:
@@ -8,24 +8,14 @@
 --      Başarılı girişte denemeler temizlenir.
 --      Eski kayıtlar (15 dakika) her login çağrısında otomatik temizlenir.
 --
---   2. pwd_changed kolonu eklendi (#2)
---      athletes ve coaches tablolarına DEFAULT false olarak eklendi.
---      Varsayılan şifreyle giriş yapan kullanıcılar şifre
---      değiştirmeye yönlendirilir.
+--   2. login_with_tc güncellendi (rate limiting eklendi)
+--      Önceki özellikler (migration 014) korunur:
+--        - sp_pass / coach_pass yanıttan çıkarılıyor
+--        - Tüm hata durumlarında aynı mesaj
+--        - bcrypt otomatik yükseltme
 --
---   3. change_user_password() fonksiyonu (#2)
---      Kullanıcının şifresini güvenli şekilde (bcrypt) güncelleyip
---      pwd_changed = true yapar. Anon + authenticated çağırabilir.
---
---   4. login_with_tc güncellendi (#13)
---      Rate limiting kontrolü eklendi. Başarısız girişler loglanır,
---      başarılı girişte log temizlenir.
---
--- UYUMLULUK:
---   Mevcut login akışı tamamen korunur. pwd_changed = false olan
---   kullanıcılar frontend'de şifre değiştirme modalıyla karşılaşır.
---   SQL migration çalıştırılmadan frontend değişikliği etkisizdir
---   (pwd_changed undefined → modal açılmaz).
+-- KULLANIM:
+--   Supabase Dashboard → SQL Editor'e yapıştır ve çalıştır.
 -- ============================================================
 
 -- ── 1. login_attempts TABLOSU ────────────────────────────────
@@ -42,8 +32,6 @@ CREATE INDEX IF NOT EXISTS idx_login_attempts_tc_time
 
 ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
 
--- SECURITY DEFINER fonksiyonlar postgres user'ı olarak çalışır,
--- RLS'i bypass eder. Grants yine de ekleniyor (defense in depth).
 GRANT SELECT, INSERT, DELETE ON login_attempts TO service_role;
 GRANT INSERT ON login_attempts TO anon, authenticated;
 
@@ -51,69 +39,7 @@ CREATE POLICY "attempts_insert_all" ON login_attempts
     FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
--- ── 2. pwd_changed KOLONU ────────────────────────────────────
-
-ALTER TABLE athletes ADD COLUMN IF NOT EXISTS pwd_changed BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE coaches  ADD COLUMN IF NOT EXISTS pwd_changed BOOLEAN NOT NULL DEFAULT false;
-
--- ── 3. change_user_password() FONKSİYONU ─────────────────────
-
-CREATE OR REPLACE FUNCTION change_user_password(
-    p_tc       TEXT,
-    p_role     TEXT,
-    p_new_pass TEXT
-)
-RETURNS JSON
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_rows_updated INTEGER;
-BEGIN
-    p_tc       := regexp_replace(COALESCE(p_tc, ''),       '[^0-9]', '', 'g');
-    p_role     := lower(trim(COALESCE(p_role, '')));
-    p_new_pass := trim(COALESCE(p_new_pass, ''));
-
-    IF length(p_tc) <> 11 THEN
-        RETURN json_build_object('ok', false, 'error', 'Geçersiz TC');
-    END IF;
-
-    IF length(p_new_pass) < 8 THEN
-        RETURN json_build_object('ok', false, 'error', 'Şifre en az 8 karakter olmalıdır');
-    END IF;
-
-    IF p_role = 'coach' THEN
-        UPDATE coaches
-        SET coach_pass  = crypt(p_new_pass, gen_salt('bf', 10)),
-            pwd_changed = true
-        WHERE tc = p_tc;
-        GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
-    ELSE
-        UPDATE athletes
-        SET sp_pass     = crypt(p_new_pass, gen_salt('bf', 10)),
-            pwd_changed = true
-        WHERE tc = p_tc;
-        GET DIAGNOSTICS v_rows_updated = ROW_COUNT;
-    END IF;
-
-    IF v_rows_updated = 0 THEN
-        RETURN json_build_object('ok', false, 'error', 'Kullanıcı bulunamadı');
-    END IF;
-
-    RETURN json_build_object('ok', true);
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION change_user_password(TEXT, TEXT, TEXT) TO anon;
-GRANT EXECUTE ON FUNCTION change_user_password(TEXT, TEXT, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION change_user_password(TEXT, TEXT, TEXT) TO service_role;
-
--- ── 4. login_with_tc GÜNCELLEMESİ (Rate Limiting Eklendi) ────
---
--- Önceki versiyon: Migration 014 (şifre hash çıkarma + hata msg birleştirme)
--- Bu versiyon: + Rate limiting (5 dk / 10 deneme)
--- Tüm önceki özellikler korunuyor.
+-- ── 2. login_with_tc GÜNCELLEMESİ (Rate Limiting Eklendi) ────
 
 CREATE OR REPLACE FUNCTION login_with_tc(p_tc TEXT, p_pass TEXT, p_role TEXT)
 RETURNS JSON
@@ -142,7 +68,7 @@ BEGIN
         RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
     END IF;
 
-    -- Eski denemeleri temizle (15 dakikadan eski) — basit otomatik temizlik
+    -- Eski denemeleri temizle (15 dakikadan eski)
     DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL '15 minutes';
 
     -- Rate limit: son 5 dakikada aynı TC ile 10+ başarısız deneme
@@ -195,7 +121,6 @@ BEGIN
             RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
         END IF;
 
-        -- Bcrypt değilse otomatik yükselt
         IF v_stored !~ '^\$2[abxy]\$' THEN
             BEGIN
                 UPDATE coaches SET coach_pass = crypt(p_pass, gen_salt('bf', 10)) WHERE tc = p_tc;
@@ -203,7 +128,6 @@ BEGIN
             END;
         END IF;
 
-        -- Başarılı giriş: denemeleri temizle
         DELETE FROM login_attempts WHERE tc = p_tc;
 
         RETURN json_build_object(
@@ -245,7 +169,6 @@ BEGIN
             RETURN json_build_object('ok', false, 'error', 'TC veya şifre hatalı');
         END IF;
 
-        -- Bcrypt değilse otomatik yükselt
         IF v_stored !~ '^\$2[abxy]\$' THEN
             BEGIN
                 UPDATE athletes SET sp_pass = crypt(p_pass, gen_salt('bf', 10)) WHERE tc = p_tc;
@@ -253,7 +176,6 @@ BEGIN
             END;
         END IF;
 
-        -- Başarılı giriş: denemeleri temizle
         DELETE FROM login_attempts WHERE tc = p_tc;
 
         RETURN json_build_object(
@@ -270,7 +192,5 @@ $$;
 --   1. login_with_tc 5 dk / 10 deneme rate limit uygular
 --   2. Başarısız girişler login_attempts'a loglanır
 --   3. Başarılı girişte log temizlenir
---   4. pwd_changed = false kullanıcılar frontend'de şifre
---      değiştirme modalıyla karşılaşır (Security.js ile birlikte çalışır)
---   5. change_user_password() ile şifre güvenli bcrypt ile güncellenir
+--   4. Varsayılan şifre: TC'nin son 6 hanesi (değiştirilmedi)
 -- ============================================================
