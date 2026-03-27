@@ -35,8 +35,8 @@ Deno.serve(async (req: Request) => {
     const expectedHash = await hmacSha256Base64(hashStr, MERCHANT_KEY);
 
     if (hash !== expectedHash) {
-      console.error("Hash dogrulamasi basarisiz!", { merchant_oid, hash, expectedHash });
-      return new Response("OK", { status: 200 });
+      console.error("Hash dogrulamasi basarisiz! merchant_oid:", merchant_oid);
+      return new Response("INVALID_HASH", { status: 403 });
     }
 
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
