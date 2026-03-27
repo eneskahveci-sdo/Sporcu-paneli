@@ -161,6 +161,102 @@ async function resolveAuthEmails(sb, role, tc) {
     return candidates;
 }
 
+// ── 5. ZORUNLU ŞİFRE DEĞİŞTİRME MODALI (#2) ──────────────────
+//
+// pwd_changed === false olan kullanıcılar login sonrası bu modal
+// ile karşılaşır. Modal kapatılamaz — şifre değiştirilmeden portal açılmaz.
+// SQL migration (015) çalıştırılmadan pwd_changed tanımsız gelir
+// ve modal açılmaz (güvenli graceful degradation).
+
+function showForcedPasswordChange(sb, tc, role) {
+    return new Promise(function(resolve) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:999998;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+        var box = document.createElement('div');
+        box.style.cssText = 'background:var(--bg2,#1a2236);border-radius:16px;padding:28px 24px;width:100%;max-width:360px;border:1px solid var(--border,#2a3550);box-shadow:0 24px 48px rgba(0,0,0,0.5);';
+        box.innerHTML = [
+            '<div style="font-weight:800;font-size:17px;margin-bottom:6px;color:var(--text,#e2e8f0)">🔒 Şifre Güncelleme Gerekli</div>',
+            '<div style="font-size:13px;color:var(--text2,#94a3b8);margin-bottom:20px;line-height:1.5">',
+            'Güvenliğiniz için yeni bir şifre belirlemeniz gerekmektedir. Bu adımı atlamak mümkün değildir.',
+            '</div>',
+            '<div style="margin-bottom:12px">',
+            '<label style="font-size:12px;font-weight:600;color:var(--text2,#94a3b8);display:block;margin-bottom:5px">Yeni Şifre <span style="color:#ef4444">*</span></label>',
+            '<input id="fpwd-new" type="password" placeholder="En az 8 karakter" autocomplete="new-password"',
+            ' style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border,#2a3550);background:var(--bg3,#0f1623);color:var(--text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;"/>',
+            '</div>',
+            '<div style="margin-bottom:16px">',
+            '<label style="font-size:12px;font-weight:600;color:var(--text2,#94a3b8);display:block;margin-bottom:5px">Şifre Tekrar <span style="color:#ef4444">*</span></label>',
+            '<input id="fpwd-new2" type="password" placeholder="Şifreyi tekrar girin" autocomplete="new-password"',
+            ' style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border,#2a3550);background:var(--bg3,#0f1623);color:var(--text,#e2e8f0);font-size:14px;box-sizing:border-box;outline:none;"/>',
+            '</div>',
+            '<div id="fpwd-err" style="display:none;color:#ef4444;font-size:12px;margin-bottom:12px;padding:9px 12px;background:rgba(239,68,68,0.1);border-radius:8px;border:1px solid rgba(239,68,68,0.2);"></div>',
+            '<button id="fpwd-btn" style="width:100%;padding:13px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s;">Şifremi Güncelle</button>'
+        ].join('');
+
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        var newEl  = document.getElementById('fpwd-new');
+        var new2El = document.getElementById('fpwd-new2');
+        var errEl  = document.getElementById('fpwd-err');
+        var btnEl  = document.getElementById('fpwd-btn');
+
+        if (newEl) setTimeout(function() { newEl.focus(); }, 100);
+
+        function showErr(msg) {
+            if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+        }
+        function hideErr() {
+            if (errEl) errEl.style.display = 'none';
+        }
+
+        async function submit() {
+            var p1 = newEl  ? newEl.value.trim()  : '';
+            var p2 = new2El ? new2El.value.trim() : '';
+            hideErr();
+
+            if (!p1 || p1.length < 8) { showErr('Şifre en az 8 karakter olmalıdır.'); return; }
+            if (p1 !== p2)             { showErr('Şifreler eşleşmiyor.');              return; }
+
+            if (btnEl) { btnEl.textContent = '⏳ Güncelleniyor...'; btnEl.disabled = true; btnEl.style.opacity = '0.7'; }
+
+            try {
+                var rpcRole = role === 'coach' ? 'coach' : 'sporcu';
+                var result  = await sb.rpc('change_user_password', {
+                    p_tc:       tc,
+                    p_role:     rpcRole,
+                    p_new_pass: p1
+                });
+
+                if (result.error || !result.data?.ok) {
+                    var msg = (result.error && result.error.message) || (result.data && result.data.error) || 'Şifre güncellenemedi. Tekrar deneyin.';
+                    showErr(msg);
+                    if (btnEl) { btnEl.textContent = 'Şifremi Güncelle'; btnEl.disabled = false; btnEl.style.opacity = '1'; }
+                    return;
+                }
+
+                // Başarılı — overlay kaldır ve devam et
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                resolve();
+
+            } catch(e) {
+                showErr('Beklenmeyen hata: ' + (e.message || e));
+                if (btnEl) { btnEl.textContent = 'Şifremi Güncelle'; btnEl.disabled = false; btnEl.style.opacity = '1'; }
+            }
+        }
+
+        if (btnEl) btnEl.addEventListener('click', submit);
+
+        [newEl, new2El].forEach(function(el) {
+            if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') submit(); });
+        });
+
+        // Overlay tıklaması — kapatma engellendi (kasıtlı)
+        overlay.addEventListener('click', function(e) { e.stopPropagation(); });
+    });
+}
+
 function _securityDoNormalLogin(role) {
     return async function() {
         // Giriş başlatıldı
@@ -319,6 +415,14 @@ function _securityDoNormalLogin(role) {
                 AppState.currentOrgId    = row.org_id;
                 AppState.currentBranchId = row.branch_id;
 
+                // #2 — Varsayılan şifre değiştirme zorunluluğu
+                // pwd_changed === false ise modal açılır, resolve olana kadar devam etmez.
+                // Migration 015 çalıştırılmadan pwd_changed undefined gelir → modal açılmaz.
+                if (row.pwd_changed === false) {
+                    try { await showForcedPasswordChange(sb, tc, 'coach'); }
+                    catch(e) { console.warn('pwd change modal error:', e); }
+                }
+
                 if (window.StorageManager) {
                     StorageManager.set('sporcu_app_user',   { ...AppState.currentUser, coach_pass: undefined });
                     StorageManager.set('sporcu_app_org',    AppState.currentOrgId);
@@ -364,6 +468,12 @@ function _securityDoNormalLogin(role) {
 
                 AppState.currentOrgId    = row.org_id;
                 AppState.currentBranchId = row.branch_id;
+
+                // #2 — Varsayılan şifre değiştirme zorunluluğu
+                if (row.pwd_changed === false) {
+                    try { await showForcedPasswordChange(sb, tc, 'sporcu'); }
+                    catch(e) { console.warn('pwd change modal error:', e); }
+                }
 
                 if (window.StorageManager) {
                     StorageManager.set('sporcu_app_sporcu', {
