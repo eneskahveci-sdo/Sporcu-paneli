@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const ALLOWED_ORIGINS = [
   'https://sporcu-paneli.vercel.app',
+  'https://dragosfutbolakademisi.com',
+  'https://www.dragosfutbolakademisi.com',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5500',
