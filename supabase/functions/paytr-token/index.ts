@@ -114,8 +114,7 @@ Deno.serve(async (req: Request) => {
 
     if (!MERCHANT_ID || !MERCHANT_KEY || !MERCHANT_SALT) {
       return jsonResp({
-        error: "PayTR credentials eksik. Supabase Secrets'ta PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY, PAYTR_MERCHANT_SALT tanımlı olmalı.",
-        hint: "supabase secrets set PAYTR_MERCHANT_ID=XXXXXX PAYTR_MERCHANT_KEY=YYYYYYYYYYYYYYYY PAYTR_MERCHANT_SALT=ZZZZZZZZZZZZZZZZ",
+        error: "Ödeme servisi şu an kullanılamıyor. Lütfen yönetici ile iletişime geçin.",
         version: "v12",
       }, 503, req);
     }

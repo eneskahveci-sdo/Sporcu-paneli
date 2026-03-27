@@ -13,8 +13,9 @@
     if (window._debugPanelReady) return;
     window._debugPanelReady = true;
 
-    // Production'da debug paneli KAPALI — açmak için URL'e ?debug=1 ekle
-    var isDebugMode = window.location.search.includes('debug=1') ||
+    // Production'da debug paneli KAPALI
+    // Açmak için URL'e ?_dbg=dragos_dev_panel ekle (sadece geliştirici bilir)
+    var isDebugMode = window.location.search.includes('_dbg=dragos_dev_panel') ||
                       window.location.hostname === 'localhost' ||
                       window.location.hostname === '127.0.0.1';
     if (!isDebugMode) return;
