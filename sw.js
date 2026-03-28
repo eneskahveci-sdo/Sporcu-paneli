@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.1
+// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.2
+// v3.2: Statik dosyalar için network-first stratejisi — eski
+//       cache kullanıcıya eski kod servis etmesini önler.
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v12';
-const API_CACHE = 'dragos-api-v12';
+const STATIC_CACHE = 'dragos-static-v13';
+const API_CACHE = 'dragos-api-v13';
 
 const STATIC_ASSETS = [
     '/',
@@ -105,16 +107,18 @@ self.addEventListener('fetch', function(event) {
         url.pathname.endsWith('.js') || url.pathname.endsWith('.css') ||
         url.pathname.endsWith('.html') || url.pathname === '/'
     )) {
+        // Network-first: önce sunucudan çek (taze kod), hata varsa cache'den dön.
+        // Cache-first kullanılmasın — deploy sonrası eski kod yüklenmesin.
         event.respondWith(
-            caches.open(STATIC_CACHE).then(function(cache) {
-                return cache.match(event.request).then(function(cached) {
-                    var fetchPromise = fetch(event.request.clone()).then(function(resp) {
-                        if (resp.ok) cache.put(event.request, resp.clone());
-                        return resp;
-                    }).catch(function() {
-                        return cached || new Response('', { status: 503, statusText: 'Offline' });
-                    });
-                    return cached || fetchPromise;
+            fetch(event.request.clone()).then(function(resp) {
+                if (resp.ok) {
+                    var clone = resp.clone();
+                    caches.open(STATIC_CACHE).then(function(cache) { cache.put(event.request, clone); });
+                }
+                return resp;
+            }).catch(function() {
+                return caches.match(event.request).then(function(cached) {
+                    return cached || new Response('', { status: 503, statusText: 'Offline' });
                 });
             })
         );

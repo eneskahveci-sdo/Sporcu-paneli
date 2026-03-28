@@ -323,9 +323,12 @@ const ModalManager = {
     open(title, body, buttons) {
         const m = document.getElementById('modal');
         if (!m) return;
-        document.getElementById('modal-title').textContent = title;
-        document.getElementById('modal-body').innerHTML = body;
+        const mt = document.getElementById('modal-title');
+        const mb = document.getElementById('modal-body');
         const mf = document.getElementById('modal-footer');
+        if (mt) mt.textContent = title;
+        if (mb) mb.innerHTML = body;
+        if (!mf) return;
         mf.innerHTML = '';
         (buttons || []).forEach(btn => {
             const b = document.createElement('button');
@@ -787,7 +790,7 @@ window.doLogin = async function() {
         }
         
         // Önce mevcut oturumu kapat
-        await sb.auth.signOut().catch(() => {});
+        await sb.auth.signOut().catch(e => console.warn('signOut (non-critical):', e));
         
         let authData, authError;
         try {
@@ -1085,7 +1088,8 @@ async function loadBranchData() {
             return data || [];
         };
 
-        const results = await Promise.all([
+        // Promise.allSettled: bir sorgu hata verse diğerleri çalışmaya devam eder.
+        const results = await Promise.allSettled([
             DB.query('athletes', filter),
             payQuery(),
             DB.query('coaches', filter),
@@ -1095,29 +1099,36 @@ async function loadBranchData() {
             DB.query('sports', filter),
             DB.query('classes', filter)
         ]);
-        
-        AppState.data.athletes = (results[0] || []).map(DB.mappers.toAthlete);
-        AppState.data.payments = (results[1] || []).map(DB.mappers.toPayment);
-        AppState.data.coaches  = (results[2] || []).map(DB.mappers.toCoach);
-        
+
+        // Başarılı sonuçları al, başarısızları boş dizi olarak say
+        const vals = results.map(function(r) {
+            if (r.status === 'fulfilled') return r.value || [];
+            console.warn('loadBranchData sorgu hatası:', r.reason);
+            return [];
+        });
+
+        AppState.data.athletes = vals[0].map(DB.mappers.toAthlete);
+        AppState.data.payments = vals[1].map(DB.mappers.toPayment);
+        AppState.data.coaches  = vals[2].map(DB.mappers.toCoach);
+
         AppState.data.attendance = {};
-        (results[3] || []).forEach(r => {
+        vals[3].forEach(r => {
             if (!AppState.data.attendance[r.att_date]) AppState.data.attendance[r.att_date] = {};
             AppState.data.attendance[r.att_date][r.athlete_id] = r.status;
         });
-        
-        AppState.data.messages = (results[4] || []).map(r => ({
+
+        AppState.data.messages = vals[4].map(r => ({
             id: r.id, senderId: r.sender_id, senderName: r.sender_name,
             senderRole: r.sender_role, recipientId: r.recipient_id,
             title: r.title, body: r.body, isRead: r.is_read, createdAt: r.created_at
         }));
-        
-        AppState.data.settings = results[5]?.[0] ? 
-            DB.mappers.toSettings(results[5][0]) : 
+
+        AppState.data.settings = vals[5][0] ?
+            DB.mappers.toSettings(vals[5][0]) :
             { schoolName: 'Dragos Futbol Akademisi' };
-        
-        AppState.data.sports  = (results[6] || []).map(DB.mappers.toSport);
-        AppState.data.classes = (results[7] || []).map(DB.mappers.toClass);
+
+        AppState.data.sports  = vals[6].map(DB.mappers.toSport);
+        AppState.data.classes = vals[7].map(DB.mappers.toClass);
         
         applyLogoEverywhere(AppState.data.settings?.logoUrl || '');
         const loginSchoolName = document.getElementById('login-school-name');
