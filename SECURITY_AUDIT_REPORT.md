@@ -1,7 +1,7 @@
 # Sporcu Paneli - Kapsamli Guvenlik Analiz Raporu
 
 **Tarih:** 2026-03-27
-**Son Guncelleme:** 2026-03-27
+**Son Guncelleme:** 2026-03-28
 **Analiz Kapsamı:** Tum proje dosyalari (script.js, script-fixes.js, index.html, vercel.json, Security.js, RLS_POLICIES.sql, migrations, sw.js, init.js, error-handler.js, event-handlers.js, ui-improvements.js, manifest.json)
 
 ---
@@ -15,14 +15,25 @@
 | Yetkilendirme (IDOR) | 0 | 2 | 1 | 0 | 3 |
 | XSS/Injection | 0 | 1 | 2 | 0 | 3 |
 | Hassas Veri Sizintisi | ~~1~~ **0** | 1 | 2 | ~~3~~ **0** | 3 |
-| Yapilandirma/Baslik | 0 | 2 | 2 | 2 | 6 |
+| Yapilandirma/Baslik | 0 | 2 | 2 | ~~2~~ **1** | 5 |
 | Odeme Guvenligi | 0 | 0 | ~~3~~ **2** | 0 | 2 |
 | CSRF | 0 | 0 | 0 | 0 | 0 |
-| **TOPLAM** | **0** | **8** | **11** | **2** | **21** |
+| **TOPLAM** | **0** | **8** | ~~**11**~~ **10** | ~~**2**~~ **1** | **19** |
 
 ---
 
 ## KAPATILANLAR ✅
+
+### 2026-03-28 Güncellemesi — Yeni Kapatılanlar
+
+| # | Açık | Nasıl Kapatıldı |
+|---|------|-----------------|
+| O15 | WhatsApp toplu mesaj rate limiting yok | `sendBulkWhatsApp` döngüsüne 500ms gecikme eklendi |
+| D6 | Logo URL'de HTTP izni | `_isSafeLogoUrl`: sadece `https:` protokolüne izin verildi |
+| — | Math.random() güvensiz fallback sessiz | `console.warn` ile HTTPS ortamı uyarısı eklendi |
+| — | init.js cache-buster rastgele URL | `?t=Date.now()` kaldırıldı, CDN önbelleklemesi düzeltildi |
+
+---
 
 ### Kritik Seviye — Tamamı Kapatıldı
 
@@ -98,7 +109,7 @@
 | O12 | WhatsApp API token düz metin | `script.js:3798` |
 | O13 | Oturum yarış durumu (edge case) | `Security.js:213` |
 | O14 | Ödeme webhook HMAC doğrulama eksik | `script.js:4782` |
-| O15 | WhatsApp toplu mesaj rate limiting yok | `script-fixes.js:383` |
+| ~~O15~~ | ~~WhatsApp toplu mesaj rate limiting yok~~ — **KAPATILDI** (500ms bekleme eklendi) | `script-fixes.js:419` |
 
 ---
 
@@ -106,7 +117,7 @@
 
 | # | Açık | Dosya |
 |---|------|-------|
-| D6 | Logo URL'de HTTP izni | `script.js:1150` |
+| ~~D6~~ | ~~Logo URL'de HTTP izni~~ — **KAPATILDI** (sadece HTTPS izinli) | `script.js:1163` |
 | D7 | onclick handler pattern (UUID güvenli ama) | `script-fixes.js:705` |
 
 ---

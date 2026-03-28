@@ -255,6 +255,7 @@ function generateId() {
         });
     }
     // Fallback only for non-HTTPS environments where crypto is unavailable
+    console.warn('generateId: crypto API kullanılamıyor, Math.random() fallback aktif. HTTPS ortamında çalışın.');
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
@@ -1165,7 +1166,7 @@ function _isSafeLogoUrl(url) {
     if (url.startsWith('data:image/')) return true;
     try {
         const u = new URL(url);
-        return u.protocol === 'https:' || u.protocol === 'http:';
+        return u.protocol === 'https:';
     } catch(e) {
         return false;
     }

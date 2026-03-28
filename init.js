@@ -16,7 +16,7 @@
         function tryNext(){
             if(i>=urls.length){console.error('Supabase: tum kaynaklar basarisiz');return}
             var s=document.createElement('script');
-            s.src=urls[i]+'?t='+Date.now();
+            s.src=urls[i];
             s.crossOrigin='anonymous';
             s.onload=function(){console.log('✅ Supabase dinamik yuklendi:',urls[i])};
             s.onerror=function(){i++;tryNext()};
