@@ -16,6 +16,8 @@ const STATIC_ASSETS = [
     '/script-fixes.js',
     '/ui-improvements.js',
     '/Security.js',
+    '/event-handlers.js',
+    '/pwa-register.js',
     '/style.css',
     '/robots.txt',
     '/sitemap.xml',

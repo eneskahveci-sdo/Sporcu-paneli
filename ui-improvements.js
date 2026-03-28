@@ -206,12 +206,20 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
     if (typeof DB !== 'undefined' && DB.query) {
         var _origQuery = DB.query;
         DB.query = async function(table, filters) {
+            // DB.query null döndürür (exception fırlatmaz) — null sonucu da retry kapsamına al
             for (var attempt = 0; attempt <= 2; attempt++) {
                 try {
                     var result = await _origQuery.call(this, table, filters);
-                    return result;
+                    if (result !== null) return result;
+                    // null = Supabase hatası; son denemede değilse bekle ve tekrar dene
+                    if (attempt === 2) {
+                        console.warn('DB.query başarısız (' + table + ') — 3 deneme tükendi');
+                        return null;
+                    }
+                    console.warn('DB.query retry ' + (attempt + 2) + '/3 (' + table + ')');
+                    await new Promise(function(r) { setTimeout(r, 500 * (attempt + 1)); });
                 } catch(e) {
-                    console.warn('DB.query retry ' + (attempt + 1) + '/3 (' + table + '):', e.message);
+                    console.warn('DB.query exception retry ' + (attempt + 1) + '/3 (' + table + '):', e.message);
                     if (attempt === 2) {
                         if (typeof toast === 'function') toast('📡 Veri yüklenemedi: ' + window._friendlyError(e), 'e');
                         return null;
