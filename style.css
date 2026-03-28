@@ -512,3 +512,84 @@ background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62))
     .inv-table th:nth-child(3),.inv-table td:nth-child(3),
     .inv-table th:nth-child(4),.inv-table td:nth-child(4){display:none}
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* iOS SAFARI + MOBİL UX DÜZELTMELERİ                        */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* 1. dvh: iOS Safari 100vh address bar dahil sayar, içerik alt kısmı kesilir.
+      100dvh dinamik güncellenir → en önemli iOS fix */
+#wrap { height: 100dvh; }
+
+/* 2. smooth scroll için scroll > auto (iOS compositing katmanı garantiler) */
+#main, #sp-content, .m-body { overflow-y: scroll; }
+
+/* 3. Toast: mobilde alt nav (65px) arkasında kalmıyor */
+@media (max-width: 768px) {
+    .toast {
+        bottom: max(calc(env(safe-area-inset-bottom, 0px) + 76px), 90px) !important;
+    }
+
+    /* 4. Modal butonları: mobilde tam genişlik dikey sıra */
+    .m-foot {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .m-foot .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* 5. Bildirim paneli: küçük ekranda sağa taşmayı önle */
+    .notif-panel {
+        right: 0 !important;
+        max-width: calc(100vw - 24px) !important;
+        width: min(360px, calc(100vw - 24px));
+    }
+
+    /* 6. Alt kıyı güvenlik boşluğu: son kart/buton bottom nav altında kalmasın */
+    #main { padding-bottom: 24px !important; }
+
+    /* 7. Kart içerikleri taşmasın */
+    .card, .info-card { word-break: break-word; }
+
+    /* 8. Çok küçük ekranda inline buton grupları taşmasın */
+    .flex.fwrap .btn { min-width: 0; }
+}
+
+/* 9. Küçük telefon (≤390px): yoklama butonları grid'e dön */
+@media (max-width: 390px) {
+    .att-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .att-btns {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+    .att-b {
+        min-height: 40px !important;
+        padding: 6px 4px !important;
+        font-size: 11px !important;
+        text-align: center;
+    }
+    /* Login sekmeleri sığsın */
+    .ltab { font-size: 11px !important; padding: 8px 4px !important; }
+}
+
+/* 10. Masaüstü: ince özel kaydırma çubuğu */
+@media (min-width: 769px) {
+    #main::-webkit-scrollbar { width: 6px; }
+    #main::-webkit-scrollbar-track { background: transparent; }
+    #main::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    #main::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+    .snav::-webkit-scrollbar { width: 4px; }
+    .snav::-webkit-scrollbar-track { background: transparent; }
+    .snav::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    /* Modal tam genişlikte değil, centered kart */
+    .m-box { border-radius: 20px !important; }
+}
+
+/* 11. Geniş ekran: daha konforlu padding */
+@media (min-width: 1280px) {
+    #main { padding: 28px 36px; }
+}
