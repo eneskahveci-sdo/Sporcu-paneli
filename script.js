@@ -1378,6 +1378,19 @@ function applyLogoEverywhere(logoUrl) {
             logoPreview.innerHTML = '&#x26BD;';
         }
     }
+
+    // 6) FAVİCON + APPLE-TOUCH-ICON — sekme ikonunu güncelle
+    const faviconUrl = hasLogo ? logoUrl : '/icons/icon-192.png';
+    const dynFavicon = document.getElementById('dyn-favicon');
+    if (dynFavicon) dynFavicon.href = faviconUrl;
+    const dynApple = document.getElementById('dyn-apple-icon');
+    if (dynApple) dynApple.href = faviconUrl;
+
+    // 7) OG IMAGE — sosyal paylaşım / Google önizleme
+    const ogImg = document.querySelector('meta[property="og:image"]');
+    if (ogImg) ogImg.content = faviconUrl;
+    const twImg = document.querySelector('meta[name="twitter:image"]');
+    if (twImg) twImg.content = faviconUrl;
 }
 
 function updateBranchUI() {
