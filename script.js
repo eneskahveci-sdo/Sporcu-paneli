@@ -1160,7 +1160,7 @@ async function loadBranchData() {
 }
 
 // Tek merkezden tüm ekranların logosunu günceller
-// URL (http/https) veya base64 data: her ikisini de destekler
+// Sadece https: veya base64 data: URL'lerine izin verir
 function _isSafeLogoUrl(url) {
     if (!url) return false;
     if (url.startsWith('data:image/')) return true;
