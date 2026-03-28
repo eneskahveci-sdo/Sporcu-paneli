@@ -254,16 +254,18 @@ function _securityDoNormalLogin(role) {
                 }
                 row = userData;
             } else {
-                // 2) Auth geçici/altyapı hatası verirse RPC fallback
+                // 2) Auth başarısız — RPC fallback dene
                 const authMsg = (authError?.message || '').toLowerCase();
-                const shouldUseRpcFallback = authMsg.includes('database error querying schema') || authMsg.includes('unexpected_failure');
+                // Hem altyapı hataları hem de e-posta doğrulanmamış durumda
+                // RPC fallback kullan — mevcut kullanıcılar giriş yapabilsin.
+                const shouldUseRpcFallback =
+                    authMsg.includes('database error querying schema') ||
+                    authMsg.includes('unexpected_failure') ||
+                    authMsg.includes('email not confirmed') ||
+                    authMsg.includes('email_not_confirmed');
 
                 if (!shouldUseRpcFallback) {
-                    if (authMsg.includes('email not confirmed') || authMsg.includes('email_not_confirmed')) {
-                        showErr('Bu hesapta e-posta doğrulaması bekleniyor. Supabase > Auth > Providers > Email bölümünde Confirm email ayarını kapatın ya da hesabı doğrulayın.');
-                    } else {
-                        showErr('TC Kimlik No veya Şifre Hatalı');
-                    }
+                    showErr('TC Kimlik No veya Şifre Hatalı');
                     return;
                 }
 
@@ -278,14 +280,8 @@ function _securityDoNormalLogin(role) {
                 if (!rpcError && rpcData?.ok && rpcData?.data) {
                     row = rpcData.data;
                 } else {
-                    const rpcMsg = rpcError?.message || rpcData?.error || '';
-                    console.error('🔴 Auth hatası');
-                    console.error('🔴 RPC fallback hatası');
-                    if (rpcMsg) {
-                        showErr('Giriş doğrulanamadı: ' + rpcMsg);
-                    } else {
-                        showErr('TC Kimlik No veya Şifre Hatalı');
-                    }
+                    console.error('🔴 Auth ve RPC fallback başarısız');
+                    showErr('TC Kimlik No veya Şifre Hatalı');
                     return;
                 }
             }
