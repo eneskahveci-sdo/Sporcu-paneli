@@ -320,6 +320,9 @@ function _securityDoNormalLogin(role) {
                     StorageManager.set('sporcu_app_org',    AppState.currentOrgId);
                     StorageManager.set('sporcu_app_branch', AppState.currentBranchId);
                 }
+                if (window.SessionManager) {
+                    SessionManager.start(AppState.currentUser.name, 'coach', tc, AppState.currentOrgId, AppState.currentBranchId);
+                }
 
                 const lboxWrap = document.getElementById('lbox-wrap');
                 const wrap     = document.getElementById('wrap');
@@ -367,6 +370,10 @@ function _securityDoNormalLogin(role) {
                         orgId: AppState.currentOrgId,
                         branchId: AppState.currentBranchId
                     });
+                }
+                if (window.SessionManager) {
+                    const sp = AppState.currentSporcu;
+                    SessionManager.start((sp.fn + ' ' + sp.ln).trim(), 'sporcu', tc, AppState.currentOrgId, AppState.currentBranchId);
                 }
 
                 if (typeof window.loadBranchData === 'function') {

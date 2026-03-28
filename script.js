@@ -87,6 +87,94 @@ const StorageManager = {
     }
 };
 
+// ── Aktif Oturum Yöneticisi ───────────────────────────────────────────────
+// Her login'de session_start() RPC çağırır, UUID'yi saklar.
+// 60sn'de bir heartbeat: FALSE dönerse admin kapattı → otomatik logout.
+const SessionManager = {
+    _id: null,
+    _iv: null,
+
+    async start(name, role, tc, orgId, branchId) {
+        try {
+            const sb = getSupabase();
+            if (!sb) return;
+            const { data, error } = await sb.rpc('session_start', {
+                p_name: name, p_role: role, p_tc: tc || null,
+                p_org_id: orgId || null, p_branch_id: branchId || null
+            });
+            if (error || !data) { console.warn('session_start:', error); return; }
+            this._id = data;
+            StorageManager.set('_sid', data);
+            this._startBeat();
+        } catch(e) { console.warn('SessionManager.start:', e); }
+    },
+
+    resume() {
+        const stored = StorageManager.get('_sid');
+        if (!stored) return;
+        this._id = stored;
+        // Hemen kontrol et, sonra periyodik heartbeat başlat
+        this._beat().then(() => { if (this._id) this._startBeat(); });
+    },
+
+    async end() {
+        this._stopBeat();
+        const id = this._id;
+        this._id = null;
+        StorageManager.remove('_sid');
+        if (!id) return;
+        try {
+            const sb = getSupabase();
+            if (sb) await sb.rpc('session_end', { p_session_id: id });
+        } catch(e) {}
+    },
+
+    _startBeat() {
+        this._stopBeat();
+        this._iv = setInterval(() => this._beat(), 60000);
+    },
+
+    _stopBeat() {
+        if (this._iv) { clearInterval(this._iv); this._iv = null; }
+    },
+
+    async _beat() {
+        if (!this._id) return;
+        try {
+            const sb = getSupabase();
+            if (!sb) return;
+            const { data, error } = await sb.rpc('session_heartbeat', { p_session_id: this._id });
+            if (error || data === false) {
+                // Admin bu oturumu kapattı
+                this._stopBeat();
+                this._id = null;
+                StorageManager.clear();
+                location.reload();
+            }
+        } catch(e) { console.warn('Heartbeat:', e); }
+    },
+
+    async list() {
+        try {
+            const sb = getSupabase();
+            const { data, error } = await sb.rpc('sessions_list');
+            if (error) throw error;
+            return data || [];
+        } catch(e) { console.warn('sessions_list:', e); return []; }
+    },
+
+    async killAll() {
+        const sb = getSupabase();
+        const { data } = await sb.rpc('sessions_kill_all', { p_exclude_id: this._id || null });
+        return data || 0;
+    },
+
+    async kill(sessionId) {
+        const sb = getSupabase();
+        await sb.rpc('session_kill', { p_session_id: sessionId });
+    }
+};
+
 // Supabase bağlantısı — anon key public-safe (RLS politikaları korur)
 // Bu key sadece public veri erişimi içindir, service_role key ASLA ekleme.
 const SUPABASE_CONFIG = {
@@ -907,7 +995,8 @@ window.doLogin = async function() {
         
         updateBranchUI();
         go('dashboard');
-        
+        SessionManager.start(AppState.currentUser.name, 'admin', null, AppState.currentOrgId, AppState.currentBranchId);
+
     } catch (err) {
         console.error('Login error');
         if (errEl) {
@@ -951,9 +1040,10 @@ async function restoreSession() {
             
             applyLogoEverywhere(AppState.data.settings?.logoUrl || '');
             spTab('profil');
+            SessionManager.resume();
             return;
         }
-        
+
         // 2. Yönetici / antrenör oturumu kontrolü
         const storedUser = StorageManager.get('sporcu_app_user');
         if (storedUser) {
@@ -999,6 +1089,7 @@ async function restoreSession() {
             
             updateBranchUI();
             go(AppState.currentUser.role === 'coach' ? 'attendance' : 'dashboard');
+            SessionManager.resume();
             return;
         }
         
@@ -1059,6 +1150,7 @@ async function loadLogoForLoginScreen() {
 }
 
 window.doLogout = async function() {
+    await SessionManager.end();
     try {
         const sb = getSupabase();
         if (sb) await sb.auth.signOut();
@@ -1069,7 +1161,8 @@ window.doLogout = async function() {
     location.reload();
 };
 
-window.doSporcuLogout = function() {
+window.doSporcuLogout = async function() {
+    await SessionManager.end();
     StorageManager.clear();
     location.reload();
 };
@@ -1096,47 +1189,77 @@ async function loadBranchData() {
             return data || [];
         };
 
-        // Promise.allSettled: bir sorgu hata verse diğerleri çalışmaya devam eder.
-        const results = await Promise.allSettled([
+        // Attendance: sadece son 30 gün — tüm geçmişi çekmek gereksiz veri
+        const attendanceQuery = async () => {
+            const thirtyDaysAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0, 10);
+            let q = sb.from('attendance').select('*');
+            if (bid) q = q.eq('branch_id', bid); else q = q.eq('org_id', oid);
+            q = q.gte('att_date', thirtyDaysAgo);
+            const { data, error } = await q;
+            if (error) { console.warn('attendance query error:', error); return []; }
+            return data || [];
+        };
+
+        // Statik veri cache (5 dk TTL): settings, sports, classes, coaches az değişir
+        const STATIC_TTL = 5 * 60 * 1000;
+        const cacheKey = 'branch_static_' + (bid || oid);
+        const cached = StorageManager.get(cacheKey);
+        const now = Date.now();
+        const useCache = cached && cached.ts && (now - cached.ts < STATIC_TTL);
+
+        // Dinamik sorgular her zaman fresh çekilir
+        const [athletesRes, paymentsRes, attendanceRes, messagesRes] = await Promise.allSettled([
             DB.query('athletes', filter),
             payQuery(),
-            DB.query('coaches', filter),
-            DB.query('attendance', filter),
-            DB.query('messages', filter),
-            DB.query('settings', filter),
-            DB.query('sports', filter),
-            DB.query('classes', filter)
+            attendanceQuery(),
+            DB.query('messages', filter)
         ]);
 
-        // Başarılı sonuçları al, başarısızları boş dizi olarak say
-        const vals = results.map(function(r) {
-            if (r.status === 'fulfilled') return r.value || [];
-            console.warn('loadBranchData sorgu hatası:', r.reason);
-            return [];
-        });
+        // Statik sorgular: cache varsa atla
+        let settingsData, sportsData, classesData, coachesData;
+        if (useCache) {
+            settingsData = cached.settings;
+            sportsData   = cached.sports;
+            classesData  = cached.classes;
+            coachesData  = cached.coaches;
+        } else {
+            const [settingsRes, sportsRes, classesRes, coachesRes] = await Promise.allSettled([
+                DB.query('settings', filter),
+                DB.query('sports', filter),
+                DB.query('classes', filter),
+                DB.query('coaches', filter)
+            ]);
+            settingsData = settingsRes.status === 'fulfilled' ? (settingsRes.value || []) : [];
+            sportsData   = sportsRes.status   === 'fulfilled' ? (sportsRes.value   || []) : [];
+            classesData  = classesRes.status  === 'fulfilled' ? (classesRes.value  || []) : [];
+            coachesData  = coachesRes.status  === 'fulfilled' ? (coachesRes.value  || []) : [];
+            StorageManager.set(cacheKey, { ts: now, settings: settingsData, sports: sportsData, classes: classesData, coaches: coachesData });
+        }
 
-        AppState.data.athletes = vals[0].map(DB.mappers.toAthlete);
-        AppState.data.payments = vals[1].map(DB.mappers.toPayment);
-        AppState.data.coaches  = vals[2].map(DB.mappers.toCoach);
+        AppState.data.athletes = (athletesRes.status  === 'fulfilled' ? athletesRes.value  || [] : []).map(DB.mappers.toAthlete);
+        AppState.data.payments = (paymentsRes.status  === 'fulfilled' ? paymentsRes.value  || [] : []).map(DB.mappers.toPayment);
+        AppState.data.coaches  = coachesData.map(DB.mappers.toCoach);
 
         AppState.data.attendance = {};
-        vals[3].forEach(r => {
+        const attendanceRows = attendanceRes.status === 'fulfilled' ? attendanceRes.value || [] : [];
+        attendanceRows.forEach(r => {
             if (!AppState.data.attendance[r.att_date]) AppState.data.attendance[r.att_date] = {};
             AppState.data.attendance[r.att_date][r.athlete_id] = r.status;
         });
 
-        AppState.data.messages = vals[4].map(r => ({
+        const messagesRows = messagesRes.status === 'fulfilled' ? messagesRes.value || [] : [];
+        AppState.data.messages = messagesRows.map(r => ({
             id: r.id, senderId: r.sender_id, senderName: r.sender_name,
             senderRole: r.sender_role, recipientId: r.recipient_id,
             title: r.title, body: r.body, isRead: r.is_read, createdAt: r.created_at
         }));
 
-        AppState.data.settings = vals[5][0] ?
-            DB.mappers.toSettings(vals[5][0]) :
+        AppState.data.settings = settingsData[0] ?
+            DB.mappers.toSettings(settingsData[0]) :
             { schoolName: 'Dragos Futbol Akademisi' };
 
-        AppState.data.sports  = vals[6].map(DB.mappers.toSport);
-        AppState.data.classes = vals[7].map(DB.mappers.toClass);
+        AppState.data.sports  = sportsData.map(DB.mappers.toSport);
+        AppState.data.classes = classesData.map(DB.mappers.toClass);
         
         applyLogoEverywhere(AppState.data.settings?.logoUrl || '');
         const loginSchoolName = document.getElementById('login-school-name');
@@ -3703,6 +3826,17 @@ function pgSettings() {
         </div>
     </div>
 
+    <div class="card mb3" style="border-left: 4px solid #16a34a">
+        <div class="tw6 tsm mb2">&#x1F5A5; Aktif Oturumlar</div>
+        <div class="al mb3" style="font-size:13px">
+            Sisteme giriş yapmış tüm kullanıcılar. Bir oturumu kapatırsanız o kullanıcı 60 saniye içinde otomatik çıkış yapacaktır.
+        </div>
+        <div id="sessions-list-area" style="margin-bottom:12px">
+            <button class="btn bs btn-sm" onclick="loadAndShowSessions()" style="width:100%">Oturumları Listele</button>
+        </div>
+        <button class="btn" style="background:#dc2626;color:#fff;border:none" onclick="killAllSessionsBtn()">Tüm Oturumları Kapat (Kendim Hariç)</button>
+    </div>
+
     <div class="card mb3" style="border-left: 4px solid var(--purple)">
         <div class="tw6 tsm mb3">&#x1F5BC; Logo Ayarları</div>
         <p class="ts tm mb3">Bu bölümden yüklediğiniz logo; giriş ekranı, sidebar ve sporcu portalinde otomatik görünür.</p>
@@ -4945,6 +5079,73 @@ window.removeAdmin = function(uid, email) {
             toast('Silinemedi: ' + e.message, 'e');
         }
     });
+};
+
+// ── Aktif Oturum Yönetimi (Admin Settings) ───────────────────────────────
+
+window.loadAndShowSessions = async function() {
+    const area = document.getElementById('sessions-list-area');
+    if (!area) return;
+    area.innerHTML = '<div class="tm ts">Yükleniyor...</div>';
+    try {
+        const sessions = await SessionManager.list();
+        if (!sessions.length) {
+            area.innerHTML = '<div class="tm ts" style="color:var(--text2)">Aktif oturum yok.</div>';
+            return;
+        }
+        const now = Date.now();
+        const rows = sessions.map(s => {
+            const isSelf = s.id === SessionManager._id;
+            const lastMs = now - new Date(s.last_seen).getTime();
+            const isActive = lastMs < 120000; // 2dk içinde heartbeat = aktif
+            const badge = s.role === 'admin' ? '#2563eb' : s.role === 'coach' ? '#d97706' : '#16a34a';
+            const roleTr = s.role === 'admin' ? 'Admin' : s.role === 'coach' ? 'Antrenör' : 'Sporcu';
+            const minAgo = Math.floor(lastMs / 60000);
+            const seenTxt = minAgo < 1 ? 'Az önce' : minAgo + ' dk önce';
+            const tcMasked = s.tc ? s.tc.slice(0,3) + '****' + s.tc.slice(-2) : '—';
+            return `<tr style="font-size:13px">
+              <td style="padding:6px 8px">${FormatUtils.escape(s.user_name)}${isSelf ? ' <span style="font-size:11px;color:var(--text2)">(Sen)</span>' : ''}</td>
+              <td style="padding:6px 8px"><span style="background:${badge};color:#fff;border-radius:4px;padding:2px 6px;font-size:11px">${roleTr}</span></td>
+              <td style="padding:6px 8px">${tcMasked}</td>
+              <td style="padding:6px 8px"><span style="color:${isActive ? '#16a34a' : '#6b7280'}">${isActive ? '● ' : '○ '}${seenTxt}</span></td>
+              <td style="padding:6px 8px">${isSelf ? '' : `<button class="btn be btn-sm" onclick="killOneSession('${s.id}')" style="padding:2px 8px;font-size:12px">Kapat</button>`}</td>
+            </tr>`;
+        }).join('');
+        area.innerHTML = `<table style="width:100%;border-collapse:collapse">
+          <thead><tr style="font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">
+            <th style="padding:4px 8px;text-align:left">Ad</th>
+            <th style="padding:4px 8px;text-align:left">Rol</th>
+            <th style="padding:4px 8px;text-align:left">TC</th>
+            <th style="padding:4px 8px;text-align:left">Son Görülme</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <button class="btn bs btn-sm mt2" onclick="loadAndShowSessions()" style="width:100%">Yenile</button>`;
+    } catch(e) {
+        area.innerHTML = '<div class="tm ts" style="color:var(--red)">Yüklenemedi.</div>';
+    }
+};
+
+window.killOneSession = async function(sessionId) {
+    try {
+        await SessionManager.kill(sessionId);
+        toast('Oturum kapatıldı.', 's');
+        loadAndShowSessions();
+    } catch(e) {
+        toast('Hata: ' + e.message, 'e');
+    }
+};
+
+window.killAllSessionsBtn = async function() {
+    if (!confirm('Kendi oturumunuz hariç tüm aktif oturumlar kapatılacak. Devam?')) return;
+    try {
+        const n = await SessionManager.killAll();
+        toast(n + ' oturum kapatıldı.', 's');
+        loadAndShowSessions();
+    } catch(e) {
+        toast('Hata: ' + e.message, 'e');
+    }
 };
 
 // AppState'e onKayitlar ekle
