@@ -879,14 +879,14 @@ window.doLogin = async function() {
             } catch (e) { console.warn('User upsert warning:', e); }
         }
         
-        AppState.currentUser = {
+        AppState.currentUser = Object.freeze({
             id: userData.id,
             email: userData.email,
             orgId: userData.org_id,
             branchId: userData.branch_id,
             role: userData.role || 'admin',
             name: userData.name || email.split('@')[0]
-        };
+        });
         
         AppState.currentOrgId = userData.org_id;
         AppState.currentBranchId = userData.branch_id;
@@ -957,7 +957,7 @@ async function restoreSession() {
         // 2. Yönetici / antrenör oturumu kontrolü
         const storedUser = StorageManager.get('sporcu_app_user');
         if (storedUser) {
-            AppState.currentUser = storedUser;
+            AppState.currentUser = Object.freeze({ ...storedUser });
             AppState.currentOrgId = StorageManager.get('sporcu_app_org') || storedUser.orgId;
             AppState.currentBranchId = StorageManager.get('sporcu_app_branch') || storedUser.branchId;
             
@@ -1293,7 +1293,12 @@ const _goHooks = { before: [], after: [] };
 window.registerGoHook = function(phase, fn) { _goHooks[phase].push(fn); };
 
 window.go = function(page, params = {}) {
-    if (AppState.currentUser?.role === 'coach') {
+    // Sporcu panelindeyken (currentUser = null) admin sayfalarına erişim engeli
+    if (!AppState.currentUser) {
+        return;
+    }
+
+    if (AppState.currentUser.role === 'coach') {
         const restricted = ['dashboard', 'payments', 'accounting', 'settings', 'sms', 'sports', 'classes'];
         if (restricted.includes(page)) {
             toast(AppState.lang === 'TR' ? 'Bu sayfaya erişim yetkiniz yok.' : 'You do not have permission to access this page.', 'e');

@@ -304,12 +304,12 @@ function _securityDoNormalLogin(role) {
 
             if (role === 'coach') {
 
-                AppState.currentUser = {
+                AppState.currentUser = Object.freeze({
                     id: row.id,
                     name: (row.fn || '') + ' ' + (row.ln || ''),
                     role: 'coach',
                     tc: tc
-                };
+                });
                 AppState.currentOrgId    = row.org_id;
                 AppState.currentBranchId = row.branch_id;
 
