@@ -8,6 +8,9 @@ async function hmacSha256Base64(data: string, key: string): Promise<string> {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204 });
+  }
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
