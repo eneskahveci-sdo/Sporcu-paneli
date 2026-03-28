@@ -421,6 +421,10 @@ window.sendBulkWhatsApp = async function() {
         var personMsg = msg.replace('{sporcu_adi}', (targets[i].fn || '') + ' ' + (targets[i].ln || '')).replace('{tutar}', FormatUtils.currency(targets[i].fee));
         var ok = await sendWhatsAppMessage(phone, personMsg);
         if (ok) sent++; else failed++;
+        // Rate limiting: API limitlerini aşmamak için mesajlar arası bekleme
+        if (i < targets.length - 1) {
+            await new Promise(function(resolve) { setTimeout(resolve, 500); });
+        }
     }
     toast('✅ ' + sent + ' mesaj gönderildi' + (failed > 0 ? ', ' + failed + ' başarısız' : ''), sent > 0 ? 'g' : 'e');
 };
