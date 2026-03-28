@@ -18,9 +18,7 @@ const ALLOWED_ORIGINS = [
 
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
-    ? origin
-    : ALLOWED_ORIGINS[0];
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : "";
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -29,7 +27,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 }
 
 function jsonResp(body: Record<string, unknown>, status: number, req?: Request) {
-  const corsHeaders = req ? getCorsHeaders(req) : { "Access-Control-Allow-Origin": ALLOWED_ORIGINS[0], "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+  const corsHeaders = req ? getCorsHeaders(req) : { "Access-Control-Allow-Origin": "", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -234,6 +232,6 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     console.error("[v12] EXCEPTION:", String(err));
-    return jsonResp({ error: String(err), version: "v12" }, 500, req);
+    return jsonResp({ error: "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.", version: "v12" }, 500, req);
   }
 });
