@@ -266,6 +266,7 @@ function _securityDoNormalLogin(role) {
 
                 if (!shouldUseRpcFallback) {
                     showErr('TC Kimlik No veya Şifre Hatalı');
+                    _startLoginCooldown(btn, originalText, errEl);
                     return;
                 }
 
@@ -282,6 +283,7 @@ function _securityDoNormalLogin(role) {
                 } else {
                     console.error('🔴 Auth ve RPC fallback başarısız');
                     showErr('TC Kimlik No veya Şifre Hatalı');
+                    _startLoginCooldown(btn, originalText, errEl);
                     return;
                 }
             }
@@ -396,10 +398,28 @@ function _securityDoNormalLogin(role) {
         } catch (err) {
             console.error('🔴 Beklenmeyen giriş hatası');
             showErr('Sistemsel bir hata oluştu. Lütfen tekrar deneyin.');
-        } finally {
             if (btn) { btn.innerText = originalText; btn.disabled = false; }
         }
     };
+}
+
+// Başarısız girişten sonra 30 saniyelik bekleme uygular
+function _startLoginCooldown(btn, originalText, errEl) {
+    if (!btn) return;
+    const COOLDOWN = 30;
+    let remaining = COOLDOWN;
+    btn.disabled = true;
+    btn.innerText = `Tekrar dene (${remaining}s)`;
+    const iv = setInterval(function() {
+        remaining--;
+        if (remaining <= 0) {
+            clearInterval(iv);
+            btn.innerText = originalText;
+            btn.disabled = false;
+        } else {
+            btn.innerText = `Tekrar dene (${remaining}s)`;
+        }
+    }, 1000);
 }
 
 // İlk atama
