@@ -161,7 +161,7 @@ async function resolveAuthEmails(sb, role, tc) {
 
 function _securityDoNormalLogin(role) {
     return async function() {
-        // Giriş başlatıldı
+        if (window._sessionRestoring) return; // K5: oturum geri yüklenirken çift login engelle
 
         const tcInputId   = role === 'coach' ? 'lc-tc'   : 'ls-tc';
         const passInputId = role === 'coach' ? 'lc-pass'  : 'ls-pass';

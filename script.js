@@ -129,6 +129,9 @@ const AppState = {
     }
 };
 
+// K5: Oturum geri yükleme mutex'i — restoreSession() çalışırken doLogin() tetiklenmesin
+let _sessionRestoring = false;
+
 const i18n = {
     TR: {
         loading: 'Yükleniyor...', menuMain: 'Ana Menü', menuDash: 'Ana Sayfa', menuAth: 'Sporcular',
@@ -765,6 +768,7 @@ window.doNormalLogin = function(role) {
 };
 
 window.doLogin = async function() {
+    if (_sessionRestoring) return; // K5: oturum geri yüklenirken çift login engelle
     const email = UIUtils.getValue('le').toLowerCase().trim();
     const password = UIUtils.getValue('lp');
     const errEl = document.getElementById('lerr');
@@ -915,8 +919,9 @@ window.doLogin = async function() {
 };
 
 async function restoreSession() {
+    _sessionRestoring = true;
     UIUtils.setLoading(true);
-    
+
     try {
         // 1. Sporcu oturumu kontrolü
         const storedSporcu = StorageManager.get('sporcu_app_sporcu');
@@ -1007,6 +1012,7 @@ async function restoreSession() {
         StorageManager.remove('sporcu_app_branch');
         await loadLogoForLoginScreen();
     } finally {
+        _sessionRestoring = false;
         UIUtils.setLoading(false);
     }
 }

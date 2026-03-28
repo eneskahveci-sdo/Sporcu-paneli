@@ -147,7 +147,7 @@ CREATE POLICY "athletes_delete" ON athletes FOR DELETE TO authenticated USING (t
 -- Payments (anon SELECT+INSERT: sporcu/veli ödeme geçmişi ve bildirim gönderimi için gerekli)
 CREATE POLICY "payments_select" ON payments FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "payments_insert" ON payments FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "payments_insert_anon" ON payments FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "payments_insert_anon" ON payments FOR INSERT TO anon WITH CHECK (branch_id IS NOT NULL AND org_id IS NOT NULL);
 CREATE POLICY "payments_update" ON payments FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "payments_delete" ON payments FOR DELETE TO authenticated USING (true);
 

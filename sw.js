@@ -1,11 +1,13 @@
 // ═══════════════════════════════════════════════════════════
-// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.3
+// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.4
 // v3.3: Logo CSS injection fix, inline onclick → addEventListener,
 //       makbuz kayıt hata yakalama.
+// v3.4: K5 race condition fix (_sessionRestoring mutex),
+//       K1 payments_insert_anon null guard (migration 017).
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v14';
-const API_CACHE = 'dragos-api-v14';
+const STATIC_CACHE = 'dragos-static-v15';
+const API_CACHE = 'dragos-api-v15';
 
 const STATIC_ASSETS = [
     '/',
