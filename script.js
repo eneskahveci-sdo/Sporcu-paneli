@@ -391,8 +391,9 @@ const UIUtils = {
             el.style.cssText = `width:40px;height:40px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;border-radius:50%`;
         } else {
             const logoUrl = url || AppState.data.settings?.logoUrl || DEFAULT_LOGO;
+            const _safeCssUrl = logoUrl.replace(/"/g, '%22');
             el.innerHTML = '';
-            el.style.cssText = `background-image:url("${logoUrl}");background-size:cover;background-position:center;`;
+            el.style.cssText = `background-image:url("${_safeCssUrl}");background-size:cover;background-position:center;`;
         }
     }
 };
@@ -1203,7 +1204,7 @@ function applyLogoEverywhere(logoUrl) {
     if (barAva) {
         if (hasLogo) {
             barAva.textContent = '';
-            barAva.style.backgroundImage = 'url("' + logoUrl + '")';
+            barAva.style.backgroundImage = 'url("' + logoUrl.replace(/"/g, '%22') + '")';
             barAva.style.backgroundSize = 'cover';
             barAva.style.backgroundPosition = 'center';
         } else {

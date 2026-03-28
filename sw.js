@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.2
-// v3.2: Statik dosyalar için network-first stratejisi — eski
-//       cache kullanıcıya eski kod servis etmesini önler.
+// DRAGOS FUTBOL AKADEMİSİ — Service Worker v3.3
+// v3.3: Logo CSS injection fix, inline onclick → addEventListener,
+//       makbuz kayıt hata yakalama.
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v13';
-const API_CACHE = 'dragos-api-v13';
+const STATIC_CACHE = 'dragos-static-v14';
+const API_CACHE = 'dragos-api-v14';
 
 const STATIC_ASSETS = [
     '/',

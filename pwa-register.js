@@ -108,13 +108,29 @@ if ('serviceWorker' in navigator) {
             instruction = 'Tarayıcı menüsünden "Ana Ekrana Ekle"';
         }
 
-        banner.innerHTML = 
-            '<div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">⚽</div>' +
-            '<div style="flex:1;min-width:0">' +
-                '<div style="font-weight:700;font-size:14px;color:#e2e8f0;margin-bottom:2px">Uygulamayı Yükle</div>' +
-                '<div style="font-size:12px;color:#94a3b8;line-height:1.4">' + instruction + '</div>' +
-            '</div>' +
-            '<button onclick="dismissPWABanner()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#94a3b8;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;min-height:36px">Kapat</button>';
+        var iconEl = document.createElement('div');
+        iconEl.style.cssText = 'width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0';
+        iconEl.textContent = '⚽';
+
+        var textEl = document.createElement('div');
+        textEl.style.cssText = 'flex:1;min-width:0';
+        var titleEl = document.createElement('div');
+        titleEl.style.cssText = 'font-weight:700;font-size:14px;color:#e2e8f0;margin-bottom:2px';
+        titleEl.textContent = 'Uygulamayı Yükle';
+        var instrEl = document.createElement('div');
+        instrEl.style.cssText = 'font-size:12px;color:#94a3b8;line-height:1.4';
+        instrEl.textContent = instruction;
+        textEl.appendChild(titleEl);
+        textEl.appendChild(instrEl);
+
+        var closeEl = document.createElement('button');
+        closeEl.style.cssText = 'background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#94a3b8;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;min-height:36px';
+        closeEl.textContent = 'Kapat';
+        closeEl.addEventListener('click', function() { window.dismissPWABanner(); });
+
+        banner.appendChild(iconEl);
+        banner.appendChild(textEl);
+        banner.appendChild(closeEl);
 
         document.body.appendChild(banner);
     }

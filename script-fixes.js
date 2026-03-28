@@ -112,11 +112,29 @@ function _openLegalOverlay(title, body) {
     var overlay = document.createElement('div');
     overlay.id = 'legal-overlay-modal';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:2100;padding:16px;opacity:0;transition:opacity .2s ease';
+
+    function _closeThis() {
+        overlay.style.opacity = '0';
+        setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 200);
+    }
+
     var box = document.createElement('div');
     box.style.cssText = 'background:var(--bg,#0f1623);border:1px solid var(--border,#1e3352);border-radius:16px;width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden';
-    box.innerHTML = '<div style="padding:20px;border-bottom:1px solid var(--border,#1e3352);display:flex;justify-content:space-between;align-items:center"><div style="font-size:18px;font-weight:800;color:var(--text,#e2e8f0)">' + _escHtml(title) + '</div><button onclick="document.getElementById(\'legal-overlay-modal\').style.opacity=\'0\';setTimeout(function(){var e=document.getElementById(\'legal-overlay-modal\');if(e)e.remove()},200)" style="background:var(--bg3,#151e2d);border:1px solid var(--border,#1e3352);border-radius:8px;padding:8px 12px;cursor:pointer;color:var(--text,#e2e8f0);font-size:16px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">✕</button></div><div style="padding:20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">' + body + '</div><div style="padding:16px 20px;border-top:1px solid var(--border,#1e3352);display:flex;justify-content:flex-end;background:var(--bg2,#0f1623);border-radius:0 0 16px 16px"><button class="btn bs" onclick="document.getElementById(\'legal-overlay-modal\').style.opacity=\'0\';setTimeout(function(){var e=document.getElementById(\'legal-overlay-modal\');if(e)e.remove()},200)" style="padding:12px 24px;min-height:44px">Kapat</button></div>';
+    // inline onclick yerine data-close attribute, event listener aşağıda ekleniyor
+    box.innerHTML =
+        '<div style="padding:20px;border-bottom:1px solid var(--border,#1e3352);display:flex;justify-content:space-between;align-items:center">' +
+            '<div style="font-size:18px;font-weight:800;color:var(--text,#e2e8f0)">' + _escHtml(title) + '</div>' +
+            '<button data-close style="background:var(--bg3,#151e2d);border:1px solid var(--border,#1e3352);border-radius:8px;padding:8px 12px;cursor:pointer;color:var(--text,#e2e8f0);font-size:16px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center">✕</button>' +
+        '</div>' +
+        '<div style="padding:20px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch">' + body + '</div>' +
+        '<div style="padding:16px 20px;border-top:1px solid var(--border,#1e3352);display:flex;justify-content:flex-end;background:var(--bg2,#0f1623);border-radius:0 0 16px 16px">' +
+            '<button data-close class="btn bs" style="padding:12px 24px;min-height:44px">Kapat</button>' +
+        '</div>';
+    box.querySelectorAll('[data-close]').forEach(function(btn) {
+        btn.addEventListener('click', _closeThis);
+    });
     overlay.appendChild(box);
-    overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.style.opacity = '0'; setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 200); } });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) _closeThis(); });
     document.body.appendChild(overlay);
     requestAnimationFrame(function() { overlay.style.opacity = '1'; });
 }
@@ -237,8 +255,8 @@ window.generateReceipt = function(paymentId) {
 
         doc.save('Makbuz_' + receiptNo + '.pdf');
 
-        // Makbuz numarasını kaydet
-        _saveReceiptNo(p.id, receiptNo, counter);
+        // Makbuz numarasını kaydet (fire-and-forget, hata yakalanır)
+        _saveReceiptNo(p.id, receiptNo, counter).catch(function(e) { console.warn('Makbuz kayıt hatası:', e); });
         toast('✅ Makbuz oluşturuldu: ' + receiptNo, 'g');
 
     } catch (e) {
@@ -272,7 +290,7 @@ function _generateReceiptHTML(p, receiptNo, s) {
     if (!w) { URL.revokeObjectURL(blobUrl); toast('Popup engellenmiş!', 'e'); return; }
     setTimeout(function() { w.print(); URL.revokeObjectURL(blobUrl); }, 500);
 
-    _saveReceiptNo(p.id, receiptNo, (s.receiptCounter || 0) + 1);
+    _saveReceiptNo(p.id, receiptNo, (s.receiptCounter || 0) + 1).catch(function(e) { console.warn('Makbuz kayıt hatası:', e); });
     toast('✅ Makbuz oluşturuldu: ' + receiptNo, 'g');
 }
 
