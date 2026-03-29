@@ -531,14 +531,16 @@ function applyLang(lang) {
 function toggleLang() {
     const newLang = AppState.lang === 'TR' ? 'EN' : 'TR';
     applyLang(newLang);
-    if (!document.getElementById('main-wrap').classList.contains('dn')) {
+    const mw = document.getElementById('main-wrap');
+    if (mw && !mw.classList.contains('dn')) {
         go(AppState.ui.curPage);
     }
 }
 
 window.changeLang = function(val) {
     applyLang(val);
-    if (!document.getElementById('main-wrap').classList.contains('dn')) {
+    const mw = document.getElementById('main-wrap');
+    if (mw && !mw.classList.contains('dn')) {
         go(AppState.ui.curPage);
     }
 };
@@ -4905,7 +4907,8 @@ window.submitSpPayment = async function() {
         toast(`✅ ${methodLabel} ödeme bildiriminiz alındı${count}! Yönetici onaylayacak.`, 'g');
         AppState.ui.activePlanId = null;
         AppState.ui.activePlanIds = null;
-        document.getElementById('sp-pay-form').style.display = 'none';
+        const spPayForm = document.getElementById('sp-pay-form');
+        if (spPayForm) spPayForm.style.display = 'none';
         spTab('odemeler');
     } catch(e) {
         toast('Bildirim gönderilemedi: ' + (e.message || e), 'e');
