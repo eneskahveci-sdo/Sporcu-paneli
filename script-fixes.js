@@ -4566,7 +4566,7 @@ window.registerGoHook('after', function(page) {
     if (page === 'dashboard' || page === 'payments' || page === 'accounting') {
         // Bu sayfalara geçince envanter verisi de yükle (gerekirse)
         if ((AppState.data.inventoryItems || []).length === 0) {
-            loadInventoryData();
+            loadInventoryData().catch(function(e) { console.warn('Envanter yüklenemedi:', e); });
         }
     }
 });
