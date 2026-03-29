@@ -281,7 +281,7 @@ const DateUtils = {
         try {
             const d = new Date(dateStr);
             if (isNaN(d.getTime())) return dateStr;
-            return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+            return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
         } catch {
             return dateStr;
         }
@@ -1868,7 +1868,7 @@ function generateActivityTimeline(aid) {
         .slice(0, 5);
     
     const attendanceDates = Object.keys(AppState.data.attendance)
-        .filter(d => AppState.data.attendance[d][aid])
+        .filter(d => AppState.data.attendance[d] && AppState.data.attendance[d][aid])
         .sort()
         .reverse()
         .slice(0, 5);
@@ -1931,7 +1931,7 @@ function generatePaymentHistory(aid) {
 
 function generateAttendanceCalendar(aid) {
     const dates = Object.keys(AppState.data.attendance)
-        .filter(d => AppState.data.attendance[d][aid])
+        .filter(d => AppState.data.attendance[d] && AppState.data.attendance[d][aid])
         .sort()
         .reverse()
         .slice(0, 28);
@@ -4463,7 +4463,7 @@ function spYoklama() {
     
     const attStats = getAttendanceStats(a.id);
     const dates = Object.keys(AppState.data.attendance)
-        .filter(d => AppState.data.attendance[d][a.id])
+        .filter(d => AppState.data.attendance[d] && AppState.data.attendance[d][a.id])
         .sort()
         .reverse();
     
@@ -5673,6 +5673,7 @@ function exportToExcel(data, filename) {
 }
 
 function convertToCSV(data) {
+    if (!data || data.length === 0) return '';
     const headers = Object.keys(data[0]);
     const rows = data.map(row => 
         headers.map(h => {
