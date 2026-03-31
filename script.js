@@ -3105,9 +3105,6 @@ window.editPay = function(id) {
         <label>Ödeme Yöntemi</label>
         <select id="p-method">
             <option value="">Belirtilmedi</option>
-            <option value="nakit"${p?.payMethod === 'nakit' ? ' selected' : ''}>💵 Nakit</option>
-            <option value="kredi_karti"${p?.payMethod === 'kredi_karti' ? ' selected' : ''}>💳 Kredi Kartı</option>
-            <option value="havale"${p?.payMethod === 'havale' ? ' selected' : ''}>🏦 Havale/EFT</option>
             <option value="paytr"${p?.payMethod === 'paytr' ? ' selected' : ''}>🔵 PayTR Online</option>
         </select>
     </div>
@@ -4690,17 +4687,12 @@ function spOdemeYap() {
         </div>
         <div id="sp-plan-info" class="sp-plan-info-box mb3"></div>
         <div class="pay-choice-grid mb3">
-            ${hasBank ? `<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice('havale')">
-                <div class="pay-choice-icon">🏦</div>
-                <div class="pay-choice-title">Havale / EFT</div>
-                <div class="pay-choice-desc">Banka havalesi veya EFT ile ödeme yapın</div>
-            </div>` : ''}
             ${hasPayTR ? `<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice('paytr')">
                 <div class="pay-choice-icon">🔵</div>
                 <div class="pay-choice-title">Online Kredi Kartı</div>
                 <div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div>
             </div>` : ''}
-            ${!hasBank && !hasPayTR ? `<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px">
+            ${!hasPayTR ? `<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px">
                 <div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div>
                 <p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p>
             </div>` : ''}
@@ -4784,34 +4776,7 @@ window.selectPayMethod = function(method) {
     const submitBtn = document.getElementById('pay-submit-btn');
     const s = AppState.data.settings;
 
-    if (method === 'nakit') {
-        detail.innerHTML = `
-        <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
-            <div class="tw6 mb1">💵 Nakit Ödeme</div>
-            <p class="ts tm">Nakit ödeme için akademi merkezine gelin. Teslim ettikten sonra bildirim gönderin, yönetici onaylayacaktır.</p>
-        </div>`;
-        submitBtn.textContent = '📩 Nakit Ödeme Bildirimi Gönder';
-        submitBtn.style.display = 'block';
-    } else if (method === 'kredi_karti') {
-        detail.innerHTML = `
-        <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
-            <div class="tw6 mb1">💳 Kredi Kartı ile Ödeme</div>
-            <p class="ts tm">Akademiye gelin veya yöneticiye başvurun. Ödemenizi yaptıktan sonra bildirim gönderin; yönetici POS slip kodunu girecektir.</p>
-        </div>`;
-        submitBtn.textContent = '📩 Kredi Kartı Ödeme Bildirimi Gönder';
-        submitBtn.style.display = 'block';
-    } else if (method === 'havale') {
-        detail.innerHTML = `
-        <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
-            <div class="tw6 mb2">🏦 Havale / EFT Bilgileri</div>
-            <div class="ts mb1"><strong>Banka:</strong> ${FormatUtils.escape(s?.bankName || '-')}</div>
-            <div class="ts mb1"><strong>Hesap Adı:</strong> ${FormatUtils.escape(s?.accountName || '-')}</div>
-            <div class="ts" style="word-break:break-all"><strong>IBAN:</strong> <span style="font-family:monospace">${FormatUtils.escape(s?.iban || '-')}</span></div>
-            <p class="ts tm mt2">Havaleyi yaptıktan sonra aşağıdan bildirim gönderin.</p>
-        </div>`;
-        submitBtn.textContent = '📩 Havale Bildirimi Gönder';
-        submitBtn.style.display = 'block';
-    } else if (method === 'paytr') {
+    if (method === 'paytr') {
         detail.innerHTML = `
         <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
             <div class="tw6 mb1">🔵 PayTR ile Online Ödeme</div>
@@ -4834,19 +4799,7 @@ window.selectPayChoice = function(choice) {
 
     AppState.ui.selectedPayMethod = choice;
 
-    if (choice === 'havale') {
-        detail.innerHTML = `
-        <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
-            <div class="tw6 mb2">🏦 Havale / EFT Bilgileri</div>
-            <div class="ts mb1"><strong>Banka:</strong> ${FormatUtils.escape(s?.bankName || '-')}</div>
-            <div class="ts mb1"><strong>Hesap Adı:</strong> ${FormatUtils.escape(s?.accountName || '-')}</div>
-            <div class="ts" style="word-break:break-all"><strong>IBAN:</strong> <span style="font-family:monospace">${FormatUtils.escape(s?.iban || '-')}</span></div>
-            <p class="ts tm mt2">Havaleyi yaptıktan sonra aşağıdan bildirim gönderin.</p>
-        </div>`;
-        submitBtn.textContent = '📩 Havale Bildirimi Gönder';
-        submitBtn.style.display = 'block';
-        if (descWrapper) descWrapper.classList.remove('dn');
-    } else if (choice === 'paytr') {
+    if (choice === 'paytr') {
         detail.innerHTML = `
         <div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px">
             <div class="tw6 mb1">🔵 PayTR ile Online Ödeme</div>
@@ -4902,7 +4855,7 @@ window.submitSpPayment = async function() {
             if (error) throw error;
             AppState.data.payments.push(payObj);
         }
-        const methodLabel = method === 'nakit' ? 'Nakit' : method === 'kredi_karti' ? 'Kredi Kartı' : 'Havale';
+        const methodLabel = 'PayTR Online';
         const count = plans.length > 1 ? ` (${plans.length} ay)` : '';
         toast(`✅ ${methodLabel} ödeme bildiriminiz alındı${count}! Yönetici onaylayacak.`, 'g');
         AppState.ui.activePlanId = null;
