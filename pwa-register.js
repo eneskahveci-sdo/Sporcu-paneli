@@ -130,6 +130,15 @@ if ('serviceWorker' in navigator) {
 
         banner.appendChild(iconEl);
         banner.appendChild(textEl);
+
+        if (isAndroid && window._deferredInstallPrompt) {
+            var installEl = document.createElement('button');
+            installEl.style.cssText = 'background:linear-gradient(135deg,#3b82f6,#1d4ed8);border:none;border-radius:8px;color:#fff;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap;min-height:36px;margin-right:6px';
+            installEl.textContent = 'Yükle';
+            installEl.addEventListener('click', function() { window.showAndroidInstallPrompt(); });
+            banner.appendChild(installEl);
+        }
+
         banner.appendChild(closeEl);
 
         document.body.appendChild(banner);
@@ -146,17 +155,22 @@ if ('serviceWorker' in navigator) {
         try { localStorage.setItem('pwa_banner_dismissed', new Date().toISOString()); } catch(e) {}
     };
 
-    // Android native install
+    // Android native install — event'i sakla, kullanıcı tıklamasında tetikle
     window.addEventListener('beforeinstallprompt', function(e) {
         e.preventDefault();
-        setTimeout(function() {
-            e.prompt();
-            e.userChoice.then(function() {
-                var b = document.getElementById('pwa-install-banner');
-                if (b) b.remove();
-            });
-        }, 3000);
+        window._deferredInstallPrompt = e;
     });
+
+    window.showAndroidInstallPrompt = function() {
+        if (!window._deferredInstallPrompt) return;
+        var e = window._deferredInstallPrompt;
+        window._deferredInstallPrompt = null;
+        e.prompt();
+        e.userChoice.then(function() {
+            var b = document.getElementById('pwa-install-banner');
+            if (b) b.remove();
+        });
+    };
 
     // Giriş sonrası banner göster
     setTimeout(function() {

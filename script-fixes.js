@@ -662,7 +662,7 @@ window.editPay = function(id) {
     + '<div id="p-cat-row" style="display:' + (p && p.ty === 'expense' ? 'block' : 'none') + '" class="mt2"><div class="fgr"><label>Gider Kategorisi</label><select id="p-cat"><option value="">Kategori Seçin</option>' + catOpts + '</select></div></div>'
     + '<div class="fgr mt2"><label>Açıklama / Hizmet Adı</label><input id="p-ds" value="' + FormatUtils.escape(p ? (p.ds || '') : '') + '" placeholder="Örn: Ekim Ayı Aidatı"/></div>'
     + '<div class="g21 mt2"><div class="fgr"><label>Durum</label><select id="p-st"><option value="completed"' + (p && p.st === 'completed' ? ' selected' : '') + '>Ödendi</option><option value="pending"' + (p && p.st === 'pending' ? ' selected' : '') + '>Bekliyor</option><option value="overdue"' + (p && p.st === 'overdue' ? ' selected' : '') + '>Gecikti</option></select></div><div class="fgr"><label>Tarih</label><input id="p-dt" type="date" value="' + FormatUtils.escape(p ? (p.dt || DateUtils.today()) : DateUtils.today()) + '"/></div></div>'
-    + '<div class="fgr mt2"><label>Ödeme Yöntemi</label><select id="p-method"><option value="">Belirtilmedi</option><option value="nakit"' + (p && p.payMethod === 'nakit' ? ' selected' : '') + '>💵 Nakit</option><option value="kredi_karti"' + (p && p.payMethod === 'kredi_karti' ? ' selected' : '') + '>💳 Kredi Kartı</option><option value="havale"' + (p && p.payMethod === 'havale' ? ' selected' : '') + '>🏦 Havale/EFT</option><option value="paytr"' + (p && p.payMethod === 'paytr' ? ' selected' : '') + '>🔵 PayTR Online</option></select></div>'
+    + '<div class="fgr mt2"><label>Ödeme Yöntemi</label><select id="p-method"><option value="">Belirtilmedi</option><option value="paytr"' + (p && p.payMethod === 'paytr' ? ' selected' : '') + '>🔵 PayTR Online</option></select></div>'
     , [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
         ...(p && p.st === 'completed' ? [{ lbl: '🧾 Makbuz', cls: 'bpur', fn: function() { closeModal(); generateReceipt(p.id); } }] : []),
@@ -1072,13 +1072,10 @@ window.spOdemeler = function() {
     html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
     html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
     html += '<div class="pay-choice-grid mb3">';
-    if (hasBank) {
-        html += '<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice(\'havale\')"><div class="pay-choice-icon">🏦</div><div class="pay-choice-title">Havale / EFT</div><div class="pay-choice-desc">Banka havalesi veya EFT ile ödeme yapın</div></div>';
-    }
     if (hasPayTR) {
         html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
     }
-    if (!hasBank && !hasPayTR) {
+    if (!hasPayTR) {
         html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
     }
     html += '</div>';
@@ -1289,7 +1286,7 @@ window.submitSpPayment = async function() {
             if (result.error) throw result.error;
             AppState.data.payments.push(payObj);
         }
-        var methodLabel = method === 'nakit' ? 'Nakit' : method === 'kredi_karti' ? 'Kredi Kartı' : 'Havale';
+        var methodLabel = 'PayTR Online';
         var count = plans.length > 1 ? ' (' + plans.length + ' ay)' : '';
         toast('✅ ' + methodLabel + ' ödeme bildiriminiz alındı' + count + '! Yönetici onaylayacak.', 'g');
         AppState.ui.activePlanId = null;
@@ -3764,13 +3761,10 @@ window.spOdemeler = function() {
     html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
     html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
     html += '<div class="pay-choice-grid mb3">';
-    if (hasBank) {
-        html += '<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice(\'havale\')"><div class="pay-choice-icon">🏦</div><div class="pay-choice-title">Havale / EFT</div><div class="pay-choice-desc">Banka havalesi veya EFT ile ödeme yapın</div></div>';
-    }
     if (hasPayTR) {
         html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
     }
-    if (!hasBank && !hasPayTR) {
+    if (!hasPayTR) {
         html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
     }
     html += '</div>';
@@ -4566,7 +4560,7 @@ window.registerGoHook('after', function(page) {
     if (page === 'dashboard' || page === 'payments' || page === 'accounting') {
         // Bu sayfalara geçince envanter verisi de yükle (gerekirse)
         if ((AppState.data.inventoryItems || []).length === 0) {
-            loadInventoryData();
+            loadInventoryData().catch(function(e) { console.warn('Envanter yüklenemedi:', e); });
         }
     }
 });
