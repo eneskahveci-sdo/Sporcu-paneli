@@ -68,6 +68,15 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
     .skeleton-avatar { width: 48px; height: 48px; border-radius: 50%; }
     .skeleton-card { height: 80px; margin: 8px 0; }
     .skeleton-stat { height: 100px; border-radius: 12px; }
+    .sk-row td { padding: 14px 16px !important; }
+    .sk-row .sk-cell {
+        height: 13px; border-radius: 6px;
+        background: linear-gradient(90deg, var(--bg3, #1a1a2e) 25%, var(--bg4, #252540) 50%, var(--bg3, #1a1a2e) 75%);
+        background-size: 200% 100%; animation: shimmer 1.5s ease infinite;
+    }
+    .sk-row .sk-cell.sk-w40 { width: 40%; }
+    .sk-row .sk-cell.sk-w20 { width: 20%; }
+    .sk-row .sk-cell.sk-w15 { width: 15%; }
     #conn-banner {
         position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
         text-align: center; font-size: 13px; font-weight: 700; padding: 8px 16px;
@@ -113,6 +122,28 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
         table { font-size: 13px !important; }
         th, td { padding: 10px 8px !important; }
         td { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Sporcu ve Ödeme tabloları → kart görünümü */
+        .tw table.athlete-table, .tw table.payment-table { display: block; }
+        .tw table.athlete-table thead, .tw table.payment-table thead { display: none; }
+        .tw table.athlete-table tbody, .tw table.payment-table tbody { display: block; }
+        .tw table.athlete-table tr, .tw table.payment-table tr {
+            display: flex; flex-direction: column;
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 12px; margin-bottom: 10px; padding: 10px 14px;
+        }
+        .tw table.athlete-table td, .tw table.payment-table td {
+            display: flex; align-items: flex-start; padding: 5px 0 !important;
+            border: none !important; font-size: 13px !important;
+            max-width: 100% !important; white-space: normal !important; overflow: visible !important;
+        }
+        .tw table.athlete-table td::before, .tw table.payment-table td::before {
+            content: attr(data-label);
+            font-weight: 700; font-size: 10px; text-transform: uppercase;
+            color: var(--text3); min-width: 76px; margin-right: 8px; padding-top: 2px; flex-shrink: 0;
+        }
+        .tw table.athlete-table td[data-label=""], .tw table.payment-table td[data-label=""] { padding-top: 8px !important; }
+        .tw table.athlete-table td[data-label=""]::before, .tw table.payment-table td[data-label=""]::before { display: none; }
     }
     .sp-tab { transition: all 0.2s ease !important; border-radius: 8px 8px 0 0; }
     .sp-tab.on { font-weight: 700 !important; }
@@ -262,18 +293,43 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
 // ── 6) OTURUM SÜRESİ UYARISI ───────────────────────────
 
 (function sessionTimeout() {
-    var IDLE_TIMEOUT = 30 * 60 * 1000;
+    var IDLE_TIMEOUT = 15 * 60 * 1000;
     var WARNING_BEFORE = 5 * 60 * 1000;
-    var idleTimer = null, warningTimer = null;
+    var idleTimer = null, warningTimer = null, cntInterval = null;
+
+    // Geri sayım rozeti — tek seferlik oluştur
+    var cntBadge = document.createElement('div');
+    cntBadge.id = 'session-countdown';
+    cntBadge.style.cssText = 'display:none;position:fixed;bottom:90px;right:16px;z-index:9999;background:#ef4444;color:#fff;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;box-shadow:0 2px 12px rgba(239,68,68,.4);pointer-events:none';
+    function attachBadge() { document.body.appendChild(cntBadge); }
+    if (document.body) attachBadge(); else document.addEventListener('DOMContentLoaded', attachBadge);
+
+    function startCountdown() {
+        var remaining = WARNING_BEFORE;
+        clearInterval(cntInterval);
+        cntBadge.style.display = 'block';
+        cntInterval = setInterval(function() {
+            remaining -= 1000;
+            if (remaining <= 0) { clearInterval(cntInterval); cntBadge.style.display = 'none'; return; }
+            var m = Math.floor(remaining / 60000);
+            var s = Math.floor((remaining % 60000) / 1000);
+            cntBadge.textContent = '⏰ ' + m + ':' + (s < 10 ? '0' : '') + s;
+        }, 1000);
+    }
 
     function resetIdle() {
         clearTimeout(idleTimer);
         clearTimeout(warningTimer);
+        clearInterval(cntInterval);
+        cntBadge.style.display = 'none';
         if (!window.AppState || (!AppState.currentUser && !AppState.currentSporcu)) return;
         warningTimer = setTimeout(function() {
             if (typeof toast === 'function') toast('⏰ 5 dakika içinde oturumunuz sonlanacak.', 'e');
+            startCountdown();
         }, IDLE_TIMEOUT - WARNING_BEFORE);
         idleTimer = setTimeout(function() {
+            clearInterval(cntInterval);
+            cntBadge.style.display = 'none';
             if (typeof toast === 'function') toast('🔒 Güvenlik nedeniyle oturumunuz kapatıldı.', 'e');
             setTimeout(function() {
                 if (typeof window.doLogout === 'function') window.doLogout();
@@ -286,7 +342,7 @@ console.log('🎨 UI İyileştirme Paketi v1.0 yükleniyor...');
         document.addEventListener(evt, resetIdle, { passive: true });
     });
     document.addEventListener('DOMContentLoaded', function() { setTimeout(resetIdle, 2000); });
-    console.log('✅ Oturum süresi takibi aktif (30dk)');
+    console.log('✅ Oturum süresi takibi aktif (15dk)');
 })();
 
 // ── 7) ÇİFT TIKLAMA KORUMASI ───────────────────────────
@@ -366,4 +422,42 @@ console.log('🎨 UI İyileştirme Paketi v1.1 — Tüm modüller yüklendi!');
 
     console.log('✅ localStorage güvenlik patch\'i aktif');
 })();
+
+// ── 9) SAYFALAMA + SKELETON YARDIMCI FONKSİYONLARI ─────
+
+window.skeletonTable = function(cols, rows) {
+    rows = rows || 6;
+    var widths = ['sk-w40','sk-w20','sk-w20','sk-w15','sk-w20','sk-w15','sk-w15'];
+    var header = '<thead><tr>' + Array(cols).fill('<th></th>').join('') + '</tr></thead>';
+    var rowHtml = Array(rows).fill(
+        '<tr class="sk-row">' +
+        Array.from({length: cols}, function(_,i) {
+            return '<td><div class="sk-cell ' + (widths[i]||'sk-w20') + '"></div></td>';
+        }).join('') +
+        '</tr>'
+    ).join('');
+    return '<div class="card" style="padding:0"><div class="tw"><table><colgroup>' +
+        Array(cols).fill('<col>').join('') +
+        '</colgroup>' + header + '<tbody>' + rowHtml + '</tbody></table></div></div>';
+};
+
+window._paginationBar = function(page, total, onChangeFn) {
+    var PAGE_SIZE = 25;
+    var totalPages = Math.ceil(total / PAGE_SIZE);
+    if (totalPages <= 1) return '';
+    var btns = '';
+    btns += '<button class="btn btn-sm bs" ' + (page === 0 ? 'disabled' : '') + ' onclick="' + onChangeFn + '(' + (page - 1) + ')" style="min-width:36px">‹</button>';
+    var start = Math.max(0, page - 2);
+    var end = Math.min(totalPages - 1, page + 2);
+    for (var i = start; i <= end; i++) {
+        btns += '<button class="btn btn-sm ' + (i === page ? 'bp' : 'bs') + '" onclick="' + onChangeFn + '(' + i + ')">' + (i + 1) + '</button>';
+    }
+    btns += '<button class="btn btn-sm bs" ' + (page >= totalPages - 1 ? 'disabled' : '') + ' onclick="' + onChangeFn + '(' + (page + 1) + ')" style="min-width:36px">›</button>';
+    btns += '<span style="color:var(--text2);font-size:12px;margin-left:6px">' + total + ' kayıt</span>';
+    return '<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 16px;flex-wrap:wrap">' + btns + '</div>';
+};
+
+window._athChangePage = function(p) { AppState.ui.athPage = p; go('athletes'); };
+window._payChangePage = function(p) { AppState.ui.payPage = p; go('payments'); };
+window._okChangePage  = function(p) { AppState.ui.okPage  = p; go('onkayit'); };
 

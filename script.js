@@ -213,7 +213,10 @@ const AppState = {
         profileTab: 'overview',
         paymentsTab: 'islemler',
         activePlanId: null,
-        selectedPayMethod: null
+        selectedPayMethod: null,
+        athPage: 0,
+        payPage: 0,
+        okPage: 0
     }
 };
 
@@ -1470,6 +1473,11 @@ window.go = function(page, params = {}) {
     if (!main) return;
     
     if (pages[page]) {
+        // Skeleton göster (ağır sayfalar için)
+        const _skCols = { athletes: 6, payments: 7, onkayit: 8 };
+        if (window.skeletonTable && _skCols[page]) {
+            main.innerHTML = window.skeletonTable(_skCols[page]);
+        }
         // Sayfa geçiş animasyonu
         main.style.opacity = '0';
         setTimeout(() => {
@@ -3053,7 +3061,13 @@ function pgPayments() {
             </div>
         </div>
     </div>
-    ${_buildGroupedTransactionList(list)}`}`;
+    ${(function(){
+        var _payPage = AppState.ui.payPage || 0;
+        var _payTotal = list.length;
+        var _payList = f.q ? list : list.slice(_payPage * 25, (_payPage + 1) * 25);
+        var _pagBar = (!f.q && window._paginationBar) ? window._paginationBar(_payPage, _payTotal, '_payChangePage') : '';
+        return _buildGroupedTransactionList(_payList) + (_pagBar ? '<div class="card" style="padding:0;margin-top:-1px">' + _pagBar + '</div>' : '');
+    })()}`}`;
 }
 
 window.editPay = function(id) {
@@ -3331,13 +3345,13 @@ function _buildGroupedTransactionList(list) {
             const mIcon = p.payMethod==='nakit'?'💵':p.payMethod==='kredi_karti'?'💳':p.payMethod==='havale'?'🏦':p.payMethod==='paytr'?'🔵':'';
             const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
             return `<tr>
-                <td>${DateUtils.format(p.dt)}</td>
-                <td>${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
-                <td>${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
-                <td class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
-                <td><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
-                <td><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
-                <td>
+                <td data-label="Tarih">${DateUtils.format(p.dt)}</td>
+                <td data-label="Açıklama">${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
+                <td data-label="Yöntem">${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
+                <td data-label="Tutar" class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
+                <td data-label="Tür"><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
+                <td data-label="Durum"><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
+                <td data-label="">
                     <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
                     <button class="btn btn-xs bd" onclick="delPay('${FormatUtils.escape(p.id)}')">Sil</button>
                 </td>
@@ -3359,7 +3373,7 @@ function _buildGroupedTransactionList(list) {
                 </div>
             </div>
             <div class="plan-acc-body" style="display:none;padding:0 14px 14px">
-                <div class="tw" style="margin-top:10px"><table>
+                <div class="tw" style="margin-top:10px"><table class="payment-table">
                     <thead><tr><th>Tarih</th><th>Açıklama</th><th>Yöntem</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table></div>
@@ -5404,6 +5418,17 @@ window.delOnKayit = async function(id) {
 // ==================== EXCEL IMPORT ====================
 
 window.importAthletesFromExcel = function() {
+    // XLSX kütüphanesi yoksa önce yükle
+    if (!window.XLSX) {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.integrity = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
+        s.crossOrigin = 'anonymous';
+        s.onload = function() { window.importAthletesFromExcel(); };
+        s.onerror = function() { toast('Excel kütüphanesi yüklenemedi.', 'e'); };
+        document.head.appendChild(s);
+        return;
+    }
     const html = `
     <div class="al al-b mb3" style="font-size:13px">
         &#x1F4CB; Excel dosyanız aşağıdaki sütunları içermelidir:<br>
@@ -5614,18 +5639,27 @@ function exportToExcel(data, filename) {
         toast(i18n[AppState.lang].noData, 'e');
         return;
     }
-    
-    try {
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-        XLSX.writeFile(wb, `${filename}_${DateUtils.today()}.xlsx`);
-        toast(i18n[AppState.lang].exportSuccess, 'g');
-    } catch (e) {
-        console.error('Export error:', e);
-        const csv = convertToCSV(data);
-        downloadFile(csv, `${filename}.csv`, 'text/csv');
+    function _doExport() {
+        try {
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+            XLSX.writeFile(wb, `${filename}_${DateUtils.today()}.xlsx`);
+            toast(i18n[AppState.lang].exportSuccess, 'g');
+        } catch (e) {
+            console.error('Export error:', e);
+            const csv = convertToCSV(data);
+            downloadFile(csv, `${filename}.csv`, 'text/csv');
+        }
     }
+    if (window.XLSX) { _doExport(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.integrity = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
+    s.crossOrigin = 'anonymous';
+    s.onload = _doExport;
+    s.onerror = function() { const csv = convertToCSV(data); downloadFile(csv, `${filename}.csv`, 'text/csv'); };
+    document.head.appendChild(s);
 }
 
 function convertToCSV(data) {

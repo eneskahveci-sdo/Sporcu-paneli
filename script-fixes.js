@@ -175,10 +175,19 @@ window.generateReceipt = function(paymentId) {
     var counter = (s.receiptCounter || 0) + 1;
     var receiptNo = 'MKB-' + year + '-' + String(counter).padStart(4, '0');
 
-    // jsPDF ile makbuz oluştur
+    // jsPDF ile makbuz oluştur — lazy-load
+    var jsPDF = window.jspdf ? window.jspdf.jsPDF : (window.jsPDF || null);
+    if (!jsPDF) {
+        var _pdfScript = document.createElement('script');
+        _pdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        _pdfScript.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
+        _pdfScript.crossOrigin = 'anonymous';
+        _pdfScript.onload = function() { window.generateReceipt(paymentId); };
+        _pdfScript.onerror = function() { _generateReceiptHTML(p, receiptNo, s); };
+        document.head.appendChild(_pdfScript);
+        return;
+    }
     try {
-        var jsPDF = window.jspdf ? window.jspdf.jsPDF : (window.jsPDF || null);
-        if (!jsPDF) { _generateReceiptHTML(p, receiptNo, s); return; }
 
         // Düzeltme #5: Türkçe karakterleri PDF için ASCII'ye çevir
         function trToAscii(str) {
@@ -727,15 +736,16 @@ function __renderAthletesInPlace() {
     if (!tbody) { go('athletes'); return; }
     tbody.innerHTML = list.map(function(a) {
         var del = isAdmin ? '<button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button>' : '';
-        return '<tr><td><div class="flex fca gap2" style="cursor:pointer" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">'
+        return '<tr>'
+            + '<td data-label="Ad Soyad"><div class="flex fca gap2" style="cursor:pointer" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">'
             + UIUtils.getAvatar(36, null, FormatUtils.initials(a.fn, a.ln))
             + '<div><div class="tw6" style="color:var(--blue2)">' + FormatUtils.escape(a.fn) + ' ' + FormatUtils.escape(a.ln) + '</div>'
             + '<div class="ts tm">' + DateUtils.age(a.bd) + ' yaş</div></div></div></td>'
-            + '<td>' + FormatUtils.escape(a.tc) + '</td>'
-            + '<td>' + sportEmoji(a.sp) + ' ' + FormatUtils.escape(a.sp) + '</td>'
-            + '<td>' + FormatUtils.escape(className(a.clsId)) + '</td>'
-            + '<td><span class="bg ' + statusClass(a.st) + '">' + statusLabel(a.st) + '</span></td>'
-            + '<td><button class="btn btn-xs bp" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">Profil</button> '
+            + '<td data-label="TC">' + FormatUtils.escape(a.tc) + '</td>'
+            + '<td data-label="Branş">' + sportEmoji(a.sp) + ' ' + FormatUtils.escape(a.sp) + '</td>'
+            + '<td data-label="Sınıf">' + FormatUtils.escape(className(a.clsId)) + '</td>'
+            + '<td data-label="Durum"><span class="bg ' + statusClass(a.st) + '">' + statusLabel(a.st) + '</span></td>'
+            + '<td data-label=""><button class="btn btn-xs bp" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">Profil</button> '
             + '<button class="btn btn-xs bs" onclick="editAth(\'' + a.id + '\')">Düzenle</button> ' + del + '</td></tr>';
     }).join('');
 }
@@ -757,27 +767,45 @@ function __renderAthletes() {
     if (f.cls) list = list.filter(function(a) { return a.clsId === f.cls; });
     if (f.q) { var q = f.q.toLowerCase(); list = list.filter(function(a) { return (a.fn + ' ' + a.ln).toLowerCase().includes(q) || a.tc.includes(q); }); }
 
+    // Sayfalama — arama modunda tüm sonuçları göster
+    var athPage = AppState.ui.athPage || 0;
+    var totalAth = list.length;
+    if (!f.q) {
+        list = list.slice(athPage * 25, (athPage + 1) * 25);
+    }
+
     var isAdmin = AppState.currentUser && AppState.currentUser.role === 'admin';
     var spOpts = (AppState.data.sports || []).map(function(s) { return '<option value="' + FormatUtils.escape(s.name) + '"' + (f.sp === s.name ? ' selected' : '') + '>' + FormatUtils.escape(s.name) + '</option>'; }).join('');
     var clOpts = (AppState.data.classes || []).map(function(c) { return '<option value="' + FormatUtils.escape(c.id) + '"' + (f.cls === c.id ? ' selected' : '') + '>' + FormatUtils.escape(c.name) + '</option>'; }).join('');
 
     var trows = list.map(function(a) {
         var del = isAdmin ? '<button class="btn btn-xs bd" onclick="delAth(\'' + a.id + '\')">Sil</button>' : '';
-        return '<tr><td><div class="flex fca gap2" style="cursor:pointer" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">' + UIUtils.getAvatar(36, null, FormatUtils.initials(a.fn, a.ln)) + '<div><div class="tw6" style="color:var(--blue2)">' + FormatUtils.escape(a.fn) + ' ' + FormatUtils.escape(a.ln) + '</div><div class="ts tm">' + DateUtils.age(a.bd) + ' yaş</div></div></div></td><td>' + FormatUtils.escape(a.tc) + '</td><td>' + sportEmoji(a.sp) + ' ' + FormatUtils.escape(a.sp) + '</td><td>' + FormatUtils.escape(className(a.clsId)) + '</td><td><span class="bg ' + statusClass(a.st) + '">' + statusLabel(a.st) + '</span></td><td><button class="btn btn-xs bp" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">Profil</button> <button class="btn btn-xs bs" onclick="editAth(\'' + a.id + '\')">Düzenle</button> ' + del + '</td></tr>';
+        return '<tr>'
+            + '<td data-label="Ad Soyad"><div class="flex fca gap2" style="cursor:pointer" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">' + UIUtils.getAvatar(36, null, FormatUtils.initials(a.fn, a.ln)) + '<div><div class="tw6" style="color:var(--blue2)">' + FormatUtils.escape(a.fn) + ' ' + FormatUtils.escape(a.ln) + '</div><div class="ts tm">' + DateUtils.age(a.bd) + ' yaş</div></div></div></td>'
+            + '<td data-label="TC">' + FormatUtils.escape(a.tc) + '</td>'
+            + '<td data-label="Branş">' + sportEmoji(a.sp) + ' ' + FormatUtils.escape(a.sp) + '</td>'
+            + '<td data-label="Sınıf">' + FormatUtils.escape(className(a.clsId)) + '</td>'
+            + '<td data-label="Durum"><span class="bg ' + statusClass(a.st) + '">' + statusLabel(a.st) + '</span></td>'
+            + '<td data-label=""><button class="btn btn-xs bp" onclick="go(\'athleteProfile\',{id:\'' + a.id + '\'})">Profil</button> <button class="btn btn-xs bs" onclick="editAth(\'' + a.id + '\')">Düzenle</button> ' + del + '</td>'
+            + '</tr>';
     }).join('');
+
+    var paginationHtml = (!f.q && window._paginationBar) ? window._paginationBar(athPage, totalAth, '_athChangePage') : '';
 
     var addBtn = isAdmin ? '<button class="btn bp" onclick="editAth()">+ Yeni Sporcu</button>' : '<div></div>';
     var expBtn = isAdmin ? '<div class="flex gap2 fwrap"><button class="btn bsu" onclick="importAthletesFromExcel()">📊 Excel\'den İçe Aktar</button><button class="btn bs" onclick="exportAthletes()">📤 Excel İndir</button></div>' : '';
 
     return '<div class="ph"><div class="stit">Sporcular</div></div>'
         + '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border)">'
-        + '<button onclick="AppState.filters.athletes.st=\'active\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='active'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">✅ Aktif <span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalActive + '</span></button>'
-        + '<button onclick="AppState.filters.athletes.st=\'inactive\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='inactive'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">📦 Pasif <span style="background:var(--text3);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalInactive + '</span></button>'
-        + '<button onclick="AppState.filters.athletes.st=\'all\';go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='all'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">👥 Tümü</button>'
+        + '<button onclick="AppState.filters.athletes.st=\'active\';AppState.ui.athPage=0;go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='active'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">✅ Aktif <span style="background:var(--green);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalActive + '</span></button>'
+        + '<button onclick="AppState.filters.athletes.st=\'inactive\';AppState.ui.athPage=0;go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='inactive'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">📦 Pasif <span style="background:var(--text3);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px">' + totalInactive + '</span></button>'
+        + '<button onclick="AppState.filters.athletes.st=\'all\';AppState.ui.athPage=0;go(\'athletes\')" style="padding:10px 20px;border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;border-bottom:' + (currentTab==='all'?'3px solid var(--blue2);color:var(--blue2)':'3px solid transparent;color:var(--text2)') + ';margin-bottom:-2px">👥 Tümü</button>'
         + '</div>'
-        + '<div class="flex fjb fca mb3 fwrap gap2"><div class="flex gap2 fwrap"><select class="fs" onchange="AppState.filters.athletes.sp=this.value;go(\'athletes\')"><option value="">Tüm Branşlar</option>' + spOpts + '</select><select class="fs" onchange="AppState.filters.athletes.cls=this.value;go(\'athletes\')"><option value="">Tüm Sınıflar</option>' + clOpts + '</select></div><input class="fs" type="text" placeholder="🔍 İsim veya TC Ara..." style="max-width:250px" value="' + FormatUtils.escape(f.q) + '" oninput="AppState.filters.athletes.q=this.value;__renderAthletesInPlace()"/></div>'
+        + '<div class="flex fjb fca mb3 fwrap gap2"><div class="flex gap2 fwrap"><select class="fs" onchange="AppState.filters.athletes.sp=this.value;AppState.ui.athPage=0;go(\'athletes\')"><option value="">Tüm Branşlar</option>' + spOpts + '</select><select class="fs" onchange="AppState.filters.athletes.cls=this.value;AppState.ui.athPage=0;go(\'athletes\')"><option value="">Tüm Sınıflar</option>' + clOpts + '</select></div><input class="fs" type="text" placeholder="🔍 İsim veya TC Ara..." style="max-width:250px" value="' + FormatUtils.escape(f.q) + '" oninput="AppState.filters.athletes.q=this.value;__renderAthletesInPlace()"/></div>'
         + '<div class="flex fjb fca mb3 gap2 fwrap">' + addBtn + expBtn + '</div>'
-        + '<div class="card"><div class="tw"><table><thead><tr><th>Ad Soyad</th><th>TC</th><th>Branş</th><th>Sınıf</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' + trows + '</tbody></table></div></div>';
+        + '<div class="card"><div class="tw"><table class="athlete-table"><thead><tr><th>Ad Soyad</th><th>TC</th><th>Branş</th><th>Sınıf</th><th>Durum</th><th>İşlemler</th></tr></thead><tbody>' + trows + '</tbody></table></div>'
+        + (paginationHtml ? '<div style="border-top:1px solid var(--border)">' + paginationHtml + '</div>' : '')
+        + '</div>';
 }
 
 function __renderOnKayit() {
@@ -786,10 +814,16 @@ function __renderOnKayit() {
     var pendingCount = onKayitlar.filter(function(o) { return o.status === 'new'; }).length;
     var inner = '';
 
+    // Sayfalama
+    var okPage = AppState.ui.okPage || 0;
+    var totalOk = onKayitlar.length;
+    var pagedList = onKayitlar.slice(okPage * 25, (okPage + 1) * 25);
+    var paginationHtml = (window._paginationBar && totalOk > 25) ? window._paginationBar(okPage, totalOk, '_okChangePage') : '';
+
     if (onKayitlar.length === 0) {
         inner = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:48px;margin-bottom:12px">📋</div><div class="tw6 tsm mb2">Henüz ön kayıt başvurusu yok.</div><button class="btn bs" onclick="refreshOnKayitlar()">↻ Tekrar Kontrol Et</button></div>';
     } else {
-        var rows = onKayitlar.map(function(ok) {
+        var rows = pagedList.map(function(ok) {
             var ad = ((ok.fn || '') + ' ' + (ok.ln || '')).trim() || ok.studentName || '-';
             var sty = ok.status === 'new' ? 'background:rgba(234,179,8,.07)' : 'opacity:.65';
             var bdg = ok.status === 'new' ? '<span class="bg bg-y">⏳ Bekliyor</span>' : '<span class="bg bg-g">✅ İşlendi</span>';
@@ -806,7 +840,9 @@ function __renderOnKayit() {
 
     return '<div class="ph"><div class="stit">📝 Ön Kayıt Başvuruları ' + (pendingCount > 0 ? '<span style="background:var(--yellow);color:#000;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:800;margin-left:8px">' + pendingCount + ' Yeni</span>' : '') + '</div></div>'
         + '<div class="flex fjb fca mb3"><button class="btn bs" onclick="refreshOnKayitlar()">↻ Yenile</button></div>'
-        + '<div class="card">' + inner + '</div>';
+        + '<div class="card">' + inner
+        + (paginationHtml ? '<div style="border-top:1px solid var(--border)">' + paginationHtml + '</div>' : '')
+        + '</div>';
 }
 
 // ────────────────────────────────────────────────────────

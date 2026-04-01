@@ -1,6 +1,6 @@
 :root{--bg:#080c14;--bg2:#0f1623;--bg3:#151e2d;--bg4:#1a2540;--border:#1e3352;--border2:#2a4a7f;--text:#e2e8f0;--text2:#94a3b8;--text3:#475569;--blue:#3b82f6;--blue2:#60a5fa;--blue3:#1d4ed8;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--orange:#f97316;--grad:linear-gradient(135deg,var(--blue),var(--blue2));--grad-hover:linear-gradient(135deg,var(--blue2),#93c5fd);--purple:#a855f7}
 html[data-theme="light"]{--bg:#f1f5f9;--bg2:#ffffff;--bg3:#f8fafc;--bg4:#e2e8f0;--border:#cbd5e1;--border2:#94a3b8;--text:#0f172a;--text2:#475569;--text3:#64748b;--blue:#0B225C;--blue2:#1e3a8a;--blue3:#1e40af;--green:#16a34a;--red:#dc2626;--yellow:#d97706;--orange:#ea580c;--grad:linear-gradient(135deg,#0B225C,#1e3a8a);--grad-hover:linear-gradient(135deg,#1e3a8a,#0B225C);--purple:#9333ea}
-html[data-theme="light"] .ni.on{color:#FFED00}html[data-theme="light"] .bp{color:#FFED00}html[data-theme="light"] .ava{color:#FFED00}
+html[data-theme="light"] .ni.on{color:#fff}html[data-theme="light"] .bp{color:#fff}html[data-theme="light"] .ava{color:#fff}
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-tap-highlight-color:transparent}body{background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;overflow-x:hidden;transition:background .3s,color .3s}a{color:inherit;text-decoration:none}button{background:none;border:none;color:inherit;cursor:pointer;font:inherit;outline:none}input,select,textarea{font:inherit;color:inherit;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;width:100%;outline:none;transition:border-color .2s,background .3s,color .3s;accent-color:var(--blue)}input:focus,select:focus,textarea:focus{border-color:var(--blue)}.dn{display:none!important}.flex{display:flex}.fca{align-items:center}.fjb{justify-content:space-between}.fjc{justify-content:center}.fc{flex-direction:column}.gap1{gap:4px}.gap2{gap:8px}.gap3{gap:12px}.gap4{gap:16px}.fwrap{flex-wrap:wrap}.tw6{font-weight:600}.tw8{font-weight:800}.tsm{font-size:14px}.ts{font-size:13px}.tm{color:var(--text2)}.tc{text-align:center}.trunc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.w100{width:100%}.h100{height:100%}.pr{position:relative}.mb1{margin-bottom:4px}.mb2{margin-bottom:8px}.mb3{margin-bottom:16px}.mb4{margin-bottom:24px}.mt1{margin-top:4px}.mt2{margin-top:8px}.mt3{margin-top:16px}.mt4{margin-top:24px}.pt2{padding-top:8px}.p3{padding:16px}.p4{padding:24px}
 .skip-nav{position:absolute;top:-40px;left:0;background:var(--blue);color:#fff;padding:8px 16px;z-index:100000;border-radius:0 0 8px 0;font-weight:600;transition:top .2s}.skip-nav:focus{top:0}
 @media(prefers-color-scheme:light){html:not([data-theme]){--bg:#f1f5f9;--bg2:#ffffff;--bg3:#f8fafc;--bg4:#e2e8f0;--border:#cbd5e1;--border2:#94a3b8;--text:#0f172a;--text2:#475569;--text3:#64748b;--blue:#0B225C;--blue2:#1e3a8a;--blue3:#1e40af;--green:#16a34a;--red:#dc2626;--yellow:#d97706;--orange:#ea580c;--grad:linear-gradient(135deg,#0B225C,#1e3a8a);--grad-hover:linear-gradient(135deg,#1e3a8a,#0B225C);--purple:#9333ea}}
@@ -352,7 +352,7 @@ color:var(--blue2);
 html[data-theme="light"] .ni.on,
 html[data-theme="light"] .bp,
 html[data-theme="light"] .slogo-icon,
-html[data-theme="light"] .ava{color:#f5d978;}
+html[data-theme="light"] .ava{color:#fff;}
 
 html[data-theme="light"] #side,
 html[data-theme="light"] #head,
@@ -415,11 +415,11 @@ box-shadow:0 10px 22px rgba(15,27,51,.05), inset 0 1px 0 rgba(255,255,255,.56);
 }
 
 html[data-theme="light"] .ni.on,
-html[data-theme="light"] .bp,
+html[data-theme="light"] .bp{color:#fff;}
 html[data-theme="light"] .pay-method-btn.active,
 html[data-theme="light"] .pay-choice-card.active,
 html[data-theme="light"] .acc-header[aria-expanded="true"]{
-color:#f5da82;
+color:#0B225C;
 }
 
 html[data-theme="light"] .bg-y,
@@ -548,7 +548,7 @@ background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62))
     }
 
     /* 6. Alt kıyı güvenlik boşluğu: son kart/buton bottom nav altında kalmasın */
-    #main { padding-bottom: 24px !important; }
+    #main { padding-bottom: max(calc(env(safe-area-inset-bottom) + 90px), 90px) !important; }
 
     /* 7. Kart içerikleri taşmasın */
     .card, .info-card { word-break: break-word; }
