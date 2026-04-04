@@ -1494,8 +1494,11 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
             // Kullanıcıya daha anlaşılır hata mesajı göster
             var userMsg = 'Ödeme sistemi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
-            if (errMsg.indexOf('paytr_token') !== -1) {
-                userMsg = 'Ödeme token doğrulaması başarısız. PayTR Merchant Key ve Salt ayarlarını kontrol edin. Supabase Secrets\'ta PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT değerlerinin PayTR panelindeki değerlerle birebir aynı olduğundan emin olun.';
+            if (response.status === 503) {
+                // 503 = Supabase Secrets tanımlı değil
+                userMsg = 'PayTR API anahtarları tanımlı değil. Yöneticinin Supabase Secrets\'ta PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT değerlerini tanımlaması gerekiyor.';
+            } else if (errMsg.indexOf('paytr_token') !== -1) {
+                userMsg = 'Ödeme token doğrulaması başarısız. PayTR Merchant Key ve Salt değerlerinin PayTR panelindeki değerlerle birebir aynı olduğundan emin olun.';
             } else if (errMsg.indexOf('credentials eksik') !== -1 || errMsg.indexOf('Secrets') !== -1) {
                 userMsg = 'PayTR API anahtarları tanımlı değil. Supabase Secrets\'ta PAYTR_MERCHANT_ID, PAYTR_MERCHANT_KEY ve PAYTR_MERCHANT_SALT tanımlanmalı.';
             } else if (errMsg.indexOf('notify_url') !== -1) {
@@ -1661,18 +1664,32 @@ window.handlePayTRCallback = async function(orderId, status) {
 
         // Eğer AppState boşsa, veritabanındaki notif_status alanından oku
         // (URL redirect akışı — sayfa yenilendi, AppState sıfırlandı)
+        // NOT: webhook daha önce çalışmışsa notif_status 'approved' olabilir.
+        // Bu durumda plan kayıtları webhook tarafından zaten güncellendi demektir.
+        var _webhookAlreadyProcessed = false;
         if (planIds.length === 0) {
-            var rec = await sb.from('payments').select('notif_status').eq('id', orderId).maybeSingle();
+            var rec = await sb.from('payments').select('notif_status, st').eq('id', orderId).maybeSingle();
             if (rec && rec.error) {
                 console.warn('[PayTR] Plan ID okuma hatası:', rec.error.message);
             }
             var notifVal = rec && !rec.error && rec.data && rec.data.notif_status;
+            var paymentSt  = rec && !rec.error && rec.data && rec.data.st;
             if (typeof notifVal === 'string' && notifVal.startsWith('planids:')) {
                 planIds = notifVal.slice(8).split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            } else if (notifVal === 'approved' && paymentSt === 'completed') {
+                // Webhook zaten her şeyi tamamladı — sadece UI'ı güncelle
+                _webhookAlreadyProcessed = true;
             }
         }
 
         if (status === 'success') {
+            if (_webhookAlreadyProcessed) {
+                // Webhook zaten DB'yi güncelledi — sadece UI'ı senkronize et
+                toast('Ödemeniz başarıyla tamamlandı!', 'g');
+                if (typeof spTab === 'function') spTab('odemeler');
+                AppState._paytrPlanIds = null;
+                return;
+            }
             // PayTR ödeme kaydını tamamlandı olarak işaretle
             await sb.from('payments').update({
                 st: 'completed',

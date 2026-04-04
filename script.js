@@ -4921,28 +4921,38 @@ async function initiatePayTRPayment(amt, desc) {
     
     UIUtils.setLoading(true);
     try {
-        const orderId = `PAY-${a.id.slice(0,8)}-${Date.now()}`;
+        // merchant_oid: sadece alfanumerik olmalı (PayTR şartı)
+        const orderId = 'PAY' + (typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID().replace(/-/g, '').slice(0, 20)
+            : a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now());
         const amtKurus = Math.round(amt * 100); // PayTR kuruş cinsinden ister
 
-        // ✅ user_basket: PayTR base64 encode ister
-        const basketArr = [[desc || 'Aidat', String(amtKurus), 1]];
-        const user_basket = btoa(unescape(encodeURIComponent(JSON.stringify(basketArr))));
+        // user_basket: PayTR TL cinsinden fiyat bekler (örn: "250.00")
+        // btoa() Latin-1 destekler; TextEncoder ile UTF-8 güvenliği sağlanır
+        const basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, ch => {
+            const m = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            return m[ch] || '';
+        });
+        const basketArr = [[basketDesc, amt.toFixed(2), 1]]; // TL cinsinden
+        const basketBytes = new TextEncoder().encode(JSON.stringify(basketArr));
+        const basketBin = Array.from(basketBytes).map(b => String.fromCharCode(b)).join('');
+        const user_basket = btoa(basketBin);
 
         // Supabase edge function çağrısı (backend token hesaplar)
         const { data: tokenData, error } = await sb.functions.invoke('paytr-token', {
             body: {
                 // merchant_key ve merchant_salt edge function içinde Supabase Secrets'tan okunuyor
                 merchant_oid: orderId,
-                email: a.em || `${a.tc}@veli.local`,
-                payment_amount: String(amtKurus), // ✅ PayTR string bekliyor
-                user_name: `${a.fn} ${a.ln}`,
-                user_address: 'Türkiye',
+                email: a.em && !a.em.endsWith('.local') ? a.em : 'musteri@dragosakademi.com',
+                payment_amount: String(amtKurus), // PayTR kuruş cinsinden string bekliyor
+                user_name: (`${a.fn} ${a.ln}`).substring(0, 60),
+                user_address: 'Turkiye',
                 user_phone: a.pph || a.ph || '05000000000',
-                merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok',
-                merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail',
-                user_basket: user_basket, // ✅ base64 encoded
+                merchant_ok_url: window.location.origin + '/paytr-ok.html?oid=' + orderId,
+                merchant_fail_url: window.location.origin + '/paytr-fail.html?oid=' + orderId,
+                user_basket: user_basket,
                 currency: 'TL',
-                test_mode: '1', // ✅ Test modunda başla, çalışınca '0' yap
+                test_mode: '0',
                 org_id: AppState.currentOrgId,
                 branch_id: AppState.currentBranchId,
                 athlete_id: a.id,
