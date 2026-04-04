@@ -44,12 +44,22 @@ Deno.serve(async (req: Request) => {
 
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // merchant_oid: PayTR'a UUID'den tireler kaldırılarak gönderildi (32 alfanumerik)
+    // DB'de id UUID formatında — tireler geri eklenerek eşleştirilir
+    function toUuid(id: string): string {
+      if (/^[0-9a-f]{32}$/i.test(id)) {
+        return `${id.slice(0,8)}-${id.slice(8,12)}-${id.slice(12,16)}-${id.slice(16,20)}-${id.slice(20)}`;
+      }
+      return id;
+    }
+    const dbId = toUuid(merchant_oid);
+
     if (status === "success") {
       // PayTR ödeme kaydında plan ID'lerini oku (notif_status = "planids:id1,id2,...")
       const { data: paytrRec, error: recErr } = await sb
         .from("payments")
         .select("notif_status, aid")
-        .eq("id", merchant_oid)
+        .eq("id", dbId)
         .maybeSingle();
 
       if (recErr) {
@@ -69,11 +79,11 @@ Deno.serve(async (req: Request) => {
         source: "paytr",
         notif_status: "approved",
         pay_method: "paytr",
-      }).eq("id", merchant_oid);
+      }).eq("id", dbId);
       if (updateErr) {
         console.error("PayTR webhook: ana kayit guncelleme hatasi:", updateErr.message);
       }
-      console.log("Odeme tamamlandi:", merchant_oid);
+      console.log("Odeme tamamlandi:", dbId);
 
       // Bağlı plan kayıtlarını da tamamlandı olarak işaretle
       if (paytrRec?.aid) {
@@ -94,7 +104,7 @@ Deno.serve(async (req: Request) => {
       const { error: failErr } = await sb.from("payments").update({
         st: "failed",
         notif_status: "",
-      }).eq("id", merchant_oid);
+      }).eq("id", dbId);
       if (failErr) {
         console.error("PayTR webhook: basarisiz kayit guncelleme hatasi:", failErr.message);
       }
