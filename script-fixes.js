@@ -1374,7 +1374,13 @@ window.initiatePayTRPayment = async function(amt, desc) {
         var amtTL = amt.toFixed(2); // TL cinsinden: "2500.00"
         var basketArr = [[basketDesc, amtTL, 1]];
         var basketJson = JSON.stringify(basketArr);
-        var userBasket = btoa(basketJson);
+        // btoa() sadece Latin-1 destekler; TextEncoder ile UTF-8 güvenliği sağlanır
+        var userBasket = (function(s) {
+            var bytes = new TextEncoder().encode(s);
+            var bin = '';
+            for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return btoa(bin);
+        })(basketJson);
 
         // PayTR basket hazırlandı
 
@@ -1484,6 +1490,31 @@ window.initiatePayTRPayment = async function(amt, desc) {
 };
 
 // PayTR initiatePayTRPayment v4 override yüklendi
+
+// ────────────────────────────────────────────────────────
+// PayTR FIX v5: showPayTRModal override
+// - allow="payment" eklendi: modern tarayıcılarda Payment Request API
+//   için iframe'e izin verilmesi gerekiyor (3D secure akışı için şart)
+// - height 500px → 600px: bazı banka 3D secure sayfaları daha fazla yer alıyor
+// ────────────────────────────────────────────────────────
+window.showPayTRModal = function(token, orderId) {
+    var iframeUrl = 'https://www.paytr.com/odeme/guvenli/' + token;
+    modal('💳 Güvenli Ödeme — PayTR',
+        '<div style="text-align:center;margin-bottom:12px;font-size:13px;color:var(--text2)">'
+        + '256-bit SSL ile korunan güvenli ödeme sayfası'
+        + '</div>'
+        + '<iframe src="' + iframeUrl + '"'
+        + ' id="paytr-iframe"'
+        + ' style="width:100%;height:600px;border:none;border-radius:10px"'
+        + ' allow="payment; fullscreen"'
+        + ' allowfullscreen'
+        + '></iframe>'
+        + '<div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text3)">'
+        + 'Sipariş No: ' + orderId + ' • Ödeme tamamlandığında otomatik kayıt yapılır.'
+        + '</div>',
+        [{ lbl: 'Kapat', cls: 'bs', fn: function() { closeModal(); spTab('odemeler'); } }]
+    );
+};
 
 // ────────────────────────────────────────────────────────
 // PayTR FIX v3: postMessage listener
