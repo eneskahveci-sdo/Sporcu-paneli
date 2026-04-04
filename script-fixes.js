@@ -10,6 +10,24 @@
 
 // script-fixes.js V13
 
+// ── Lazy script yükleyici (Chart.js / FullCalendar ihtiyaç anında indirilir) ──
+var _lazyLoaded = {};
+var _lazyCallbacks = {};
+function _loadScript(src, cb) {
+    if (_lazyLoaded[src]) { cb(); return; }
+    if (_lazyCallbacks[src]) { _lazyCallbacks[src].push(cb); return; }
+    _lazyCallbacks[src] = [cb];
+    var s = document.createElement('script');
+    s.src = src; s.crossOrigin = 'anonymous';
+    s.onload = function() {
+        _lazyLoaded[src] = true;
+        (_lazyCallbacks[src] || []).forEach(function(fn) { fn(); });
+        delete _lazyCallbacks[src];
+    };
+    s.onerror = function() { console.error('[Lazy] Yüklenemedi:', src); delete _lazyCallbacks[src]; };
+    document.head.appendChild(s);
+}
+
 // ────────────────────────────────────────────────────────
 // CROSS-ORIGIN "Script error." FILTRESİ
 // Tarayıcılar, farklı origin'den yüklenen script hatalarını
@@ -2425,8 +2443,11 @@ function buildAutoAlerts() {
 window.buildAutoAlerts = buildAutoAlerts;
 
 // ── CHART.JS ───────────────────────────────────────────────
+var _CHARTJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+var _FULLCAL_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.11/index.global.min.js';
+
 function initDashboardChart() {
-    if (!window.Chart) { setTimeout(initDashboardChart, 300); return; }
+    if (!window.Chart) { _loadScript(_CHARTJS_CDN, initDashboardChart); return; }
     var ctx = document.getElementById('dash-chart');
     if (!ctx) return;
     if (ctx._ci) { ctx._ci.destroy(); }
@@ -2458,7 +2479,7 @@ function initDashboardChart() {
 }
 
 function initBranchChart() {
-    if (!window.Chart) { setTimeout(initBranchChart, 300); return; }
+    if (!window.Chart) { _loadScript(_CHARTJS_CDN, initBranchChart); return; }
     var ctx = document.getElementById('branch-chart');
     if (!ctx) return;
     if (ctx._ci) { ctx._ci.destroy(); }
@@ -2479,7 +2500,7 @@ function pgCalendar() {
 window.pgCalendar = pgCalendar;
 
 function initCalendarChart() {
-    if (!window.FullCalendar) { setTimeout(initCalendarChart, 300); return; }
+    if (!window.FullCalendar) { _loadScript(_FULLCAL_CDN, initCalendarChart); return; }
     var el = document.getElementById('fc-calendar');
     if (!el) return;
     if (el._fc) { el._fc.destroy(); el._fc = null; }
