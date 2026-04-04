@@ -45,18 +45,59 @@ Deno.serve(async (req: Request) => {
     const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
     if (status === "success") {
-      await sb.from("payments").update({
+      // PayTR ödeme kaydında plan ID'lerini oku (notif_status = "planids:id1,id2,...")
+      const { data: paytrRec, error: recErr } = await sb
+        .from("payments")
+        .select("notif_status, aid")
+        .eq("id", merchant_oid)
+        .maybeSingle();
+
+      if (recErr) {
+        console.warn("PayTR webhook: plan ID okuma hatasi:", recErr.message);
+      }
+
+      const planIds: string[] = [];
+      if (paytrRec?.notif_status?.startsWith("planids:")) {
+        paytrRec.notif_status.slice(8).split(",").forEach((id: string) => {
+          const trimmed = id.trim();
+          if (trimmed) planIds.push(trimmed);
+        });
+      }
+
+      const { error: updateErr } = await sb.from("payments").update({
         st: "completed",
         source: "paytr",
         notif_status: "approved",
         pay_method: "paytr",
       }).eq("id", merchant_oid);
+      if (updateErr) {
+        console.error("PayTR webhook: ana kayit guncelleme hatasi:", updateErr.message);
+      }
       console.log("Odeme tamamlandi:", merchant_oid);
+
+      // Bağlı plan kayıtlarını da tamamlandı olarak işaretle
+      if (paytrRec?.aid) {
+        for (const pid of planIds) {
+          const { error: planErr } = await sb.from("payments").update({
+            st: "completed",
+            notif_status: "approved",
+            pay_method: "paytr",
+          }).eq("id", pid).eq("source", "plan").eq("aid", paytrRec.aid);
+          if (planErr) {
+            console.warn("Plan kaydı guncellenemedi:", pid, planErr.message);
+          } else {
+            console.log("Plan kaydı tamamlandi:", pid);
+          }
+        }
+      }
     } else {
-      await sb.from("payments").update({
+      const { error: failErr } = await sb.from("payments").update({
         st: "failed",
         notif_status: "",
       }).eq("id", merchant_oid);
+      if (failErr) {
+        console.error("PayTR webhook: basarisiz kayit guncelleme hatasi:", failErr.message);
+      }
       console.log("Odeme basarisiz:", merchant_oid, failed_reason_code, failed_reason_msg);
     }
 
