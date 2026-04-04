@@ -399,6 +399,29 @@ function _securityDoNormalLogin(role) {
                 }
                 if (typeof window.spTab === 'function') spTab('profil');
 
+                // 3D Secure sonrası bekleyen PayTR callback varsa işle
+                // (3D Secure akışında sayfa yeniden yüklenir ve kullanıcı tekrar giriş yapar)
+                try {
+                    const pendingRaw = localStorage.getItem('_paytr_pending_cb');
+                    if (pendingRaw) {
+                        const pending = JSON.parse(pendingRaw);
+                        const ageMs = Date.now() - (pending.ts || 0);
+                        localStorage.removeItem('_paytr_pending_cb');
+                        if (ageMs < 30 * 60 * 1000 && pending.oid) { // 30 dakikadan yeni
+                            // Verinin yüklenmesi için kısa bir bekleme
+                            setTimeout(function() {
+                                if (typeof window.handlePayTRCallback === 'function') {
+                                    window.handlePayTRCallback(
+                                        pending.oid,
+                                        pending.status === 'ok' ? 'success' : 'fail'
+                                    );
+                                }
+                                if (typeof window.spTab === 'function') window.spTab('odemeler');
+                            }, 1500);
+                        }
+                    }
+                } catch(cbErr) {}
+
                 // Sporcu girişi tamamlandı
             }
 
