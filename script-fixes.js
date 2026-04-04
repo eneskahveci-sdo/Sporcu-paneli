@@ -1107,14 +1107,7 @@ window.spOdemeler = function() {
     html += '<div class="card mb3" id="sp-pay-form" style="display:none">';
     html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
     html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
-    html += '<div class="pay-choice-grid mb3">';
-    if (hasPayTR) {
-        html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
-    }
-    if (!hasPayTR) {
-        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
-    }
-    html += '</div>';
+    html += _spPayChoiceGridHtml(hasPayTR, hasBank);
     html += '<div id="pay-method-detail" class="mb2"></div>';
     html += '<div class="fgr mb2 dn" id="sp-desc-wrapper"><label>Açıklama <span class="tm ts">(opsiyonel)</span></label><input id="sp-desc" placeholder="Ödeme notu ekleyin..."/></div>';
     html += '<button class="btn bp w100 mt2" id="pay-submit-btn" style="display:none" onclick="submitSpPayment()">Bildirim Gönder</button>';
@@ -1325,7 +1318,7 @@ window.submitSpPayment = async function() {
             if (result.error) throw result.error;
             AppState.data.payments.push(payObj);
         }
-        var methodLabel = 'PayTR Online';
+        var methodLabel = PAY_METHOD_LABELS[method] || method || 'Ödeme';
         var count = plans.length > 1 ? ' (' + plans.length + ' ay)' : '';
         toast('✅ ' + methodLabel + ' ödeme bildiriminiz alındı' + count + '! Yönetici onaylayacak.', 'g');
         AppState.ui.activePlanId = null;
@@ -1335,6 +1328,58 @@ window.submitSpPayment = async function() {
         spTab('odemeler');
     } catch(e) {
         toast('Bildirim gönderilemedi: ' + (e.message || e), 'e');
+    }
+};
+
+// ────────────────────────────────────────────────────────
+// FIX: selectPayChoice override — havale/banka havalesi desteği
+// Orijinal selectPayChoice yalnızca 'paytr' işliyor.
+// hasBank varken havale seçeneğini de desteklemek için override.
+// ────────────────────────────────────────────────────────
+
+// Ödeme yöntemi etiketleri — submitSpPayment ve selectPayChoice tarafından kullanılır
+var PAY_METHOD_LABELS = { nakit: 'Nakit', kredi_karti: 'Kredi Kartı', havale: 'Havale/EFT', paytr: 'PayTR Online' };
+
+// Ödeme formu seçim kartları HTML — spOdemeler override'larında ortak kullanılır
+function _spPayChoiceGridHtml(hasPayTR, hasBank) {
+    var html = '<div class="pay-choice-grid mb3">';
+    if (hasPayTR) {
+        html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
+    }
+    if (hasBank) {
+        html += '<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice(\'havale\')"><div class="pay-choice-icon">🏦</div><div class="pay-choice-title">Banka Havalesi</div><div class="pay-choice-desc">IBAN\'a havale yapın, yöneticiye bildirin</div></div>';
+    }
+    if (!hasPayTR && !hasBank) {
+        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+window.selectPayChoice = function(choice) {
+    document.querySelectorAll('.pay-choice-card').forEach(function(c) { c.classList.remove('active'); });
+    var activeCard = document.getElementById('pc-' + choice);
+    if (activeCard) activeCard.classList.add('active');
+
+    var detail = document.getElementById('pay-method-detail');
+    var submitBtn = document.getElementById('pay-submit-btn');
+    var descWrapper = document.getElementById('sp-desc-wrapper');
+    var s = AppState.data.settings || {};
+
+    AppState.ui.selectedPayMethod = choice;
+
+    if (choice === 'paytr') {
+        if (detail) detail.innerHTML = '<div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px"><div class="tw6 mb1">🔵 PayTR ile Online Ödeme</div><p class="ts tm">Güvenli ödeme sayfasına yönlendirileceksiniz. 256-bit SSL ile korunan ödeme altyapısı.</p></div>';
+        if (submitBtn) { submitBtn.textContent = '🔵 PayTR ile Ödemeye Geç'; submitBtn.style.display = 'block'; }
+        if (descWrapper) descWrapper.classList.remove('dn');
+    } else if (choice === 'havale') {
+        var bankInfo = '';
+        if (s.bankName) bankInfo += '<div><strong>Banka:</strong> ' + FormatUtils.escape(s.bankName) + '</div>';
+        if (s.accountName) bankInfo += '<div><strong>Alıcı:</strong> ' + FormatUtils.escape(s.accountName) + '</div>';
+        if (s.iban) bankInfo += '<div><strong>IBAN:</strong> <code style="user-select:all;font-size:13px">' + FormatUtils.escape(s.iban) + '</code></div>';
+        if (detail) detail.innerHTML = '<div class="al al-b" style="border-radius:10px;padding:14px;margin-bottom:12px"><div class="tw6 mb1">🏦 Banka Havalesi Bilgileri</div>' + (bankInfo || '<p class="ts tm">Banka bilgileri için yöneticinize başvurun.</p>') + '<p class="ts tm mt2">Havaleyi yaptıktan sonra "Bildirim Gönder" butonuna tıklayın. Yönetici ödemenizi onaylayacak.</p></div>';
+        if (submitBtn) { submitBtn.textContent = '🏦 Havale Bildirimi Gönder'; submitBtn.style.display = 'block'; }
+        if (descWrapper) descWrapper.classList.remove('dn');
     }
 };
 
@@ -2049,7 +2094,7 @@ window.submitOnKayit = async function() {
 // ── H5: ÇEREZ BİLDİRİMİ ─────────────────────────────────────────────────
 (function() {
     var COOKIE_KEY = 'dragos_cookie_consent';
-    if (localStorage.getItem(COOKIE_KEY)) return; // Zaten onaylandı
+    try { if (localStorage.getItem(COOKIE_KEY)) return; } catch(e) { return; } // iOS Safari private mode safe
 
     function _showCookieBanner() {
         if (document.getElementById('_cookie-banner')) return;
@@ -2065,7 +2110,7 @@ window.submitOnKayit = async function() {
     }
 
     window._acceptCookies = function() {
-        localStorage.setItem(COOKIE_KEY, '1');
+        try { localStorage.setItem(COOKIE_KEY, '1'); } catch(e) {}
         var b = document.getElementById('_cookie-banner');
         if (b) b.parentNode.removeChild(b);
     };
@@ -3952,14 +3997,7 @@ window.spOdemeler = function() {
     html += '<div class="card mb3" id="sp-pay-form" style="display:none">';
     html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
     html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
-    html += '<div class="pay-choice-grid mb3">';
-    if (hasPayTR) {
-        html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
-    }
-    if (!hasPayTR) {
-        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
-    }
-    html += '</div>';
+    html += _spPayChoiceGridHtml(hasPayTR, hasBank);
     html += '<div id="pay-method-detail" class="mb2"></div>';
     html += '<div class="fgr mb2 dn" id="sp-desc-wrapper"><label>Açıklama <span class="tm ts">(opsiyonel)</span></label><input id="sp-desc" placeholder="Ödeme notu ekleyin..."/></div>';
     html += '<button class="btn bp w100 mt2" id="pay-submit-btn" style="display:none" onclick="submitSpPayment()">Bildirim Gönder</button>';
