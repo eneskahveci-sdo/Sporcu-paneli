@@ -1107,7 +1107,7 @@ window.spOdemeler = function() {
     html += '<div class="card mb3" id="sp-pay-form" style="display:none">';
     html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
     html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
-    html += _spPayChoiceGridHtml(hasPayTR, hasBank);
+    html += _spPayChoiceGridHtml(hasPayTR);
     html += '<div id="pay-method-detail" class="mb2"></div>';
     html += '<div class="fgr mb2 dn" id="sp-desc-wrapper"><label>Açıklama <span class="tm ts">(opsiyonel)</span></label><input id="sp-desc" placeholder="Ödeme notu ekleyin..."/></div>';
     html += '<button class="btn bp w100 mt2" id="pay-submit-btn" style="display:none" onclick="submitSpPayment()">Bildirim Gönder</button>';
@@ -1340,17 +1340,13 @@ window.submitSpPayment = async function() {
 // Ödeme yöntemi etiketleri — submitSpPayment ve selectPayChoice tarafından kullanılır
 var PAY_METHOD_LABELS = { nakit: 'Nakit', kredi_karti: 'Kredi Kartı', havale: 'Havale/EFT', paytr: 'PayTR Online' };
 
-// Ödeme formu seçim kartları HTML — spOdemeler override'larında ortak kullanılır
-function _spPayChoiceGridHtml(hasPayTR, hasBank) {
+// Ödeme formu seçim kartları HTML — sadece PayTR online ödeme
+function _spPayChoiceGridHtml(hasPayTR) {
     var html = '<div class="pay-choice-grid mb3">';
     if (hasPayTR) {
         html += '<div class="pay-choice-card" id="pc-paytr" onclick="selectPayChoice(\'paytr\')"><div class="pay-choice-icon">🔵</div><div class="pay-choice-title">Online Kredi Kartı</div><div class="pay-choice-desc">PayTR güvenli altyapısı ile kartla ödeyin</div></div>';
-    }
-    if (hasBank) {
-        html += '<div class="pay-choice-card" id="pc-havale" onclick="selectPayChoice(\'havale\')"><div class="pay-choice-icon">🏦</div><div class="pay-choice-title">Banka Havalesi</div><div class="pay-choice-desc">IBAN\'a havale yapın, yöneticiye bildirin</div></div>';
-    }
-    if (!hasPayTR && !hasBank) {
-        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Ödeme yöntemi bulunamadı</div><p class="ts tm">Yönetici henüz ödeme yöntemlerini yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
+    } else {
+        html += '<div class="al al-y" style="grid-column:1/-1;border-radius:10px;padding:14px"><div class="tw6 mb1">⚠️ Online ödeme aktif değil</div><p class="ts tm">Yönetici henüz online ödemeyi yapılandırmamış. Lütfen akademi yönetimine başvurun.</p></div>';
     }
     html += '</div>';
     return html;
@@ -1406,10 +1402,10 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
     UIUtils.setLoading(true);
     try {
-        // PayTR: merchant_oid sadece alfanumerik olmalı, max 64 karakter
-        var orderId = 'PAY' + (typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID().replace(/-/g, '').slice(0, 20)
-            : a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now());
+        // DB id: payments tablosu UUID bekler — generateId() kullan
+        var dbId = (typeof generateId === 'function') ? generateId() : crypto.randomUUID();
+        // PayTR merchant_oid: sadece alfanumerik, max 64 karakter — UUID'den tireler kaldırılır
+        var orderId = dbId.replace(/-/g, '');
         var amtKurus = Math.round(amt * 100);
 
         // ─── user_basket: PayTR Base64 encode bekler ───
@@ -1510,7 +1506,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         // Bekleyen ödeme kaydı oluştur
         var storedPlanIds = AppState._paytrPlanIds || [];
         var pendingPay = {
-            id: orderId,
+            id: dbId,   // DB'ye UUID ile kaydet
             aid: a.id,
             an: a.fn + ' ' + a.ln,
             amt: amt,
@@ -1658,6 +1654,15 @@ window.handlePayTRCallback = async function(orderId, status) {
     var sb = typeof getSupabase === 'function' ? getSupabase() : AppState.sb;
     if (!sb || !orderId) return;
 
+    // orderId: PayTR'dan 32 karakter alfanumerik gelir (UUID'den tireler kaldırılmış)
+    // DB'de id UUID formatında — tireler geri eklenerek eşleştirilir
+    var dbId = (function(id) {
+        if (/^[0-9a-f]{32}$/i.test(id)) {
+            return id.slice(0,8)+'-'+id.slice(8,12)+'-'+id.slice(12,16)+'-'+id.slice(16,20)+'-'+id.slice(20);
+        }
+        return id;
+    })(orderId);
+
     try {
         // Plan ID'lerini AppState'ten al (postMessage akışı — sayfa yenilenmedi)
         var planIds = (AppState._paytrPlanIds || []).slice();
@@ -1668,7 +1673,7 @@ window.handlePayTRCallback = async function(orderId, status) {
         // Bu durumda plan kayıtları webhook tarafından zaten güncellendi demektir.
         var _webhookAlreadyProcessed = false;
         if (planIds.length === 0) {
-            var rec = await sb.from('payments').select('notif_status, st').eq('id', orderId).maybeSingle();
+            var rec = await sb.from('payments').select('notif_status, st').eq('id', dbId).maybeSingle();
             if (rec && rec.error) {
                 console.warn('[PayTR] Plan ID okuma hatası:', rec.error.message);
             }
@@ -1696,8 +1701,8 @@ window.handlePayTRCallback = async function(orderId, status) {
                 source: 'paytr',
                 notif_status: 'approved',
                 pay_method: 'paytr'
-            }).eq('id', orderId);
-            var idx = (AppState.data.payments || []).findIndex(function(p) { return p.id === orderId; });
+            }).eq('id', dbId);
+            var idx = (AppState.data.payments || []).findIndex(function(p) { return p.id === dbId; });
             if (idx >= 0) {
                 AppState.data.payments[idx].st = 'completed';
                 AppState.data.payments[idx].notifStatus = 'approved';
@@ -1729,8 +1734,8 @@ window.handlePayTRCallback = async function(orderId, status) {
             toast('✅ PayTR ödemesi başarıyla tamamlandı!', 'g');
         } else {
             // PayTR ödeme kaydını başarısız olarak işaretle
-            await sb.from('payments').update({ st: 'failed', notif_status: '' }).eq('id', orderId);
-            var fidx = (AppState.data.payments || []).findIndex(function(p) { return p.id === orderId; });
+            await sb.from('payments').update({ st: 'failed', notif_status: '' }).eq('id', dbId);
+            var fidx = (AppState.data.payments || []).findIndex(function(p) { return p.id === dbId; });
             if (fidx >= 0) {
                 AppState.data.payments[fidx].st = 'failed';
                 AppState.data.payments[fidx].notifStatus = '';
@@ -4014,7 +4019,7 @@ window.spOdemeler = function() {
     html += '<div class="card mb3" id="sp-pay-form" style="display:none">';
     html += '<div class="sp-pay-form-header mb3"><div class="tw6 tsm">💳 Ödeme Yöntemi Seç</div><button class="btn bs btn-sm" onclick="document.getElementById(\'sp-pay-form\').style.display=\'none\'">✕ Kapat</button></div>';
     html += '<div id="sp-plan-info" class="sp-plan-info-box mb3"></div>';
-    html += _spPayChoiceGridHtml(hasPayTR, hasBank);
+    html += _spPayChoiceGridHtml(hasPayTR);
     html += '<div id="pay-method-detail" class="mb2"></div>';
     html += '<div class="fgr mb2 dn" id="sp-desc-wrapper"><label>Açıklama <span class="tm ts">(opsiyonel)</span></label><input id="sp-desc" placeholder="Ödeme notu ekleyin..."/></div>';
     html += '<button class="btn bp w100 mt2" id="pay-submit-btn" style="display:none" onclick="submitSpPayment()">Bildirim Gönder</button>';

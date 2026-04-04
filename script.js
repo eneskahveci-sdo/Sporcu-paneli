@@ -4921,10 +4921,10 @@ async function initiatePayTRPayment(amt, desc) {
     
     UIUtils.setLoading(true);
     try {
-        // merchant_oid: sadece alfanumerik olmalı (PayTR şartı)
-        const orderId = 'PAY' + (typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID().replace(/-/g, '').slice(0, 20)
-            : a.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + Date.now());
+        // DB id: UUID (payments tablosu UUID primary key kullanır)
+        const dbId = generateId();
+        // PayTR merchant_oid: tireler kaldırılmış UUID (PayTR sadece alfanumerik kabul eder)
+        const orderId = dbId.replace(/-/g, '');
         const amtKurus = Math.round(amt * 100); // PayTR kuruş cinsinden ister
 
         // user_basket: PayTR TL cinsinden fiyat bekler (örn: "250.00")
@@ -4968,7 +4968,7 @@ async function initiatePayTRPayment(amt, desc) {
         
         // Bekleyen ödeme kaydı oluştur (webhook onaylayacak)
         const pendingPay = {
-            id: orderId,
+            id: dbId,   // DB'ye UUID ile kaydet
             aid: a.id,
             an: `${a.fn} ${a.ln}`,
             amt: amt,
