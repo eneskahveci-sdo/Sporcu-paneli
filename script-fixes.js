@@ -1517,7 +1517,9 @@ window.initiatePayTRPayment = async function(amt, desc) {
             serviceName: desc || 'PayTR Ödemesi',
             source: 'paytr',
             notifStatus: storedPlanIds.length > 0 ? 'planids:' + storedPlanIds.join(',') : '',
-            payMethod: 'paytr'
+            payMethod: 'paytr',
+            orgId: AppState.currentOrgId,
+            branchId: AppState.currentBranchId
         };
         var insertResult = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
         if (insertResult.error) { console.error('[PayTR] DB insert error:', insertResult.error.message); throw new Error('Ödeme kaydedilemedi. Lütfen tekrar deneyin.'); }
