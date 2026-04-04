@@ -5034,14 +5034,24 @@ window.handlePayTRCallback = async function(orderId, status) {
 };
 
 // URL'de PayTR dönüşü varsa işle
+// NOT: 3D Secure akışında sayfa yeniden yüklenir, kullanıcı henüz giriş yapmamış olabilir.
+// Bu nedenle callback'i direkt çağırmak yerine localStorage'a kaydediyoruz.
+// Kullanıcı giriş yaptıktan sonra Security.js'deki kontrol bunu işleyecek.
 (function checkPayTRReturn() {
     const params = new URLSearchParams(window.location.search);
     const paytrStatus = params.get('paytr');
     const orderId = params.get('oid') || params.get('merchant_oid');
     if (paytrStatus && orderId) {
-        setTimeout(() => handlePayTRCallback(orderId, paytrStatus === 'ok' ? 'success' : 'fail'), 1000);
-        // URL'i temizle
+        // URL'i hemen temizle (kullanıcı görmesın, yenileme yapmasın)
         window.history.replaceState({}, '', window.location.pathname);
+        // localStorage'a kaydet — login sonrası işlenecek
+        try {
+            localStorage.setItem('_paytr_pending_cb', JSON.stringify({
+                status: paytrStatus,
+                oid: orderId,
+                ts: Date.now()
+            }));
+        } catch(e) {}
     }
 })();
 
