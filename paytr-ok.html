@@ -11,6 +11,13 @@
   (function() {
     var p = new URLSearchParams(window.location.search);
     var oid = p.get('oid') || p.get('merchant_oid') || '';
+    // PayTR 3D Secure bazen üst pencereyi (top window) bu sayfaya yönlendirebilir.
+    // Bu durumda ana uygulamaya geri dönmemiz gerekir.
+    if (window.self === window.top) {
+      var url = window.location.origin + '/?paytr=ok' + (oid ? '&oid=' + encodeURIComponent(oid) : '');
+      window.location.replace(url);
+      return;
+    }
     try {
       window.parent.postMessage({ source: 'paytr_cb', status: 'ok', oid: oid }, window.location.origin);
     } catch(e) {
