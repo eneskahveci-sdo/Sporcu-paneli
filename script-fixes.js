@@ -1292,7 +1292,8 @@ window.submitSpPayment = async function() {
 
     if (method === 'paytr') {
         // Plan ID'lerini kaydet — handlePayTRCallback içinde senkronize edilecek
-        AppState._paytrPlanIds = planIds.map(function(p) { return p.id; });
+        // planIds zaten string ID dizisidir, .map(p => p.id) undefined üretirdi
+        AppState._paytrPlanIds = planIds;
         await window.initiatePayTRPayment(totalAmt, desc);
         return;
     }
