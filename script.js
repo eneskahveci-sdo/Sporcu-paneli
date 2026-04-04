@@ -679,13 +679,15 @@ const DB = {
                 payMethod: r.pay_method || '',
                 slipCode: r.slip_code || '',
                 taxRate: r.tax_rate || 0,
-                taxAmount: r.tax_amount || 0
+                taxAmount: r.tax_amount || 0,
+                orgId: r.org_id || '',
+                branchId: r.branch_id || ''
             };
         },
         fromPayment(p) {
             return {
-                id: p.id, org_id: AppState.currentOrgId,
-                branch_id: AppState.currentBranchId,
+                id: p.id, org_id: p.orgId || AppState.currentOrgId,
+                branch_id: p.branchId || AppState.currentBranchId,
                 aid: p.aid, an: p.an, amt: p.amt, dt: p.dt,
                 ty: p.ty, cat: p.cat, ds: p.ds, st: p.st,
                 inv: p.inv, dd: p.dd, service_name: p.serviceName,
@@ -804,13 +806,13 @@ const DB = {
             
             const { data: result, error } = await sb.from(table).upsert(clean, { onConflict: 'id' }).select();
             if (error) {
-                console.error(`Supabase upsert error (${table})`);
+                console.error(`Supabase upsert error (${table})`, error);
                 toast('Kayıt hatası. Lütfen tekrar deneyin.', 'e');
                 return null;
             }
             return result;
         } catch (e) {
-            console.error(`DB upsert exception (${table})`);
+            console.error(`DB upsert exception (${table})`, e);
             toast('Kayıt hatası. Lütfen tekrar deneyin.', 'e');
             return null;
         }
@@ -3158,7 +3160,12 @@ window.editPay = function(id) {
                 serviceName: ds,
                 payMethod: UIUtils.getValue('p-method') || p?.payMethod || '',
                 taxRate: UIUtils.getNumber('p-tax-rate') || 0,
-                taxAmount: UIUtils.getNumber('p-tax-amt') || 0
+                taxAmount: UIUtils.getNumber('p-tax-amt') || 0,
+                source: p?.source || 'manual',
+                notifStatus: p?.notifStatus || '',
+                slipCode: p?.slipCode || '',
+                orgId: p?.orgId || '',
+                branchId: p?.branchId || ''
             };
             
             if (!obj.amt) {
@@ -4852,6 +4859,10 @@ window.submitSpPayment = async function() {
     const planIds = AppState.ui.activePlanIds || (planId ? [planId] : []);
 
     if (!method) { toast('Lütfen ödeme yöntemi seçiniz!', 'e'); return; }
+    if (!AppState.currentOrgId || !AppState.currentBranchId) {
+        toast('Organizasyon bilgileri eksik. Lütfen çıkış yapıp tekrar giriş yapınız.', 'e');
+        return;
+    }
 
     // Collect plans
     const plans = planIds.map(id => AppState.data.payments.find(p => p.id === id)).filter(Boolean);
@@ -4888,7 +4899,8 @@ window.submitSpPayment = async function() {
             if (error) throw error;
             AppState.data.payments.push(payObj);
         }
-        const methodLabel = 'PayTR Online';
+        const methodLabels = { nakit: 'Nakit', kredi_karti: 'Kredi Kartı', havale: 'Havale/EFT', paytr: 'PayTR Online' };
+        const methodLabel = methodLabels[method] || 'Ödeme';
         const count = plans.length > 1 ? ` (${plans.length} ay)` : '';
         toast(`✅ ${methodLabel} ödeme bildiriminiz alındı${count}! Yönetici onaylayacak.`, 'g');
         AppState.ui.activePlanId = null;
@@ -4915,10 +4927,15 @@ async function initiatePayTRPayment(amt, desc) {
         toast('PayTR ayarları yapılandırılmamış. Yöneticiye başvurun.', 'e');
         return;
     }
-    
+
+    if (!AppState.currentOrgId || !AppState.currentBranchId) {
+        toast('Organizasyon bilgileri eksik. Lütfen çıkış yapıp tekrar giriş yapınız.', 'e');
+        return;
+    }
+
     const sb = getSupabase();
     if (!sb) { toast('Bağlantı hatası', 'e'); return; }
-    
+
     UIUtils.setLoading(true);
     try {
         // DB id: UUID (payments tablosu UUID primary key kullanır)
@@ -4959,13 +4976,13 @@ async function initiatePayTRPayment(amt, desc) {
                 athlete_name: `${a.fn} ${a.ln}`
             }
         });
-        
+
         if (error || !tokenData?.token) {
-            const errMsg = error?.message || JSON.stringify(error) || 'Token alınamadı.';
-            console.error('PayTR edge function hatası');
+            const errMsg = tokenData?.error || error?.message || 'Ödeme başlatılamadı. Lütfen tekrar deneyin.';
+            console.error('PayTR edge function hatası:', errMsg);
             throw new Error(errMsg);
         }
-        
+
         // Bekleyen ödeme kaydı oluştur (webhook onaylayacak)
         const pendingPay = {
             id: dbId,   // DB'ye UUID ile kaydet
@@ -4979,17 +4996,19 @@ async function initiatePayTRPayment(amt, desc) {
             serviceName: desc || 'PayTR Ödemesi',
             source: 'paytr',
             notifStatus: '',
-            payMethod: 'paytr'
+            payMethod: 'paytr',
+            orgId: AppState.currentOrgId,
+            branchId: AppState.currentBranchId
         };
         const { error: insertErr } = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
         if (insertErr) throw insertErr;
         AppState.data.payments.push(pendingPay);
-        
+
         // PayTR iframe aç
         showPayTRModal(tokenData.token, orderId);
-        
+
     } catch(e) {
-        console.error('PayTR error');
+        console.error('PayTR error:', e.message);
         toast('PayTR hatası: ' + e.message, 'e');
     } finally {
         UIUtils.setLoading(false);
@@ -5011,6 +5030,16 @@ function showPayTRModal(token, orderId) {
         Sipariş No: ${orderId} • Ödeme tamamlandığında otomatik kayıt yapılır.
     </div>
     `, [{ lbl: 'Kapat', cls: 'bs', fn: () => { closeModal(); spTab('odemeler'); } }]);
+
+    // paytr-ok.html / paytr-fail.html sayfalarından postMessage dinle (iframe mod)
+    function _paytrMsgHandler(e) {
+        if (e.origin !== window.location.origin) return;
+        if (!e.data || e.data.source !== 'paytr_cb') return;
+        window.removeEventListener('message', _paytrMsgHandler);
+        closeModal();
+        handlePayTRCallback(e.data.oid || orderId, e.data.status === 'ok' ? 'success' : 'fail');
+    }
+    window.addEventListener('message', _paytrMsgHandler);
 }
 
 // PayTR webhook — Supabase Edge Function'dan çağrılır
@@ -5018,19 +5047,19 @@ function showPayTRModal(token, orderId) {
 window.handlePayTRCallback = async function(orderId, status) {
     const sb = getSupabase();
     if (!sb || !orderId) return;
-    try {
-        if (status === 'success') {
-            await sb.from('payments').update({ st: 'completed', source: 'paytr', notif_status: 'approved' }).eq('id', orderId);
-            // AppState'i güncelle
-            const idx = AppState.data.payments.findIndex(p => p.id === orderId);
-            if (idx >= 0) { AppState.data.payments[idx].st = 'completed'; AppState.data.payments[idx].notifStatus = 'approved'; }
-            toast('✅ PayTR ödemesi başarıyla tamamlandı!', 'g');
-        } else {
-            await sb.from('payments').update({ st: 'failed' }).eq('id', orderId);
-            toast('❌ Ödeme başarısız. Lütfen tekrar deneyin.', 'e');
-        }
-        spTab('odemeler');
-    } catch(e) { console.error('PayTR callback error'); }
+    // DB güncellemesi paytr-webhook edge function tarafından yapılır (service_role).
+    // Sporcu anon role olduğundan payments UPDATE yetkisi yoktur.
+    // Sadece AppState'i güncelle ve DB'den güncel veriyi çek.
+    if (status === 'success') {
+        const idx = AppState.data.payments.findIndex(p => p.id === orderId);
+        if (idx >= 0) { AppState.data.payments[idx].st = 'completed'; AppState.data.payments[idx].notifStatus = 'approved'; }
+        toast('✅ PayTR ödemesi tamamlandı! Yönetici onayı bekleniyor.', 'g');
+    } else {
+        const idx = AppState.data.payments.findIndex(p => p.id === orderId);
+        if (idx >= 0) AppState.data.payments[idx].st = 'failed';
+        toast('❌ Ödeme başarısız. Lütfen tekrar deneyin.', 'e');
+    }
+    spTab('odemeler');
 };
 
 // URL'de PayTR dönüşü varsa işle
