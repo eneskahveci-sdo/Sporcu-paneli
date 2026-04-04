@@ -609,6 +609,7 @@ const DB = {
                 rd: r.rd, st: r.st || 'active', fee: r.fee || 0, vd: r.vd,
                 nt: r.nt, clsId: r.cls_id, pn: r.pn, pph: r.pph, pem: r.pem,
                 spPass: r.sp_pass, orgId: r.org_id, branchId: r.branch_id,
+                photoUrl: r.photo_url || '',
                 address: extra.address || '',
                 city: extra.city || '',
                 emergency: extra.emergency || '',
@@ -658,7 +659,8 @@ const DB = {
                 cls_id: str(a.clsId) || null,
                 pn: str(a.pn),
                 pph: str(a.pph),
-                pem: str(a.pem)
+                pem: str(a.pem),
+                photo_url: str(a.photoUrl)
             };
             // Only include sp_pass if explicitly provided (not undefined)
             if (a.spPass !== undefined) {
@@ -675,7 +677,9 @@ const DB = {
                 source: r.source || 'manual',
                 notifStatus: r.notif_status || '',
                 payMethod: r.pay_method || '',
-                slipCode: r.slip_code || ''
+                slipCode: r.slip_code || '',
+                taxRate: r.tax_rate || 0,
+                taxAmount: r.tax_amount || 0
             };
         },
         fromPayment(p) {
@@ -688,7 +692,9 @@ const DB = {
                 source: p.source || 'manual',
                 notif_status: p.notifStatus || '',
                 pay_method: p.payMethod || '',
-                slip_code: p.slipCode || ''
+                slip_code: p.slipCode || '',
+                tax_rate: p.taxRate || 0,
+                tax_amount: p.taxAmount || 0
             };
         },
         toCoach(r) {
@@ -1629,19 +1635,20 @@ function coachName(id) {
 function pgAthleteProfile(athleteId) {
     const a = AppState.data.athletes.find(x => x.id === athleteId);
     if (!a) return `<div class="al al-r">Sporcu bulunamadı</div>`;
-    
+
     const initials = FormatUtils.initials(a.fn, a.ln);
     const age = DateUtils.age(a.bd);
     const attStats = getAttendanceStats(a.id);
     const payStats = getPaymentStats(a.id);
     const cls = AppState.data.classes.find(c => c.id === a.clsId);
     const coach = cls ? AppState.data.coaches.find(c => c.id === cls.coachId) : null;
+    const avatarStyle = a.photoUrl ? `;background-image:url(${a.photoUrl});background-size:cover;background-position:center` : '';
     
     return `
     <div class="profile-container">
         <div class="profile-header">
             <div class="profile-header-content">
-                <div class="profile-avatar">${initials}</div>
+                <div class="profile-avatar" onclick="typeof showPhotoUploadModal==='function'&&showPhotoUploadModal('${FormatUtils.escape(a.id)}')" title="Fotoğraf yükle" style="cursor:pointer${avatarStyle}">${a.photoUrl ? '' : initials}</div>
                 <div class="profile-info">
                     <div class="profile-name">${FormatUtils.escape(`${a.fn} ${a.ln}`)}</div>
                     <div class="profile-meta">
@@ -3122,6 +3129,16 @@ window.editPay = function(id) {
             <option value="paytr"${p?.payMethod === 'paytr' ? ' selected' : ''}>🔵 PayTR Online</option>
         </select>
     </div>
+    <div class="g21 mt2">
+        <div class="fgr">
+            <label>KDV Oranı (%)</label>
+            <input id="p-tax-rate" type="number" min="0" max="100" step="1" value="${p?.taxRate || 0}" oninput="(function(){var a=parseFloat(document.getElementById('p-amt').value)||0;var r=parseFloat(this.value)||0;document.getElementById('p-tax-amt').value=(a*r/100).toFixed(2)}).call(this)"/>
+        </div>
+        <div class="fgr">
+            <label>KDV Tutarı (₺)</label>
+            <input id="p-tax-amt" type="number" min="0" step="0.01" value="${p?.taxAmount || 0}"/>
+        </div>
+    </div>
     `, [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
         { lbl: 'Kaydet', cls: 'bp', fn: async () => {
@@ -3139,7 +3156,9 @@ window.editPay = function(id) {
                 dt: UIUtils.getValue('p-dt'),
                 ty: UIUtils.getValue('p-ty'),
                 serviceName: ds,
-                payMethod: UIUtils.getValue('p-method') || p?.payMethod || ''
+                payMethod: UIUtils.getValue('p-method') || p?.payMethod || '',
+                taxRate: UIUtils.getNumber('p-tax-rate') || 0,
+                taxAmount: UIUtils.getNumber('p-tax-amt') || 0
             };
             
             if (!obj.amt) {
