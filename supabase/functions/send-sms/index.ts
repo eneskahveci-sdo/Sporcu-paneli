@@ -132,10 +132,17 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Client IP — rate limiting için
-    // x-forwarded-for ve x-real-ip Supabase'in güvenilir proxy altyapısı tarafından eklenir.
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-        || req.headers.get('x-real-ip')?.trim()
-        || '0.0.0.0';
+    // Supabase Edge Functions: x-forwarded-for ve x-real-ip Supabase altyapısının
+    // güvenilir ağ geçidi tarafından enjekte edilir. Doğrudan dışarıya açık
+    // bir deployment'ta bu başlıklar güvenilmez olabilir.
+    const rawIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || req.headers.get('x-real-ip')?.trim();
+
+    if (!rawIp) {
+        // IP belirsiz — rate limit atlanmasını önlemek için özel bir bucket kullan
+        console.warn('[send-sms] Client IP alınamadı. unknown_ip bucket kullanılıyor.');
+    }
+    const clientIp = rawIp || 'unknown_ip';
 
     // Rate limit kontrolü (5 SMS / 60 saniye / IP)
     const allowed = await checkRateLimit(supabase, clientIp, 5, 60);
