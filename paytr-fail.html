@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ödeme Başarısız</title>
+  <style>body{margin:0;padding:20px;font-family:sans-serif;text-align:center;color:#333}</style>
+</head>
+<body>
+  <p>Ödeme işlemi tamamlanamadı, lütfen bekleyiniz...</p>
+  <script>
+  (function() {
+    var p = new URLSearchParams(window.location.search);
+    var oid = p.get('oid') || p.get('merchant_oid') || '';
+    try {
+      window.parent.postMessage({ source: 'paytr_cb', status: 'fail', oid: oid }, window.location.origin);
+    } catch(e) {
+      var url = window.location.origin + '/?paytr=fail' + (oid ? '&oid=' + encodeURIComponent(oid) : '');
+      try { window.top.location.href = url; } catch(e2) { window.location.href = url; }
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -1291,6 +1291,8 @@ window.submitSpPayment = async function() {
     if (!totalAmt || totalAmt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
 
     if (method === 'paytr') {
+        // Plan ID'lerini kaydet — handlePayTRCallback içinde senkronize edilecek
+        AppState._paytrPlanIds = planIds.map(function(p) { return p.id; });
         await window.initiatePayTRPayment(totalAmt, desc);
         return;
     }
@@ -1404,8 +1406,8 @@ window.initiatePayTRPayment = async function(amt, desc) {
             user_name: userName,
             user_address: 'Turkiye',
             user_phone: a.pph || a.ph || '05000000000',
-            merchant_ok_url: window.location.origin + window.location.pathname + '?paytr=ok&oid=' + orderId,
-            merchant_fail_url: window.location.origin + window.location.pathname + '?paytr=fail&oid=' + orderId,
+            merchant_ok_url: window.location.origin + '/paytr-ok.html?oid=' + orderId,
+            merchant_fail_url: window.location.origin + '/paytr-fail.html?oid=' + orderId,
             user_basket: userBasket,
             currency: 'TL',
             test_mode: '0',
@@ -1457,6 +1459,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         }
 
         // Bekleyen ödeme kaydı oluştur
+        var storedPlanIds = AppState._paytrPlanIds || [];
         var pendingPay = {
             id: orderId,
             aid: a.id,
@@ -1468,7 +1471,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
             ty: 'income',
             serviceName: desc || 'PayTR Ödemesi',
             source: 'paytr',
-            notifStatus: '',
+            notifStatus: storedPlanIds.length > 0 ? 'planids:' + storedPlanIds.join(',') : '',
             payMethod: 'paytr'
         };
         var insertResult = await sb.from('payments').insert(DB.mappers.fromPayment(pendingPay));
@@ -1561,6 +1564,127 @@ window.showPayTRModal = function(token, orderId) {
 
     // PayTR postMessage listener kuruldu
 })();
+
+// ────────────────────────────────────────────────────────
+// PayTR FIX v6: Callback sayfaları için same-origin postMessage dinleyici
+// paytr-ok.html / paytr-fail.html yüklendiğinde window.parent.postMessage
+// ile ana pencereye bildirim gönderir. Bu dinleyici o mesajları yakalar.
+// ────────────────────────────────────────────────────────
+(function installPaytrCallbackListener() {
+    if (window.__paytrCbListenerInstalled) return;
+    window.__paytrCbListenerInstalled = true;
+
+    window.addEventListener('message', async function(e) {
+        // Sadece kendi origin'den gelen callback mesajlarını kabul et
+        if (!e.origin || e.origin !== window.location.origin) return;
+        if (!e.data || e.data.source !== 'paytr_cb') return;
+
+        var orderId = e.data.oid || AppState._paytrCurrentOrderId;
+        var status = e.data.status === 'ok' ? 'success' : 'fail';
+        if (!orderId) return;
+
+        // Modal'ı kapat
+        if (typeof closeModal === 'function') closeModal();
+
+        // handlePayTRCallback ile senkronize et
+        if (typeof window.handlePayTRCallback === 'function') {
+            await window.handlePayTRCallback(orderId, status);
+        }
+    });
+})();
+
+// ────────────────────────────────────────────────────────
+// PayTR FIX v6: handlePayTRCallback override — ödeme planı senkronizasyonu
+// Ödeme başarılı/başarısız olduğunda yalnızca PayTR kaydını değil,
+// seçili plan kayıtlarını (source='plan') da senkronize eder.
+// Plan ID'leri AppState._paytrPlanIds (postMessage akışı) veya
+// veritabanındaki notif_status alanından (webhook/URL yenileme akışı)
+// okunur.
+// ────────────────────────────────────────────────────────
+window.handlePayTRCallback = async function(orderId, status) {
+    // Çift işlemi engelle
+    if (AppState._paytrCallbackDone === orderId) return;
+    AppState._paytrCallbackDone = orderId;
+
+    var sb = typeof getSupabase === 'function' ? getSupabase() : AppState.sb;
+    if (!sb || !orderId) return;
+
+    try {
+        // Plan ID'lerini AppState'ten al (postMessage akışı — sayfa yenilenmedi)
+        var planIds = (AppState._paytrPlanIds || []).slice();
+
+        // Eğer AppState boşsa, veritabanındaki notif_status alanından oku
+        // (URL redirect akışı — sayfa yenilendi, AppState sıfırlandı)
+        if (planIds.length === 0) {
+            var rec = await sb.from('payments').select('notif_status').eq('id', orderId).maybeSingle();
+            if (rec && rec.error) {
+                console.warn('[PayTR] Plan ID okuma hatası:', rec.error.message);
+            }
+            var notifVal = rec && !rec.error && rec.data && rec.data.notif_status;
+            if (typeof notifVal === 'string' && notifVal.startsWith('planids:')) {
+                planIds = notifVal.slice(8).split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            }
+        }
+
+        if (status === 'success') {
+            // PayTR ödeme kaydını tamamlandı olarak işaretle
+            await sb.from('payments').update({
+                st: 'completed',
+                source: 'paytr',
+                notif_status: 'approved',
+                pay_method: 'paytr'
+            }).eq('id', orderId);
+            var idx = (AppState.data.payments || []).findIndex(function(p) { return p.id === orderId; });
+            if (idx >= 0) {
+                AppState.data.payments[idx].st = 'completed';
+                AppState.data.payments[idx].notifStatus = 'approved';
+            }
+
+            // Bağlı plan kayıtlarını da tamamlandı olarak işaretle
+            // Güvenlik: sadece aynı sporcu (aid) ve source='plan' kayıtlarını güncelle
+            var athleteId = AppState.currentSporcu && AppState.currentSporcu.id;
+            for (var i = 0; i < planIds.length; i++) {
+                var pid = planIds[i];
+                var query = sb.from('payments').update({
+                    st: 'completed',
+                    notif_status: 'approved',
+                    pay_method: 'paytr'
+                }).eq('id', pid).eq('source', 'plan');
+                if (athleteId) query = query.eq('aid', athleteId);
+                var updateRes = await query;
+                if (updateRes && updateRes.error) {
+                    console.warn('[PayTR] Plan kaydı güncellenemedi (' + pid + '):', updateRes.error.message);
+                }
+                var pi = (AppState.data.payments || []).findIndex(function(p) { return p.id === pid; });
+                if (pi >= 0) {
+                    AppState.data.payments[pi].st = 'completed';
+                    AppState.data.payments[pi].notifStatus = 'approved';
+                    AppState.data.payments[pi].payMethod = 'paytr';
+                }
+            }
+
+            toast('✅ PayTR ödemesi başarıyla tamamlandı!', 'g');
+        } else {
+            // PayTR ödeme kaydını başarısız olarak işaretle
+            await sb.from('payments').update({ st: 'failed', notif_status: '' }).eq('id', orderId);
+            var fidx = (AppState.data.payments || []).findIndex(function(p) { return p.id === orderId; });
+            if (fidx >= 0) {
+                AppState.data.payments[fidx].st = 'failed';
+                AppState.data.payments[fidx].notifStatus = '';
+            }
+            // Plan kayıtları 'pending' olarak bırakılır — kullanıcı yeniden deneyebilir
+            toast('❌ Ödeme başarısız. Lütfen tekrar deneyin.', 'e');
+        }
+
+        // Plan ID önbelleğini temizle
+        AppState._paytrPlanIds = null;
+
+        // Ödemeler sekmesine dön
+        if (typeof spTab === 'function') spTab('odemeler');
+    } catch(e) {
+        console.error('[PayTR] handlePayTRCallback hatası:', e);
+    }
+};
 
 // ── H1: SETTINGS MAPPER — Hukuki alanlar ────────────────────────────────
 (function() {
