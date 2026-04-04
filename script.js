@@ -1054,6 +1054,17 @@ async function restoreSession() {
             applyLogoEverywhere(AppState.data.settings?.logoUrl || '');
             spTab('profil');
             SessionManager.resume();
+            // 3D Secure üst pencere yönlendirmesinden dönüş kontrolü
+            try {
+                const cbRaw = localStorage.getItem('_paytr_pending_cb');
+                if (cbRaw) {
+                    localStorage.removeItem('_paytr_pending_cb');
+                    const cb = JSON.parse(cbRaw);
+                    if (cb.oid && (Date.now() - cb.ts) < 600000) { // 10 dk içindeyse geçerli
+                        setTimeout(() => handlePayTRCallback(cb.oid, cb.status === 'ok' ? 'success' : 'fail'), 500);
+                    }
+                }
+            } catch(e) {}
             return;
         }
 
