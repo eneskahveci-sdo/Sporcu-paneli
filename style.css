@@ -177,59 +177,59 @@ table{min-width:600px}
 
 /* Theme refresh: corporate navy-gold, subtle glass only via CSS overrides */
 :root{
---bg:#09111f;
---bg2:rgba(17,28,46,.88);
---bg3:rgba(24,38,61,.82);
---bg4:#1a2942;
---border:rgba(151,176,216,.12);
---border2:rgba(84,119,186,.38);
---text:#e6edf8;
---text2:#9cafc9;
---text3:#6e819f;
---blue:#163979;
---blue2:#2d5cb3;
---blue3:#0b225c;
---yellow:#d8a312;
---orange:#c98716;
---grad:linear-gradient(135deg,#0b225c,#224b93);
---grad-hover:linear-gradient(135deg,#173a7f,#2a57a1);
+--bg:#070e1c;
+--bg2:rgba(14,24,44,.92);
+--bg3:rgba(20,34,60,.86);
+--bg4:#162440;
+--border:rgba(120,160,220,.13);
+--border2:rgba(245,196,0,.22);
+--text:#ecf0fa;
+--text2:#9bb0cc;
+--text3:#5e7898;
+--blue:#f5c400;
+--blue2:#f5c400;
+--blue3:#c9a000;
+--yellow:#f5c400;
+--orange:#e8a800;
+--grad:linear-gradient(135deg,#0b225c,#1e3d80);
+--grad-hover:linear-gradient(135deg,#1a3a7a,#264d96);
 }
 
 html[data-theme="light"]{
---bg:#edf3f8;
---bg2:rgba(255,255,255,.72);
---bg3:rgba(255,255,255,.56);
---bg4:rgba(231,238,247,.92);
---border:rgba(11,34,92,.1);
---border2:rgba(29,61,124,.22);
---text:#10203b;
---text2:#50627e;
---text3:#75849b;
+--bg:#faf7e8;
+--bg2:rgba(255,255,255,.82);
+--bg3:rgba(255,252,230,.68);
+--bg4:rgba(248,234,160,.72);
+--border:rgba(160,120,0,.12);
+--border2:rgba(11,34,92,.24);
+--text:#0a1828;
+--text2:#354f72;
+--text3:#607090;
 --blue:#0b225c;
---blue2:#21488e;
+--blue2:#1e3d80;
 --blue3:#091a47;
---yellow:#d4a019;
---orange:#bc7e18;
+--yellow:#8a6200;
+--orange:#7a5000;
 --grad:linear-gradient(135deg,#0b225c,#21488e);
 --grad-hover:linear-gradient(135deg,#173a7f,#29539a);
 }
 
 @media(prefers-color-scheme:light){
 html:not([data-theme]){
---bg:#edf3f8;
---bg2:rgba(255,255,255,.72);
---bg3:rgba(255,255,255,.56);
---bg4:rgba(231,238,247,.92);
---border:rgba(11,34,92,.1);
---border2:rgba(29,61,124,.22);
---text:#10203b;
---text2:#50627e;
---text3:#75849b;
+--bg:#faf7e8;
+--bg2:rgba(255,255,255,.82);
+--bg3:rgba(255,252,230,.68);
+--bg4:rgba(248,234,160,.72);
+--border:rgba(160,120,0,.12);
+--border2:rgba(11,34,92,.24);
+--text:#0a1828;
+--text2:#354f72;
+--text3:#607090;
 --blue:#0b225c;
---blue2:#21488e;
+--blue2:#1e3d80;
 --blue3:#091a47;
---yellow:#d4a019;
---orange:#bc7e18;
+--yellow:#8a6200;
+--orange:#7a5000;
 --grad:linear-gradient(135deg,#0b225c,#21488e);
 --grad-hover:linear-gradient(135deg,#173a7f,#29539a);
 }
@@ -237,8 +237,9 @@ html:not([data-theme]){
 
 body{
 background:
-radial-gradient(circle at top left, rgba(212,160,25,.12), transparent 22%),
-radial-gradient(circle at top right, rgba(33,72,142,.1), transparent 28%),
+radial-gradient(circle at top left, rgba(245,196,0,.18), transparent 26%),
+radial-gradient(circle at bottom right, rgba(11,34,92,.14), transparent 30%),
+radial-gradient(circle at 70% 20%, rgba(245,196,0,.07), transparent 20%),
 var(--bg);
 }
 
@@ -382,11 +383,11 @@ html[data-theme="light"] .qa-btn,
 html[data-theme="light"] .tab-nav,
 html[data-theme="light"] .att-day,
 html[data-theme="light"] .att-b{
-background:linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.56));
-border-color:rgba(255,255,255,.62);
-box-shadow:0 14px 34px rgba(15,27,51,.06), inset 0 1px 0 rgba(255,255,255,.5);
-backdrop-filter:blur(16px) saturate(1.04);
--webkit-backdrop-filter:blur(16px) saturate(1.04);
+background:linear-gradient(180deg, rgba(255,253,238,.82), rgba(255,250,220,.65));
+border-color:rgba(200,160,0,.14);
+box-shadow:0 14px 34px rgba(11,26,60,.07), inset 0 1px 0 rgba(255,248,200,.5);
+backdrop-filter:blur(16px) saturate(1.06);
+-webkit-backdrop-filter:blur(16px) saturate(1.06);
 }
 
 html[data-theme="light"] #side,
@@ -394,7 +395,7 @@ html[data-theme="light"] .slogo,
 html[data-theme="light"] #head,
 html[data-theme="light"] .sp-head,
 html[data-theme="light"] .sp-nav{
-background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62));
+background:linear-gradient(180deg, rgba(255,252,228,.88), rgba(255,248,210,.72));
 }
 
 html[data-theme="light"] .ni:hover,
@@ -468,11 +469,11 @@ html:not([data-theme]) .qa-btn,
 html:not([data-theme]) .tab-nav,
 html:not([data-theme]) .att-day,
 html:not([data-theme]) .att-b{
-background:linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.56));
-border-color:rgba(255,255,255,.62);
-box-shadow:0 14px 34px rgba(15,27,51,.06), inset 0 1px 0 rgba(255,255,255,.5);
-backdrop-filter:blur(16px) saturate(1.04);
--webkit-backdrop-filter:blur(16px) saturate(1.04);
+background:linear-gradient(180deg, rgba(255,253,238,.82), rgba(255,250,220,.65));
+border-color:rgba(200,160,0,.14);
+box-shadow:0 14px 34px rgba(11,26,60,.07), inset 0 1px 0 rgba(255,248,200,.5);
+backdrop-filter:blur(16px) saturate(1.06);
+-webkit-backdrop-filter:blur(16px) saturate(1.06);
 }
 
 html:not([data-theme]) #side,
@@ -480,7 +481,7 @@ html:not([data-theme]) .slogo,
 html:not([data-theme]) #head,
 html:not([data-theme]) .sp-head,
 html:not([data-theme]) .sp-nav{
-background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62));
+background:linear-gradient(180deg, rgba(255,252,228,.88), rgba(255,248,210,.72));
 }
 }
 
@@ -593,3 +594,59 @@ background:linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.62))
 @media (min-width: 1280px) {
     #main { padding: 28px 36px; }
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* ALTIN/LACİVERT TEMA — EK DÜZELTMELER                      */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Bildirim sayaç rozeti: koyu tema'da altın çerçeve */
+.notif-count{background:rgba(245,196,0,.16);color:#f5c400;border:1px solid rgba(245,196,0,.35);font-weight:800}
+
+/* Açık temada bildirim rozeti lacivert */
+html[data-theme="light"] .notif-count,
+html:not([data-theme]) .notif-count{background:rgba(11,34,92,.1);color:#0b225c;border:1px solid rgba(11,34,92,.2)}
+
+/* Koyu temada hover/aktif kart arka planları → altın ton */
+.pay-choice-card:hover,.pay-method-btn:hover{background:rgba(245,196,0,.07)!important}
+.pay-choice-card.active,.pay-method-btn.active{background:rgba(245,196,0,.14)!important;border-color:rgba(245,196,0,.5)!important}
+.sp-plan-cb-row.checked{background:rgba(245,196,0,.09)!important;border-color:rgba(245,196,0,.45)!important}
+.excel-drop-zone:hover,.excel-drop-zone.drag-over{background:rgba(245,196,0,.06)!important}
+.ath-tag{background:rgba(245,196,0,.15);color:#f5c400}
+
+/* Seçim kutusu ve etiket rengi */
+*{accent-color:#f5c400}
+html[data-theme="light"] *,html:not([data-theme]) *{accent-color:#0b225c}
+
+/* Spinner → altın */
+.spinner{border-top-color:#f5c400!important}
+html[data-theme="light"] .spinner,html:not([data-theme]) .spinner{border-top-color:#0b225c!important}
+
+/* Tablo hover → hafif altın ton (koyu temada) */
+.tw tr:hover td{background:rgba(245,196,0,.04)!important}
+html[data-theme="light"] .tw tr:hover td,
+html:not([data-theme]) .tw tr:hover td{background:rgba(11,34,92,.04)!important}
+
+/* Ön kayıt rozeti: siyah yerine lacivert metin */
+#onkayit-badge{color:#0b225c!important}
+
+/* İstatistik kutusu değer rengi: açık temada lacivert */
+html[data-theme="light"] .stat-box-value,
+html:not([data-theme]) .stat-box-value{color:#0b225c}
+
+/* Bağlantı ve odak çerçevesi açık temada lacivert */
+html[data-theme="light"] :focus-visible,
+html:not([data-theme]) :focus-visible{outline-color:#0b225c}
+
+/* Koyu temada stat-b ikonu → altın */
+.stat-b .stat-icon{background:rgba(245,196,0,.18)!important;color:#f5c400!important}
+
+/* Notif panel bilgi çizgisi → altın */
+.notif-item-info{border-left-color:#f5c400}
+html[data-theme="light"] .notif-item-info,
+html:not([data-theme]) .notif-item-info{border-left-color:#0b225c}
+
+/* Logo ikonu: lacivert arka plan üzerinde altın top → güzel */
+html[data-theme="light"] .slogo-icon,html:not([data-theme]) .slogo-icon{color:#f5c400!important}
+
+/* Sosyal buton hover'larında sarı gölge */
+html[data-theme="light"] .lbox,html:not([data-theme]) .lbox{box-shadow:0 20px 40px rgba(11,34,92,.12),0 0 0 1px rgba(200,160,0,.1)}
