@@ -2436,6 +2436,46 @@ function buildAutoAlerts() {
         alerts.push({ type: 'danger', icon: '⚠️', msg: riskAthletes.length + ' sporcu %30 altında devam oranıyla risk altında.', action: "go('athletes')" });
     }
 
+    // ── Doğum günü uyarıları (5 gün içinde) ────────────────
+    var todayDate = new Date(today + 'T00:00:00');
+    var upcomingBirthdays = (AppState.data.athletes || []).filter(function(a) {
+        if (a.st !== 'active' || !a.bd) return false;
+        var parts = a.bd.split('-');
+        if (parts.length < 3) return false;
+        // Bu yılki doğum gününü hesapla
+        var bdThisYear = todayDate.getFullYear() + '-' + parts[1] + '-' + parts[2];
+        var bdDate = new Date(bdThisYear + 'T00:00:00');
+        var diffMs = bdDate - todayDate;
+        var diffDays = Math.round(diffMs / 86400000);
+        // Doğum günü geçtiyse gelecek yılı dene
+        if (diffDays < 0) {
+            var bdNextYear = (todayDate.getFullYear() + 1) + '-' + parts[1] + '-' + parts[2];
+            bdDate = new Date(bdNextYear + 'T00:00:00');
+            diffDays = Math.round((bdDate - todayDate) / 86400000);
+        }
+        return diffDays >= 0 && diffDays <= 5;
+    });
+    if (upcomingBirthdays.length > 0) {
+        upcomingBirthdays.forEach(function(a) {
+            var parts = a.bd.split('-');
+            var bdThisYear = todayDate.getFullYear() + '-' + parts[1] + '-' + parts[2];
+            var bdDate = new Date(bdThisYear + 'T00:00:00');
+            var diffDays = Math.round((bdDate - todayDate) / 86400000);
+            if (diffDays < 0) {
+                bdDate = new Date((todayDate.getFullYear() + 1) + '-' + parts[1] + '-' + parts[2] + 'T00:00:00');
+                diffDays = Math.round((bdDate - todayDate) / 86400000);
+            }
+            var age = bdDate.getFullYear() - parseInt(parts[0]);
+            var diffLabel = diffDays === 0 ? 'Bugün' : diffDays === 1 ? 'Yarın' : diffDays + ' gün sonra';
+            alerts.push({
+                type: 'birthday',
+                icon: '🎂',
+                msg: a.fn + ' ' + a.ln + ' — ' + diffLabel + ' (' + age + '. yaş doğum günü)',
+                action: "go('calendar')"
+            });
+        });
+    }
+
     AppState.data.autoAlerts = alerts;
     if (typeof refreshNotifBadges === 'function') refreshNotifBadges();
     return alerts;
@@ -2555,6 +2595,32 @@ function initCalendarChart() {
         });
     }
 
+    // ── Doğum günleri ────────────────────────────────────────
+    var calStart = new Date(); calStart.setDate(calStart.getDate() - 60);
+    var calEnd = new Date(); calEnd.setDate(calEnd.getDate() + 365);
+    var nowYear = new Date().getFullYear();
+    (AppState.data.athletes || []).filter(function(a) { return a.st === 'active' && a.bd && a.bd.length >= 10; }).forEach(function(a) {
+        var parts = a.bd.split('-');
+        if (parts.length < 3) return;
+        var bdMonth = parts[1], bdDay = parts[2], birthYear = parseInt(parts[0]);
+        // Bu yıl ve gelecek yıl için doğum günü ekle
+        [nowYear, nowYear + 1].forEach(function(yr) {
+            var bdDate = yr + '-' + bdMonth + '-' + bdDay;
+            var bdMs = new Date(bdDate + 'T00:00:00');
+            if (bdMs < calStart || bdMs > calEnd) return;
+            var age = yr - birthYear;
+            events.push({
+                title: '🎂 ' + a.fn + ' ' + a.ln + ' (' + age + '. yaş)',
+                start: bdDate,
+                allDay: true,
+                backgroundColor: '#ec4899',
+                borderColor: 'transparent',
+                textColor: '#fff',
+                extendedProps: { type: 'birthday', athleteName: a.fn + ' ' + a.ln, age: age, athleteId: a.id }
+            });
+        });
+    });
+
     var cal = new FullCalendar.Calendar(el, {
         initialView: 'dayGridMonth', locale: 'tr',
         firstDay: 1,
@@ -2563,7 +2629,9 @@ function initCalendarChart() {
         events: events,
         eventClick: function(info) {
             var ep = info.event.extendedProps;
-            if (ep.clsName !== undefined) {
+            if (ep.type === 'birthday') {
+                if (typeof toast === 'function') toast('🎂 ' + ep.athleteName + ' — ' + ep.age + '. yaş doğum günü!', 'g');
+            } else if (ep.clsName !== undefined) {
                 var msg = '🏫 ' + (ep.clsName||'') + (ep.ts ? ' · ' + ep.ts : '');
                 if (ep.hasAtt) msg += '  |  ✅ ' + ep.present + ' Var  ❌ ' + ep.absent + ' Yok';
                 else msg += (ep.isPast ? '  |  Yoklama girilmedi' : '  |  Planlandı');
