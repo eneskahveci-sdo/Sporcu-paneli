@@ -691,6 +691,30 @@ html[data-theme="light"] .lbox,html:not([data-theme]) .lbox{box-shadow:0 20px 40
 html[data-theme="light"] .acc-header:not([aria-expanded="true"]),
 html:not([data-theme]) .acc-header:not([aria-expanded="true"]){color:#1a3060;font-weight:600}
 
+/* ── Sporcu portalı: 5 sekme yatay scroll (taşma yok) ───────── */
+.sp-nav{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap}
+.sp-nav::-webkit-scrollbar{display:none}
+.sp-tab{white-space:nowrap;flex-shrink:0}
+
+/* ── Kimlik Kartı bileşeni (kk-) ────────────────────────────── */
+.kk-card{background:linear-gradient(135deg,#0a1628 0%,#1a2f55 100%);border-radius:18px;overflow:hidden;max-width:420px;margin:0 auto;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.kk-stripe{height:6px;background:linear-gradient(90deg,#f5c400,#e69d00,#f5c400)}
+.kk-content{padding:20px}
+.kk-top{display:flex;align-items:flex-start;gap:14px}
+.kk-avatar{width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,#f5c400,#e69d00);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#0a1628;flex-shrink:0}
+.kk-details{flex:1;min-width:0}
+.kk-name{font-size:18px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kk-org{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:4px}
+.kk-qr{border-radius:8px;background:#fff;padding:4px;flex-shrink:0}
+.kk-divider{height:1px;background:rgba(255,255,255,.12);margin:14px 0}
+.kk-fields{display:flex;flex-direction:column;gap:6px}
+.kk-field{display:flex;justify-content:space-between;align-items:center}
+.kk-label{font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px}
+.kk-value{font-size:13px;font-weight:600;color:#fff}
+
+/* ── Yazdır: modal içindeki kimlik kartı görünsün ────────────── */
+@media print{body>*{display:none!important}#modal{display:block!important;position:static!important;background:#fff!important;z-index:auto!important}.m-head,.m-foot{display:none!important}.m-body{overflow:visible!important;padding:0!important}.kk-card{box-shadow:none!important;max-width:100%!important}}
+
 /* Koyu tema: nav hover belirgin */
 .ni:hover{color:var(--text)!important}
 

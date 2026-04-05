@@ -5100,3 +5100,181 @@ window.generatePaymentHistory = function(athleteId) {
 })();
 
 // Geliştirme 1-28 uygulandı — script-fixes.js V15
+
+// ════════════════════════════════════════════════════════════
+// ÖZELLİK 1: Dijital Sporcu Kimlik Kartı
+// ════════════════════════════════════════════════════════════
+window.showKimlikKarti = function() {
+    var a = AppState.currentSporcu;
+    if (!a) return;
+
+    var org = (AppState.data && AppState.data.settings && AppState.data.settings.schoolName) || 'Dragos Futbol Akademisi';
+    var cls = AppState.data.classes && AppState.data.classes.find(function(c) { return c.id === a.clsId; });
+    var initials = window.FormatUtils ? FormatUtils.initials(a.fn, a.ln) : ((a.fn || '?')[0] + (a.ln || '?')[0]).toUpperCase();
+    var fullName = FormatUtils.escape((a.fn || '') + ' ' + (a.ln || ''));
+    var sport    = FormatUtils.escape(a.sp || '-');
+    var clsName  = FormatUtils.escape(cls ? cls.name : '-');
+    var lic      = FormatUtils.escape(a.lic || 'Lisans Yok');
+    var rd       = a.rd ? DateUtils.format(a.rd) : '-';
+    var qrText   = encodeURIComponent((a.fn || '') + ' ' + (a.ln || '') + ' | ' + (a.lic || '') + ' | ' + org);
+    var qrUrl    = 'https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=' + qrText;
+
+    var body = '<div id="kimlik-karti-wrap">'
+        + '<div class="kk-card">'
+        + '<div class="kk-stripe"></div>'
+        + '<div class="kk-content">'
+        + '<div class="kk-top">'
+        + '<div class="kk-avatar">' + initials + '</div>'
+        + '<div class="kk-details">'
+        + '<div class="kk-name">' + fullName + '</div>'
+        + '<div class="kk-org">' + FormatUtils.escape(org) + '</div>'
+        + '<div style="margin-top:6px"><span class="badge badge-blue">' + sport + '</span></div>'
+        + '</div>'
+        + '<img class="kk-qr" src="' + qrUrl + '" alt="QR Kod" width="90" height="90" loading="lazy"/>'
+        + '</div>'
+        + '<div class="kk-divider"></div>'
+        + '<div class="kk-fields">'
+        + '<div class="kk-field"><span class="kk-label">Sınıf</span><span class="kk-value">' + clsName + '</span></div>'
+        + '<div class="kk-field"><span class="kk-label">Lisans No</span><span class="kk-value">' + lic + '</span></div>'
+        + '<div class="kk-field"><span class="kk-label">Kayıt Tarihi</span><span class="kk-value">' + rd + '</span></div>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+
+    modal('&#x1FA7A; Kimlik Kartım', body, [
+        { lbl: '&#x1F5A8;&#xFE0F; Yazdır', cls: 'bp', fn: function() { window.print(); } },
+        { lbl: 'Kapat', cls: 'bs', fn: closeModal }
+    ]);
+};
+
+// ════════════════════════════════════════════════════════════
+// ÖZELLİK 3: Sporcu Karnesi
+// ════════════════════════════════════════════════════════════
+window.spKarne = function() {
+    var a = AppState.currentSporcu;
+    if (!a) return '';
+
+    var attStats = getAttendanceStats(a.id);
+    var payStats  = getPaymentStats(a.id);
+    var cls   = AppState.data.classes && AppState.data.classes.find(function(c) { return c.id === a.clsId; });
+    var coach = cls ? (AppState.data.coaches && AppState.data.coaches.find(function(c) { return c.id === cls.coachId; })) : null;
+
+    // Devam oranına göre performans değerlendirmesi
+    var perfLabel, perfColor, perfIcon, stars;
+    if (attStats.rate >= 85)      { perfLabel = 'Mükemmel';    perfColor = 'tg';  perfIcon = '&#x1F31F;'; stars = '&#x2605;&#x2605;&#x2605;'; }
+    else if (attStats.rate >= 65) { perfLabel = 'İyi';         perfColor = 'tb';  perfIcon = '&#x1F44D;'; stars = '&#x2605;&#x2605;&#x2606;'; }
+    else if (attStats.rate >= 40) { perfLabel = 'Geliştirilmeli'; perfColor = 'ty'; perfIcon = '&#x1F4C8;'; stars = '&#x2605;&#x2606;&#x2606;'; }
+    else                          { perfLabel = 'Yetersiz';    perfColor = 'tr2'; perfIcon = '&#x26A0;&#xFE0F;'; stars = '&#x2606;&#x2606;&#x2606;'; }
+
+    var payBadge = payStats.totalDebt <= 0
+        ? '<span class="badge badge-green">Borç Yok ✓</span>'
+        : '<span class="badge badge-red">Borç: ' + FormatUtils.currency(payStats.totalDebt) + '</span>';
+
+    var noteHtml = a.nt
+        ? '<div class="info-card">'
+          + '<div class="info-card-title">&#x1F4DD; Antrenör Notu</div>'
+          + '<div style="color:var(--text2);font-size:14px;line-height:1.7;padding:4px 0">'
+          + FormatUtils.escape(a.nt)
+          + '</div></div>'
+        : '<div class="info-card" style="text-align:center;padding:24px 20px">'
+          + '<div style="font-size:32px;margin-bottom:8px">&#x270F;&#xFE0F;</div>'
+          + '<div class="tm ts">Antrenörünüz henüz değerlendirme notu eklememiş.</div>'
+          + '</div>';
+
+    var today = new Date();
+    var donem = today.getMonth() < 6 ? '1. Dönem (Ocak \u2013 Haziran)' : '2. Dönem (Temmuz \u2013 Aralık)';
+    var period = today.getFullYear() + ' / ' + donem;
+    var coachName = coach ? FormatUtils.escape((coach.fn || '') + ' ' + (coach.ln || '')) : '-';
+
+    return '<div style="max-width:600px;margin:0 auto;padding:0 2px">'
+        // Dönem başlığı
+        + '<div class="info-card" style="text-align:center;padding:24px;margin-bottom:12px">'
+        + '<div style="font-size:40px;margin-bottom:6px">&#x1F4CB;</div>'
+        + '<div class="tw6" style="font-size:18px;margin-bottom:2px">' + FormatUtils.escape((a.fn || '') + ' ' + (a.ln || '')) + '</div>'
+        + '<div class="ts tm" style="margin-bottom:4px">' + FormatUtils.escape(period) + '</div>'
+        + '<div class="ts" style="color:var(--text3)">Antrenör: ' + coachName + '</div>'
+        + '</div>'
+
+        // Genel değerlendirme
+        + '<div class="info-card" style="margin-bottom:12px">'
+        + '<div class="info-card-title">&#x1F3C5; Genel Değerlendirme</div>'
+        + '<div style="display:flex;align-items:center;gap:16px;padding:8px 0">'
+        + '<div style="font-size:36px">' + perfIcon + '</div>'
+        + '<div style="flex:1">'
+        + '<div class="' + perfColor + '" style="font-size:20px;font-weight:800">' + perfLabel + '</div>'
+        + '<div class="ts tm" style="margin-top:2px">Devam oranı: ' + attStats.rate + '%</div>'
+        + '</div>'
+        + '<div style="font-size:26px;letter-spacing:3px;color:var(--yellow)">' + stars + '</div>'
+        + '</div>'
+        + '</div>'
+
+        // Devam istatistikleri
+        + '<div class="stats-grid" style="margin-bottom:12px">'
+        + '<div class="stat-box"><div class="stat-box-value tb">' + attStats.rate + '%</div><div class="stat-box-label">Devam Oranı</div></div>'
+        + '<div class="stat-box"><div class="stat-box-value tg">' + attStats.present + '</div><div class="stat-box-label">Geldi</div></div>'
+        + '<div class="stat-box"><div class="stat-box-value tr2">' + attStats.absent + '</div><div class="stat-box-label">Gelmedi</div></div>'
+        + '</div>'
+
+        // Ödeme durumu
+        + '<div class="info-card" style="margin-bottom:12px">'
+        + '<div class="info-card-title">&#x1F4B0; Ödeme Durumu</div>'
+        + '<div class="info-row"><span class="info-label">Toplam Ödenen</span><span class="info-value tg">' + FormatUtils.currency(payStats.totalPaid) + '</span></div>'
+        + '<div class="info-row" style="border:none"><span class="info-label">Durum</span><span class="info-value">' + payBadge + '</span></div>'
+        + '</div>'
+
+        // Antrenör notu
+        + noteHtml
+
+        // Kimlik kartı butonu
+        + '<div style="text-align:center;padding:20px 0 8px">'
+        + '<button class="btn bp" onclick="showKimlikKarti()" style="min-width:180px">&#x1FA7A; Kimlik Kartımı Görüntüle</button>'
+        + '</div>'
+        + '</div>';
+};
+
+// ════════════════════════════════════════════════════════════
+// SON spTab OVERRİDE — Karne + Mesajlar + Debounce (final)
+// ════════════════════════════════════════════════════════════
+var _spTabRefreshingFinal = false;
+window.spTab = function(tab) {
+    if (tab === 'odeme-yap') tab = 'odemeler';
+
+    document.querySelectorAll('.sp-tab').forEach(function(el) {
+        var elTab = el.getAttribute('data-tab');
+        if (elTab) {
+            el.classList.toggle('on', elTab === tab);
+            el.setAttribute('aria-selected', elTab === tab ? 'true' : 'false');
+        }
+    });
+
+    var content = document.getElementById('sp-content');
+    var pages = {
+        profil:    spProfil,
+        yoklama:   spYoklama,
+        odemeler:  spOdemeler,
+        karne:     spKarne,
+        mesajlar:  spMesajlar
+    };
+
+    // Ödeme sekmesi: taze veri çek, debounce ile paralel istek engelle
+    if (tab === 'odemeler' && AppState.currentSporcu) {
+        if (_spTabRefreshingFinal) return;
+        _spTabRefreshingFinal = true;
+        if (content) content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)">&#x23F3; Yükleniyor...</div>';
+        refreshSporcuPayments()
+            .then(function() { if (content && pages[tab]) content.innerHTML = pages[tab](); })
+            .catch(function() { if (content && pages[tab]) content.innerHTML = pages[tab](); })
+            .then(function() { _spTabRefreshingFinal = false; });
+        return;
+    }
+
+    // Mesajlar sekmesi: asenkron yükle
+    if (tab === 'mesajlar') {
+        if (content) content.innerHTML = typeof spMesajlar === 'function' ? spMesajlar() : '';
+        if (typeof _loadSporcuMessages === 'function') _loadSporcuMessages();
+        return;
+    }
+
+    if (content && pages[tab]) content.innerHTML = pages[tab]();
+};
