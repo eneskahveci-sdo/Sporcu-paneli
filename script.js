@@ -204,7 +204,7 @@ const AppState = {
     },
     filters: {
         athletes: { sp: '', st: '', cls: '', q: '' },
-        payments: { st: '', q: '' }
+        payments: { st: '', q: '', src: '' }
     },
     ui: {
         curPage: 'dashboard',
@@ -680,6 +680,7 @@ const DB = {
                 slipCode: r.slip_code || '',
                 taxRate: r.tax_rate || 0,
                 taxAmount: r.tax_amount || 0,
+                receiptNo: r.receipt_no || '',
                 orgId: r.org_id || '',
                 branchId: r.branch_id || ''
             };
@@ -694,7 +695,10 @@ const DB = {
                 source: p.source || 'manual',
                 notif_status: p.notifStatus || '',
                 pay_method: p.payMethod || '',
-                slip_code: p.slipCode || ''
+                slip_code: p.slipCode || '',
+                tax_rate: p.taxRate || 0,
+                tax_amount: p.taxAmount || 0,
+                receipt_no: p.receiptNo || ''
             };
         },
         toCoach(r) {
@@ -1590,7 +1594,7 @@ function getPaymentStats(aid) {
         .filter(p => p.ty === 'income' && p.st === 'completed')
         .reduce((s, p) => s + (p.amt || 0), 0);
     const totalDebt = payments
-        .filter(p => p.st === 'pending' || p.st === 'overdue')
+        .filter(p => p.ty === 'income' && (p.st === 'pending' || p.st === 'overdue'))
         .reduce((s, p) => s + (p.amt || 0), 0);
     const lastPayment = payments
         .filter(p => p.st === 'completed')
@@ -2935,10 +2939,16 @@ window.setAtt = async function(aid, status) {
 };
 
 function pgPayments() {
-    const activeTab = AppState.ui.paymentsTab || 'islemler';
-    let list = [...AppState.data.payments];
+    // Filtre objesini güvenceye al — src alanı yoksa ekle
+    if (!AppState.filters.payments) AppState.filters.payments = { st: '', q: '', src: '' };
+    if (!('src' in AppState.filters.payments)) AppState.filters.payments.src = '';
+
     const f = AppState.filters.payments;
+    let list = [...AppState.data.payments];
+
+    // Filtreleri uygula
     if (f.st) list = list.filter(p => p.st === f.st);
+    if (f.src) list = list.filter(p => (p.source || 'manual') === f.src);
     if (f.q) {
         const q = f.q.toLowerCase();
         list = list.filter(p =>
@@ -2947,8 +2957,10 @@ function pgPayments() {
             (p.serviceName || '').toLowerCase().includes(q)
         );
     }
+    // Tarihe göre sırala (yeniden eskiye)
+    list.sort((a, b) => (b.dt || '').localeCompare(a.dt || ''));
+
     const total = list.reduce((s, p) => s + (p.ty === 'income' ? (p.amt || 0) : -(p.amt || 0)), 0);
-    // Status counts for mini charts (from filtered list)
     const completedCount = list.filter(p => p.st === 'completed').length;
     const pendingCount = list.filter(p => p.st === 'pending').length;
     const overdueCount = list.filter(p => p.st === 'overdue').length;
@@ -2978,77 +2990,52 @@ function pgPayments() {
         }).join('')}
     </div>` : '';
 
-    // Ödeme Planları sekmesi içeriği
-    const planlar = (AppState.data.payments || []).filter(p => p.source === 'plan');
-
-    // --- Feature 1: Multi-select athlete component ---
-    const athleteCheckboxes = _buildAthleteCheckboxes('plan-ath-cb', true);
-
-    const planSection = `
-    <div class="card mb3" style="border-left:4px solid var(--blue2)">
-        <div class="flex fjb fca mb3">
-            <div class="tw6 tsm">📅 Sporcu Ödeme Planı Oluştur</div>
-        </div>
-        <div class="fgr mb2">
-            <label>Sporcu(lar) *</label>
-            <input id="plan-ath-search" type="text" placeholder="Sporcu ara..." oninput="filterPlanAthletes()" style="margin-bottom:6px"/>
-            <div class="flex gap2 mb2">
-                <button type="button" class="btn btn-xs bs" onclick="toggleAllPlanAthletes(true)">✅ Tümünü Seç</button>
-                <button type="button" class="btn btn-xs bd" onclick="toggleAllPlanAthletes(false)">✕ Seçimi Temizle</button>
-            </div>
-            <div id="plan-ath-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">${athleteCheckboxes}</div>
-            <div id="plan-ath-tags" class="flex fwrap gap1 mt1" style="min-height:0"></div>
-        </div>
-        <div class="g21 mb2">
-            <div class="fgr">
-                <label>Ödeme Tutarı (₺) *</label>
-                <input id="plan-amt" type="number" placeholder="Aylık tutar"/>
-            </div>
-            <div class="fgr">
-                <label>Ay *</label>
-                <input id="plan-month" type="month" value="${DateUtils.today().slice(0,7)}"/>
-            </div>
-        </div>
-        <div class="fgr mb2">
-            <label>Açıklama</label>
-            <input id="plan-desc" placeholder="Örn: Ocak Aidatı"/>
-        </div>
-        <div class="flex gap2 mb3">
-            <button class="btn bp" onclick="createPaymentPlan()">+ Tek Ay Ekle</button>
-            <button class="btn bs" onclick="showBulkPlanModal()">📆 Toplu Plan Oluştur</button>
-        </div>
-    </div>
-
-    ${_buildGroupedPlanList(planlar)}`;
+    // Sayfalama
+    const _payPage = AppState.ui.payPage || 0;
+    const _hasFilter = !!(f.q || f.st || f.src);
+    const _payList = _hasFilter ? list : list.slice(_payPage * 25, (_payPage + 1) * 25);
+    const _pagBar = (!_hasFilter && window._paginationBar) ? window._paginationBar(_payPage, list.length, '_payChangePage') : '';
 
     return `
     <div class="ph"><div class="stit">Ödemeler</div></div>
     ${notifSection}
-    <div class="flex gap2 mb3" style="border-bottom:1px solid var(--border);padding-bottom:0">
-        <button onclick="AppState.ui.paymentsTab='islemler';go('payments')" style="padding:10px 18px;border:none;cursor:pointer;border-bottom:${activeTab==='islemler'?'2px solid var(--blue2)':'2px solid transparent'};background:none;color:${activeTab==='islemler'?'var(--blue2)':'var(--text2)'};font-weight:${activeTab==='islemler'?'700':'400'};font-size:14px">💳 Tüm İşlemler</button>
-        <button onclick="AppState.ui.paymentsTab='planlar';go('payments')" style="padding:10px 18px;border:none;cursor:pointer;border-bottom:${activeTab==='planlar'?'2px solid var(--blue2)':'2px solid transparent'};background:none;color:${activeTab==='planlar'?'var(--blue2)':'var(--text2)'};font-weight:${activeTab==='planlar'?'700':'400'};font-size:14px">📅 Ödeme Planları</button>
-    </div>
-    ${activeTab === 'planlar' ? planSection : `
+
+    <!-- İşlem Çubuğu -->
     <div class="flex fjb fca mb3 gap2 fwrap">
         <div class="flex gap2 fca fwrap">
             <button class="btn bp" onclick="editPay()">+ Yeni İşlem</button>
-            <input class="fs" style="width:180px" type="search" placeholder="🔍 Ara..."
-                value="${FormatUtils.escape(AppState.filters.payments.q || '')}"
-                oninput="AppState.filters.payments.q=this.value;go('payments')"/>
-            <select class="fs" onchange="AppState.filters.payments.st=this.value;go('payments')">
-                <option value="">Tüm Durumlar</option>
-                <option value="completed"${AppState.filters.payments.st==='completed'?' selected':''}>Ödendi</option>
-                <option value="pending"${AppState.filters.payments.st==='pending'?' selected':''}>Bekliyor</option>
-                <option value="overdue"${AppState.filters.payments.st==='overdue'?' selected':''}>Gecikti</option>
-            </select>
+            <button class="btn bs" onclick="showPlanCreateModal()">📅 Plan Oluştur</button>
+            <button class="btn bs" onclick="showBulkPlanModal()">📆 Toplu Plan</button>
         </div>
         <div class="flex gap2 fca">
             <button class="btn bs" onclick="exportPayments()">&#x1F4E4; İndir</button>
-            <span class="tw6 tb">Net: ${FormatUtils.currency(total)}</span>
+            <span class="tw6 ${total >= 0 ? 'tg' : 'tr2'}">Net: ${FormatUtils.currency(total)}</span>
         </div>
     </div>
+
+    <!-- Filtreler -->
     <div class="flex gap2 fwrap mb3">
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:120px">
+        <input class="fs" style="min-width:160px;flex:1" type="search" placeholder="🔍 Ara..."
+            value="${FormatUtils.escape(f.q || '')}"
+            oninput="AppState.filters.payments.q=this.value;AppState.ui.payPage=0;go('payments')"/>
+        <select class="fs" onchange="AppState.filters.payments.st=this.value;AppState.ui.payPage=0;go('payments')">
+            <option value="">Tüm Durumlar</option>
+            <option value="completed"${f.st==='completed'?' selected':''}>Ödendi</option>
+            <option value="pending"${f.st==='pending'?' selected':''}>Bekliyor</option>
+            <option value="overdue"${f.st==='overdue'?' selected':''}>Gecikti</option>
+        </select>
+        <select class="fs" onchange="AppState.filters.payments.src=this.value;AppState.ui.payPage=0;go('payments')">
+            <option value="">Tüm Kaynaklar</option>
+            <option value="plan"${f.src==='plan'?' selected':''}>📅 Ödeme Planları</option>
+            <option value="manual"${f.src==='manual'?' selected':''}>✏️ Manuel</option>
+            <option value="paytr"${f.src==='paytr'?' selected':''}>🔵 Online (PayTR)</option>
+            <option value="parent_notification"${f.src==='parent_notification'?' selected':''}>📩 Veli Bildirimi</option>
+        </select>
+    </div>
+
+    <!-- Özet Kartları -->
+    <div class="flex gap2 fwrap mb3">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='completed'?'':'completed');AppState.ui.payPage=0;go('payments')">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--green)" stroke-width="4" stroke-dasharray="${(completedCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
@@ -3058,7 +3045,7 @@ function pgPayments() {
                 <div style="font-size:11px;color:var(--text2)">Ödendi</div>
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:120px">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='pending'?'':'pending');AppState.ui.payPage=0;go('payments')">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--yellow)" stroke-width="4" stroke-dasharray="${(pendingCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
@@ -3068,7 +3055,7 @@ function pgPayments() {
                 <div style="font-size:11px;color:var(--text2)">Bekliyor</div>
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:120px">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='overdue'?'':'overdue');AppState.ui.payPage=0;go('payments')">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--red)" stroke-width="4" stroke-dasharray="${(overdueCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
@@ -3079,13 +3066,11 @@ function pgPayments() {
             </div>
         </div>
     </div>
-    ${(function(){
-        var _payPage = AppState.ui.payPage || 0;
-        var _payTotal = list.length;
-        var _payList = f.q ? list : list.slice(_payPage * 25, (_payPage + 1) * 25);
-        var _pagBar = (!f.q && window._paginationBar) ? window._paginationBar(_payPage, _payTotal, '_payChangePage') : '';
-        return _buildGroupedTransactionList(_payList) + (_pagBar ? '<div class="card" style="padding:0;margin-top:-1px">' + _pagBar + '</div>' : '');
-    })()}`}`;
+
+    <!-- İşlem Listesi -->
+    ${_buildGroupedTransactionList(_payList)}
+    ${_pagBar ? '<div class="card" style="padding:0;margin-top:-1px">' + _pagBar + '</div>' : ''}
+    `;
 }
 
 window.editPay = function(id) {
@@ -3137,6 +3122,9 @@ window.editPay = function(id) {
         <label>Ödeme Yöntemi</label>
         <select id="p-method">
             <option value="">Belirtilmedi</option>
+            <option value="nakit"${p?.payMethod === 'nakit' ? ' selected' : ''}>💵 Nakit</option>
+            <option value="kredi_karti"${p?.payMethod === 'kredi_karti' ? ' selected' : ''}>💳 Kredi Kartı</option>
+            <option value="havale"${p?.payMethod === 'havale' ? ' selected' : ''}>🏦 Havale/EFT</option>
             <option value="paytr"${p?.payMethod === 'paytr' ? ' selected' : ''}>🔵 PayTR Online</option>
         </select>
     </div>
@@ -3309,7 +3297,7 @@ function _buildGroupedPlanList(planlar) {
     const groupKeys = Object.keys(groups).sort((a, b) => groups[a].name.localeCompare(groups[b].name, 'tr'));
     const accordionItems = groupKeys.map((key, idx) => {
         const g = groups[key];
-        const totalDebt = g.plans.reduce((s, p) => s + (p.amt || 0), 0);
+        const totalDebt = g.plans.filter(p => p.ty !== 'expense' && p.st !== 'completed').reduce((s, p) => s + (p.amt || 0), 0);
         const rows = g.plans.sort((a, b) => b.dt.localeCompare(a.dt)).map(p => `
             <tr>
                 <td>${FormatUtils.escape(p.ds || DateUtils.format(p.dt))}</td>
