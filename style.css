@@ -422,7 +422,7 @@ html[data-theme="light"] .bp{color:#fff;}
 html[data-theme="light"] .pay-method-btn.active,
 html[data-theme="light"] .pay-choice-card.active,
 html[data-theme="light"] .acc-header[aria-expanded="true"]{
-color:#0B225C;
+color:#fff;
 }
 
 html[data-theme="light"] .bg-y,

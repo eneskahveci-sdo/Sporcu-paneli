@@ -503,7 +503,7 @@ function applyTheme(theme) {
         if (btn) btn.innerHTML = '&#x25D0;';
         if (spBtn) spBtn.innerHTML = '&#x25D0;';
     } else {
-        document.documentElement.removeAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', 'dark');
         if (btn) btn.innerHTML = '&#x25D1;';
         if (spBtn) spBtn.innerHTML = '&#x25D1;';
     }
