@@ -196,11 +196,11 @@ table{min-width:600px}
 }
 
 html[data-theme="light"]{
---bg:#faf7e8;
---bg2:rgba(255,255,255,.82);
---bg3:rgba(255,252,230,.68);
---bg4:rgba(248,234,160,.72);
---border:rgba(160,120,0,.12);
+--bg:#eff4f9;
+--bg2:rgba(255,255,255,.88);
+--bg3:rgba(244,248,255,.72);
+--bg4:rgba(220,232,248,.85);
+--border:rgba(11,34,92,.1);
 --border2:rgba(11,34,92,.24);
 --text:#0a1828;
 --text2:#354f72;
@@ -216,11 +216,11 @@ html[data-theme="light"]{
 
 @media(prefers-color-scheme:light){
 html:not([data-theme]){
---bg:#faf7e8;
---bg2:rgba(255,255,255,.82);
---bg3:rgba(255,252,230,.68);
---bg4:rgba(248,234,160,.72);
---border:rgba(160,120,0,.12);
+--bg:#eff4f9;
+--bg2:rgba(255,255,255,.88);
+--bg3:rgba(244,248,255,.72);
+--bg4:rgba(220,232,248,.85);
+--border:rgba(11,34,92,.1);
 --border2:rgba(11,34,92,.24);
 --text:#0a1828;
 --text2:#354f72;
@@ -383,11 +383,11 @@ html[data-theme="light"] .qa-btn,
 html[data-theme="light"] .tab-nav,
 html[data-theme="light"] .att-day,
 html[data-theme="light"] .att-b{
-background:linear-gradient(180deg, rgba(255,253,238,.82), rgba(255,250,220,.65));
-border-color:rgba(200,160,0,.14);
-box-shadow:0 14px 34px rgba(11,26,60,.07), inset 0 1px 0 rgba(255,248,200,.5);
-backdrop-filter:blur(16px) saturate(1.06);
--webkit-backdrop-filter:blur(16px) saturate(1.06);
+background:linear-gradient(180deg, rgba(255,255,255,.82), rgba(246,250,255,.66));
+border-color:rgba(11,34,92,.08);
+box-shadow:0 14px 34px rgba(11,26,60,.07), inset 0 1px 0 rgba(255,255,255,.55);
+backdrop-filter:blur(16px) saturate(1.05);
+-webkit-backdrop-filter:blur(16px) saturate(1.05);
 }
 
 html[data-theme="light"] #side,
@@ -395,7 +395,7 @@ html[data-theme="light"] .slogo,
 html[data-theme="light"] #head,
 html[data-theme="light"] .sp-head,
 html[data-theme="light"] .sp-nav{
-background:linear-gradient(180deg, rgba(255,252,228,.88), rgba(255,248,210,.72));
+background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(246,250,255,.78));
 }
 
 html[data-theme="light"] .ni:hover,
@@ -406,13 +406,15 @@ html[data-theme="light"] .pay-choice-card:hover,
 html[data-theme="light"] .bs:hover,
 html[data-theme="light"] .ht-btn:hover,
 html[data-theme="light"] .menu-btn:hover{
-background:linear-gradient(180deg, rgba(255,255,255,.86), rgba(245,249,255,.68));
+background:rgba(11,34,92,.07);
+border-color:rgba(11,34,92,.14);
 }
 
 html[data-theme="light"] .ltab.on,
 html[data-theme="light"] .tab-btn.active{
-background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(247,250,255,.7));
-box-shadow:0 10px 22px rgba(15,27,51,.05), inset 0 1px 0 rgba(255,255,255,.56);
+background:rgba(11,34,92,.08);
+color:var(--blue);
+box-shadow:0 2px 8px rgba(11,34,92,.1);
 }
 
 html[data-theme="light"] .ni.on,
@@ -469,11 +471,11 @@ html:not([data-theme]) .qa-btn,
 html:not([data-theme]) .tab-nav,
 html:not([data-theme]) .att-day,
 html:not([data-theme]) .att-b{
-background:linear-gradient(180deg, rgba(255,253,238,.82), rgba(255,250,220,.65));
-border-color:rgba(200,160,0,.14);
-box-shadow:0 14px 34px rgba(11,26,60,.07), inset 0 1px 0 rgba(255,248,200,.5);
-backdrop-filter:blur(16px) saturate(1.06);
--webkit-backdrop-filter:blur(16px) saturate(1.06);
+background:linear-gradient(180deg, rgba(255,255,255,.82), rgba(246,250,255,.66));
+border-color:rgba(11,34,92,.08);
+box-shadow:0 14px 34px rgba(11,26,60,.07), inset 0 1px 0 rgba(255,255,255,.55);
+backdrop-filter:blur(16px) saturate(1.05);
+-webkit-backdrop-filter:blur(16px) saturate(1.05);
 }
 
 html:not([data-theme]) #side,
@@ -481,7 +483,7 @@ html:not([data-theme]) .slogo,
 html:not([data-theme]) #head,
 html:not([data-theme]) .sp-head,
 html:not([data-theme]) .sp-nav{
-background:linear-gradient(180deg, rgba(255,252,228,.88), rgba(255,248,210,.72));
+background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(246,250,255,.78));
 }
 }
 
@@ -645,8 +647,27 @@ html:not([data-theme]) :focus-visible{outline-color:#0b225c}
 html[data-theme="light"] .notif-item-info,
 html:not([data-theme]) .notif-item-info{border-left-color:#0b225c}
 
-/* Logo ikonu: lacivert arka plan üzerinde altın top → güzel */
-html[data-theme="light"] .slogo-icon,html:not([data-theme]) .slogo-icon{color:#f5c400!important}
+/* Sidebar nav: açık temada güçlü lacivert metin + görünür ikonlar */
+html[data-theme="light"] .ni,
+html:not([data-theme]) .ni{color:#1a3060;font-weight:500}
+html[data-theme="light"] .ni svg,
+html:not([data-theme]) .ni svg{opacity:1;color:#1e3d80}
+html[data-theme="light"] .ni:hover,
+html:not([data-theme]) .ni:hover{color:#0b225c!important;background:rgba(11,34,92,.07)!important}
 
-/* Sosyal buton hover'larında sarı gölge */
-html[data-theme="light"] .lbox,html:not([data-theme]) .lbox{box-shadow:0 20px 40px rgba(11,34,92,.12),0 0 0 1px rgba(200,160,0,.1)}
+/* Tab butonları: aktif durumda lacivert ton, beyaz değil */
+html[data-theme="light"] .ltab:not(.on),
+html:not([data-theme]) .ltab:not(.on){color:#354f72}
+html[data-theme="light"] .ltab.on,
+html:not([data-theme]) .ltab.on{background:rgba(11,34,92,.1)!important;color:#0b225c!important;box-shadow:0 2px 8px rgba(11,34,92,.12)!important}
+
+/* Tab-btn aktif: lacivert ton */
+html[data-theme="light"] .tab-btn.active,
+html:not([data-theme]) .tab-btn.active{background:rgba(11,34,92,.08)!important;color:#0b225c!important;box-shadow:0 2px 8px rgba(11,34,92,.1)!important}
+
+/* Accordion başlık hover: temiz lacivert */
+html[data-theme="light"] .acc-header:hover,
+html:not([data-theme]) .acc-header:hover{background:rgba(11,34,92,.06)!important;color:#0b225c!important}
+
+/* Lbox gölge */
+html[data-theme="light"] .lbox,html:not([data-theme]) .lbox{box-shadow:0 20px 40px rgba(11,34,92,.13),0 0 0 1px rgba(11,34,92,.07)}
