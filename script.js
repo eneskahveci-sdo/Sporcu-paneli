@@ -221,7 +221,8 @@ const AppState = {
 };
 
 // K5: Oturum geri yükleme mutex'i — restoreSession() çalışırken doLogin() tetiklenmesin
-let _sessionRestoring = false;
+// window üzerinde tanımlanıyor: Security.js'deki kontrol (window._sessionRestoring) ile senkronize olsun
+window._sessionRestoring = false;
 
 const i18n = {
     TR: {
@@ -872,7 +873,7 @@ window.doNormalLogin = function(role) {
 };
 
 window.doLogin = async function() {
-    if (_sessionRestoring) return; // K5: oturum geri yüklenirken çift login engelle
+    if (window._sessionRestoring) return; // K5: oturum geri yüklenirken çift login engelle
     const email = UIUtils.getValue('le').toLowerCase().trim();
     const password = UIUtils.getValue('lp');
     const errEl = document.getElementById('lerr');
@@ -1024,7 +1025,7 @@ window.doLogin = async function() {
 };
 
 async function restoreSession() {
-    _sessionRestoring = true;
+    window._sessionRestoring = true;
     UIUtils.setLoading(true);
 
     try {
@@ -1130,7 +1131,7 @@ async function restoreSession() {
         StorageManager.remove('sporcu_app_branch');
         await loadLogoForLoginScreen();
     } finally {
-        _sessionRestoring = false;
+        window._sessionRestoring = false;
         UIUtils.setLoading(false);
     }
 }

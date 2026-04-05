@@ -23,7 +23,7 @@ init.js             — Supabase başlatma
 event-handlers.js   — global event listener'lar
 pwa-register.js     — Service Worker kaydı
 error-handler.js    — global hata yakalama
-sw.js               — Service Worker (PWA), STATIC_CACHE = 'dragos-static-v16'
+sw.js               — Service Worker (PWA), STATIC_CACHE = 'dragos-static-v22'
 style.css           — tek CSS dosyası
 paytr-ok.html       — PayTR başarı callback sayfası (iframe postMessage + top redirect)
 paytr-fail.html     — PayTR hata callback sayfası (iframe postMessage + top redirect)
@@ -188,7 +188,7 @@ CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`)
 1. **Büyük tek dosyalar:** `script.js` ~6000 satır. Değişiklik yaparken arama yaparak ilgili bölümü bul.
 2. **script-fixes.js override'ları:** `window.initiatePayTRPayment` ve `window.showPayTRModal` `script-fixes.js`'te override edilir. Bu fonksiyonları değiştirirken her iki dosyayı da kontrol et.
 3. **innerHTML kullanımı:** `pages[page]()` ve `modal()` innerHTML kullanıyor — XSS için `FormatUtils.escape()` zorunlu.
-4. **PWA cache:** Değişiklikler SW cache'i atlayana kadar görünmeyebilir. `sw.js`'de `STATIC_CACHE = 'dragos-static-v16'`. Değişiklik yapınca versiyon numarasını artır.
+4. **PWA cache:** Değişiklikler SW cache'i atlayana kadar görünmeyebilir. `sw.js`'de `STATIC_CACHE = 'dragos-static-v22'`. Değişiklik yapınca versiyon numarasını artır.
 5. **CSP:** `vercel.json`'da Content-Security-Policy var. Yeni CDN eklersen buraya da ekle.
 6. **anon INSERT:** Sporcu panelinden yapılan tüm INSERT'ler `anon` role ile gider. `org_id` ve `branch_id` her zaman dolu olmalı (`fromPayment` bunu garantiler).
 7. **payments.org_id tipi:** DB'de TEXT, `sessions.org_id` UUID. Farklı tiplere dikkat et.
@@ -214,6 +214,25 @@ FormatUtils.currency(amt)    // ₺ formatında para birimi
 refreshSporcuPayments()      // Sporcu ödeme listesini DB'den tazele
 handlePayTRCallback(oid, st) // PayTR sonucu işle ('success'|'fail')
 ```
+
+## Güvenlik Audit Notları (2026-04)
+
+Kapsamlı taramada tespit edilen ve düzeltilen sorunlar:
+
+### Düzeltildi ✅
+| Sorun | Dosya | Commit |
+|-------|-------|--------|
+| `frame-src https:` — herhangi HTTPS site iframe yüklenebiliyordu | vercel.json | df1d66a |
+| `_sessionRestoring` lokal var — Security.js'deki mutex kontrolü çalışmıyordu | script.js | df1d66a |
+| `Permissions-Policy` fullscreen eksikti (PayTR iframe için gerekli) | vercel.json | df1d66a |
+| `onclick` inline handler — event-handlers.js'e taşındı | index.html | — |
+| `spTab` paralel refresh — hızlı tab tıklamada çift DB isteği gidiyordu | script-fixes.js | — |
+| i18n dosyaları SW cache listesinde eksikti | sw.js | — |
+
+### Açık / Düşük Öncelikli
+- **`unsafe-inline` CSP:** index.html'de artık inline script yok; `paytr-ok.html`/`paytr-fail.html` kendi CSP'sine sahip. Ana site CSP'sinden `unsafe-inline` kaldırılabilir ancak eski tarayıcı uyumluluğu test edilmeli.
+- **Supabase CDN SRI:** `cdn.jsdelivr.net`'ten yüklenen Supabase JS'e `integrity` hash eklenebilir.
+- **`window._sessionRestoring`:** `restoreSession()` mutex'i — script.js'te `window` üzerinde tutulur, Security.js ile senkronize.
 
 ## Geliştirme Ortamı
 

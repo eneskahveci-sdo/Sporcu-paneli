@@ -55,6 +55,9 @@ function _loadScript(src, cb) {
 // 0) KRİTİK FIX: spTab() — data-tab attribute bazlı eşleştirme
 //    Orijinal spTab textContent ile eşleştiriyordu, i18n bozuyordu
 // ────────────────────────────────────────────────────────
+// Ödeme sekmesi için paralel refresh koruması
+var _spTabRefreshing = false;
+
 window.spTab = function(tab) {
     // "odeme-yap" kaldırıldı — eski çağrıları "odemeler" sayfasına yönlendir
     if (tab === 'odeme-yap') tab = 'odemeler';
@@ -75,10 +78,15 @@ window.spTab = function(tab) {
     };
 
     // Ödeme sekmesine geçince DB'den taze payments çek
+    // _spTabRefreshing bayrağı ile paralel istekler engellenir
     if (tab === 'odemeler' && AppState.currentSporcu) {
+        if (_spTabRefreshing) return;
+        _spTabRefreshing = true;
         if (content) content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)">⏳ Yükleniyor...</div>';
         refreshSporcuPayments().then(function() {
             if (content && pages[tab]) content.innerHTML = pages[tab]();
+        }).finally(function() {
+            _spTabRefreshing = false;
         });
         return;
     }
