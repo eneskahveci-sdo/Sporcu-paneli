@@ -2939,7 +2939,7 @@ window.setAtt = async function(aid, status) {
 };
 
 function pgPayments() {
-    // Filtre objesini güvenceye al — src alanı yoksa ekle
+    // Filtre objesini güvenceye al
     if (!AppState.filters.payments) AppState.filters.payments = { st: '', q: '', src: '' };
     if (!('src' in AppState.filters.payments)) AppState.filters.payments.src = '';
 
@@ -2973,7 +2973,7 @@ function pgPayments() {
             <div class="tw6 tsm">⏳ Onay Bekleyen Veli Bildirimleri <span style="background:var(--yellow);color:#000;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:800;margin-left:6px">${pendingNotifs.length}</span></div>
         </div>
         ${pendingNotifs.map(p => {
-            const methodLabel = p.payMethod === 'nakit' ? '💵 Nakit' : p.payMethod === 'kredi_karti' ? '💳 Kredi Kartı' : p.payMethod === 'havale' ? '🏦 Havale/EFT' : p.payMethod || 'Belirtilmedi';
+            const methodLabel = p.payMethod === 'nakit' ? '💵 Nakit' : p.payMethod === 'paytr' ? '🔵 PayTR' : p.payMethod || 'Belirtilmedi';
             return `
             <div style="padding:12px;background:var(--bg3);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">
                 <div class="flex fjb fca fwrap gap2">
@@ -2989,12 +2989,6 @@ function pgPayments() {
             </div>`;
         }).join('')}
     </div>` : '';
-
-    // Sayfalama
-    const _payPage = AppState.ui.payPage || 0;
-    const _hasFilter = !!(f.q || f.st || f.src);
-    const _payList = _hasFilter ? list : list.slice(_payPage * 25, (_payPage + 1) * 25);
-    const _pagBar = (!_hasFilter && window._paginationBar) ? window._paginationBar(_payPage, list.length, '_payChangePage') : '';
 
     return `
     <div class="ph"><div class="stit">Ödemeler</div></div>
@@ -3017,14 +3011,14 @@ function pgPayments() {
     <div class="flex gap2 fwrap mb3">
         <input class="fs" style="min-width:160px;flex:1" type="search" placeholder="🔍 Ara..."
             value="${FormatUtils.escape(f.q || '')}"
-            oninput="AppState.filters.payments.q=this.value;AppState.ui.payPage=0;go('payments')"/>
-        <select class="fs" onchange="AppState.filters.payments.st=this.value;AppState.ui.payPage=0;go('payments')">
+            oninput="AppState.filters.payments.q=this.value;go('payments')"/>
+        <select class="fs" onchange="AppState.filters.payments.st=this.value;go('payments')">
             <option value="">Tüm Durumlar</option>
             <option value="completed"${f.st==='completed'?' selected':''}>Ödendi</option>
             <option value="pending"${f.st==='pending'?' selected':''}>Bekliyor</option>
             <option value="overdue"${f.st==='overdue'?' selected':''}>Gecikti</option>
         </select>
-        <select class="fs" onchange="AppState.filters.payments.src=this.value;AppState.ui.payPage=0;go('payments')">
+        <select class="fs" onchange="AppState.filters.payments.src=this.value;go('payments')">
             <option value="">Tüm Kaynaklar</option>
             <option value="plan"${f.src==='plan'?' selected':''}>📅 Ödeme Planları</option>
             <option value="manual"${f.src==='manual'?' selected':''}>✏️ Manuel</option>
@@ -3035,7 +3029,7 @@ function pgPayments() {
 
     <!-- Özet Kartları -->
     <div class="flex gap2 fwrap mb3">
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='completed'?'':'completed');AppState.ui.payPage=0;go('payments')">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='completed'?'':'completed');go('payments')">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--green)" stroke-width="4" stroke-dasharray="${(completedCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
@@ -3045,7 +3039,7 @@ function pgPayments() {
                 <div style="font-size:11px;color:var(--text2)">Ödendi</div>
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='pending'?'':'pending');AppState.ui.payPage=0;go('payments')">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='pending'?'':'pending');go('payments')">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--yellow)" stroke-width="4" stroke-dasharray="${(pendingCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
@@ -3055,7 +3049,7 @@ function pgPayments() {
                 <div style="font-size:11px;color:var(--text2)">Bekliyor</div>
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='overdue'?'':'overdue');AppState.ui.payPage=0;go('payments')">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);flex:1;min-width:110px;cursor:pointer" onclick="AppState.filters.payments.st=(AppState.filters.payments.st==='overdue'?'':'overdue');go('payments')">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" stroke-width="4"/>
                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--red)" stroke-width="4" stroke-dasharray="${(overdueCount/totalStatusCount)*100.53} 100.53" stroke-linecap="round" transform="rotate(-90 20 20)"/>
@@ -3067,9 +3061,8 @@ function pgPayments() {
         </div>
     </div>
 
-    <!-- İşlem Listesi -->
-    ${_buildGroupedTransactionList(_payList)}
-    ${_pagBar ? '<div class="card" style="padding:0;margin-top:-1px">' + _pagBar + '</div>' : ''}
+    <!-- Tüm İşlemler — Sporcu Bazlı Akordiyon (sayfalama yok) -->
+    ${_buildGroupedTransactionList(list)}
     `;
 }
 
@@ -3273,6 +3266,43 @@ function _getSelectedAthleteIds() {
     return Array.from(document.querySelectorAll('#plan-ath-list .plan-ath-cb:checked')).map(cb => cb.value);
 }
 
+// Tek ay ödeme planı oluştur — modal
+window.showPlanCreateModal = function() {
+    const athleteCheckboxes = _buildAthleteCheckboxes('plan-ath-cb', true);
+    modal('📅 Ödeme Planı Oluştur', `
+    <div class="fgr mb2">
+        <label>Sporcu(lar) *</label>
+        <input id="plan-ath-search" type="text" placeholder="Sporcu ara..." oninput="filterPlanAthletes()" style="margin-bottom:6px"/>
+        <div class="flex gap2 mb2">
+            <button type="button" class="btn btn-xs bs" onclick="toggleAllPlanAthletes(true)">✅ Tümünü Seç</button>
+            <button type="button" class="btn btn-xs bd" onclick="toggleAllPlanAthletes(false)">✕ Temizle</button>
+        </div>
+        <div id="plan-ath-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px">${athleteCheckboxes}</div>
+        <div id="plan-ath-tags" class="flex fwrap gap1 mt1" style="min-height:0"></div>
+    </div>
+    <div class="g21 mb2">
+        <div class="fgr">
+            <label>Tutar (₺) *</label>
+            <input id="plan-amt" type="number" placeholder="Aylık tutar"/>
+        </div>
+        <div class="fgr">
+            <label>Ay *</label>
+            <input id="plan-month" type="month" value="${DateUtils.today().slice(0,7)}"/>
+        </div>
+    </div>
+    <div class="fgr mb2">
+        <label>Açıklama</label>
+        <input id="plan-desc" placeholder="Örn: Ocak Aidatı (boş bırakılırsa otomatik)"/>
+    </div>
+    `, [
+        { lbl: 'İptal', cls: 'bs', fn: closeModal },
+        { lbl: 'Oluştur', cls: 'bp', fn: () => { createPaymentPlan(); } }
+    ]);
+    setTimeout(() => {
+        if (typeof window._initPlanAthCheckboxes === 'function') window._initPlanAthCheckboxes();
+    }, 100);
+};
+
 // Attach change event to checkboxes after render
 window._initPlanAthCheckboxes = function() {
     document.querySelectorAll('#plan-ath-list .plan-ath-cb').forEach(cb => {
@@ -3361,16 +3391,19 @@ function _buildGroupedTransactionList(list) {
     });
     const accordionItems = groupKeys.map(key => {
         const g = groups[key];
-        const groupTotal = g.txns.reduce((s, p) => s + (p.ty === 'income' ? (p.amt || 0) : -(p.amt || 0)), 0);
+        const groupPaid = g.txns.filter(p => p.st === 'completed' && p.ty === 'income').reduce((s, p) => s + (p.amt || 0), 0);
+        const groupDebt = g.txns.filter(p => p.st !== 'completed' && p.ty === 'income').reduce((s, p) => s + (p.amt || 0), 0);
+        const hasOverdue = g.txns.some(p => p.st === 'overdue');
+        const hasPending = g.txns.some(p => p.st === 'pending');
         const rows = g.txns.sort((a, b) => (b.dt || '').localeCompare(a.dt || '')).map(p => {
-            const mIcon = p.payMethod==='nakit'?'💵':p.payMethod==='kredi_karti'?'💳':p.payMethod==='havale'?'🏦':p.payMethod==='paytr'?'🔵':'';
-            const notifBadge = p.notifStatus==='pending_approval'?'<span class="bg bg-y" style="font-size:10px">Onay Bekliyor</span>':'';
+            const mIcon = p.payMethod==='nakit'?'💵':p.payMethod==='paytr'?'🔵':'';
+            const planBadge = p.source==='plan'?'<span style="background:rgba(59,130,246,.12);color:var(--blue2);border-radius:6px;padding:1px 5px;font-size:10px;font-weight:700">Plan</span>':'';
+            const notifBadge = p.notifStatus==='pending_approval'?'<span style="background:rgba(234,179,8,.15);color:var(--yellow);border-radius:6px;padding:1px 5px;font-size:10px;font-weight:700">Onay Bekliyor</span>':'';
             return `<tr>
                 <td data-label="Tarih">${DateUtils.format(p.dt)}</td>
-                <td data-label="Açıklama">${FormatUtils.escape(p.serviceName||p.ds||'-')}</td>
-                <td data-label="Yöntem">${mIcon} ${FormatUtils.escape(p.payMethod||'-')}</td>
+                <td data-label="Açıklama">${FormatUtils.escape(p.serviceName||p.ds||'-')} ${planBadge}</td>
+                <td data-label="Yöntem">${mIcon} ${p.payMethod ? FormatUtils.escape(p.payMethod==='nakit'?'Nakit':p.payMethod==='paytr'?'PayTR':p.payMethod) : '-'}</td>
                 <td data-label="Tutar" class="tw6 ${p.ty==='income'?'tg':'tr2'}">${FormatUtils.currency(p.amt)}</td>
-                <td data-label="Tür"><span class="bg ${statusClass(p.ty)}">${statusLabel(p.ty)}</span></td>
                 <td data-label="Durum"><span class="bg ${statusClass(p.st)}">${statusLabel(p.st)}</span> ${notifBadge}</td>
                 <td data-label="">
                     <button class="btn btn-xs bp" onclick="editPay('${FormatUtils.escape(p.id)}')">Düzenle</button>
@@ -3381,21 +3414,27 @@ function _buildGroupedTransactionList(list) {
         const nameHtml = key !== '_independent'
             ? `<span class="tw6" style="cursor:pointer;color:var(--blue2)" onclick="event.stopPropagation();go('athleteProfile',{id:'${FormatUtils.escape(key)}'})">${FormatUtils.escape(g.name)}</span>`
             : `<span class="tw6">${FormatUtils.escape(g.name)}</span>`;
+        const statusDot = hasOverdue
+            ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;margin-left:6px" title="Gecikmiş ödeme"></span>'
+            : hasPending ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--yellow);display:inline-block;margin-left:6px" title="Bekleyen ödeme"></span>' : '';
         return `
-        <div class="plan-acc-item" style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden">
-            <div class="plan-acc-head" style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--bg3)" onclick="this.parentElement.classList.toggle('open')">
-                <div>
-                    ${nameHtml}
+        <div class="plan-acc-item" style="border:1px solid var(--border);border-radius:10px;margin-bottom:6px;overflow:hidden">
+            <div class="plan-acc-head" style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--bg3)" onclick="this.parentElement.classList.toggle('open')">
+                <div class="flex fca gap1">
+                    ${nameHtml}${statusDot}
                     <span class="tm ts" style="margin-left:8px">${g.txns.length} işlem</span>
                 </div>
                 <div class="flex fca gap2">
-                    <span class="tw6 ${groupTotal >= 0 ? 'tg' : 'tr2'} ts">${FormatUtils.currency(Math.abs(groupTotal))}</span>
+                    <div style="text-align:right">
+                        ${groupPaid > 0 ? `<div style="font-size:11px;color:var(--green);font-weight:700">+${FormatUtils.currency(groupPaid)}</div>` : ''}
+                        ${groupDebt > 0 ? `<div style="font-size:11px;color:var(--red);font-weight:700">-${FormatUtils.currency(groupDebt)}</div>` : ''}
+                    </div>
                     <span class="plan-acc-arrow" style="transition:transform .2s">▼</span>
                 </div>
             </div>
             <div class="plan-acc-body" style="display:none;padding:0 14px 14px">
-                <div class="tw" style="margin-top:10px"><table class="payment-table">
-                    <thead><tr><th>Tarih</th><th>Açıklama</th><th>Yöntem</th><th>Tutar</th><th>Tür</th><th>Durum</th><th>İşlemler</th></tr></thead>
+                <div class="tw" style="margin-top:10px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="border-bottom:1px solid var(--border)"><th style="padding:8px 6px;text-align:left;color:var(--text2);font-size:11px">Tarih</th><th style="padding:8px 6px;text-align:left;color:var(--text2);font-size:11px">Açıklama</th><th style="padding:8px 6px;text-align:left;color:var(--text2);font-size:11px">Yöntem</th><th style="padding:8px 6px;text-align:right;color:var(--text2);font-size:11px">Tutar</th><th style="padding:8px 6px;text-align:left;color:var(--text2);font-size:11px">Durum</th><th style="padding:8px 6px;text-align:right;color:var(--text2);font-size:11px">İşlemler</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table></div>
             </div>
