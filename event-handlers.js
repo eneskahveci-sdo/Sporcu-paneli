@@ -63,7 +63,7 @@
         if (themeBtn) themeBtn.addEventListener('click', function () { toggleTheme(); });
 
         // ── Admin çıkış ──────────────────────────────────────────
-        var logoutBtn = document.querySelector('#side .btn.bs');
+        var logoutBtn = document.getElementById('side-logout-btn') || document.querySelector('#side .btn.bs.w100');
         if (logoutBtn) logoutBtn.addEventListener('click', function () { doLogout(); });
 
         // ── Sol menü navigasyon butonları (ni-xxx) ───────────────

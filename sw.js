@@ -6,8 +6,8 @@
 //       K1 payments_insert_anon null guard (migration 017).
 // ═══════════════════════════════════════════════════════════
 
-const STATIC_CACHE = 'dragos-static-v18';
-const API_CACHE = 'dragos-api-v18';
+const STATIC_CACHE = 'dragos-static-v19';
+const API_CACHE = 'dragos-api-v19';
 
 const STATIC_ASSETS = [
     '/',

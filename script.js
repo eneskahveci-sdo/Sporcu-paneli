@@ -500,12 +500,12 @@ function applyTheme(theme) {
     document.documentElement.classList.add('theme-transitioning');
     if (isLight) {
         document.documentElement.setAttribute('data-theme', 'light');
-        if (btn) btn.innerHTML = '&#x1F319;';
-        if (spBtn) spBtn.innerHTML = '&#x1F319;';
+        if (btn) btn.innerHTML = '&#x25D0;';
+        if (spBtn) spBtn.innerHTML = '&#x25D0;';
     } else {
         document.documentElement.removeAttribute('data-theme');
-        if (btn) btn.innerHTML = '&#x1F31E;';
-        if (spBtn) spBtn.innerHTML = '&#x1F31E;';
+        if (btn) btn.innerHTML = '&#x25D1;';
+        if (spBtn) spBtn.innerHTML = '&#x25D1;';
     }
     StorageManager.set('sporcu_theme', theme);
     AppState.theme = theme;
