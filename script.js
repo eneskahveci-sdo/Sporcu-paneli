@@ -3123,8 +3123,6 @@ window.editPay = function(id) {
         <select id="p-method">
             <option value="">Belirtilmedi</option>
             <option value="nakit"${p?.payMethod === 'nakit' ? ' selected' : ''}>💵 Nakit</option>
-            <option value="kredi_karti"${p?.payMethod === 'kredi_karti' ? ' selected' : ''}>💳 Kredi Kartı</option>
-            <option value="havale"${p?.payMethod === 'havale' ? ' selected' : ''}>🏦 Havale/EFT</option>
             <option value="paytr"${p?.payMethod === 'paytr' ? ' selected' : ''}>🔵 PayTR Online</option>
         </select>
     </div>
