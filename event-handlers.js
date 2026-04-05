@@ -28,6 +28,12 @@
         var coachLoginBtn = document.querySelector('#login-coach .btn.bp');
         if (coachLoginBtn) coachLoginBtn.addEventListener('click', function () { doNormalLogin('coach'); });
 
+        // ── Şifremi unuttum ──────────────────────────────────────
+        var forgotPassBtn = document.getElementById('forgot-pass-btn');
+        if (forgotPassBtn) forgotPassBtn.addEventListener('click', function () {
+            if (typeof showPasswordResetModal === 'function') showPasswordResetModal();
+        });
+
         // ── Yasal metinler (data-legal attribute ile) ────────────
         document.querySelectorAll('.login-legal-btn[data-legal]').forEach(function (btn) {
             btn.addEventListener('click', function () { showLegal(this.dataset.legal); });
