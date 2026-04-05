@@ -184,8 +184,8 @@ table{min-width:600px}
 --border:rgba(120,160,220,.13);
 --border2:rgba(245,196,0,.22);
 --text:#ecf0fa;
---text2:#9bb0cc;
---text3:#5e7898;
+--text2:#8a9db5;
+--text3:#5a7090;
 --blue:#f5c400;
 --blue2:#f5c400;
 --blue3:#c9a000;
@@ -671,3 +671,31 @@ html:not([data-theme]) .acc-header:hover{background:rgba(11,34,92,.06)!important
 
 /* Lbox gölge */
 html[data-theme="light"] .lbox,html:not([data-theme]) .lbox{box-shadow:0 20px 40px rgba(11,34,92,.13),0 0 0 1px rgba(11,34,92,.07)}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* RENK TUTARSIZLIĞI DÜZELTMELERİ                           */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Koyu tema: açık accordion başlığı gold (nav.on ile tutarlı)
+   Açık tema'da specificity'si daha yüksek olan html[data-theme="light"] kuralı kazanır → #0B225C */
+.acc-header[aria-expanded="true"]{color:#f5c400}
+
+/* Accordion ok oku: renk miras alır, daha belirgin */
+.acc-arrow{color:inherit;opacity:.85}
+
+/* Nav ikonlar: renk miras alır (--text2 ile tutarlı) */
+.ni svg{color:inherit}
+
+/* Açık tema: kapalı accordion başlığı nav öğeleriyle aynı renk/ağırlık */
+html[data-theme="light"] .acc-header:not([aria-expanded="true"]),
+html:not([data-theme]) .acc-header:not([aria-expanded="true"]){color:#1a3060;font-weight:600}
+
+/* Koyu tema: nav hover belirgin */
+.ni:hover{color:var(--text)!important}
+
+/* Açık tema: nav ikon rengi lacivert */
+html[data-theme="light"] .ni svg,html:not([data-theme]) .ni svg{color:#1e3d80}
+
+/* Koyu tema: alt nav aktif renk tutarlı (gold) */
+.bni-btn.on{color:#f5c400}
+.bni-btn.on svg{color:#f5c400}
