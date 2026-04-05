@@ -151,6 +151,7 @@ table{min-width:600px}
 .notif-item-danger{border-left:3px solid #ef4444}
 .notif-item-warning{border-left:3px solid #eab308}
 .notif-item-info{border-left:3px solid var(--blue2)}
+.notif-item-birthday{border-left:3px solid #ec4899}
 .notif-item-icon{font-size:20px;flex-shrink:0;margin-top:2px}
 .notif-item-body{flex:1;min-width:0}
 .notif-item-text{font-size:13px;line-height:1.4;color:var(--text);word-break:break-word}

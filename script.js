@@ -5834,6 +5834,30 @@ function getNotifications() {
                 type: 'info'
             });
         });
+
+        // Doğum günü bildirimleri — admin/antrenör (5 gün içinde)
+        const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        (AppState.data.athletes || []).filter(a => a.st === 'active' && a.bd && a.bd.length >= 10).forEach(a => {
+            const parts = a.bd.split('-');
+            if (parts.length < 3) return;
+            let bdThisYear = new Date(today.getFullYear(), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            let diffDays = Math.round((bdThisYear - todayMidnight) / 86400000);
+            // Geçtiyse gelecek yılı kullan
+            if (diffDays < 0) {
+                bdThisYear = new Date(today.getFullYear() + 1, parseInt(parts[1]) - 1, parseInt(parts[2]));
+                diffDays = Math.round((bdThisYear - todayMidnight) / 86400000);
+            }
+            if (diffDays < 0 || diffDays > 5) return;
+            const age = bdThisYear.getFullYear() - parseInt(parts[0]);
+            const diffLabel = diffDays === 0 ? 'Bugün' : diffDays === 1 ? 'Yarın' : `${diffDays} gün sonra`;
+            notifications.push({
+                id: `notif-bday-${a.id}-${bdThisYear.getFullYear()}`,
+                icon: '🎂',
+                text: `${a.fn} ${a.ln} — ${diffLabel} ${age}. yaş doğum günü`,
+                time: `${String(parseInt(parts[2])).padStart(2,'0')}.${String(parseInt(parts[1])).padStart(2,'0')}.${bdThisYear.getFullYear()}`,
+                type: 'birthday'
+            });
+        });
     }
 
     // Dismissed olanları filtrele
@@ -5851,7 +5875,7 @@ function renderNotifPanel(panelId, badgeId) {
     } else {
         panel.innerHTML = '<div class="notif-panel-header"><span class="tw6 tsm">🔔 Bildirimler</span><span class="notif-count">' + notifs.length + '</span></div>' +
             notifs.map(n => {
-                const typeClass = n.type === 'danger' ? 'notif-item-danger' : n.type === 'warning' ? 'notif-item-warning' : 'notif-item-info';
+                const typeClass = n.type === 'danger' ? 'notif-item-danger' : n.type === 'warning' ? 'notif-item-warning' : n.type === 'birthday' ? 'notif-item-birthday' : 'notif-item-info';
                 return '<div class="notif-item ' + typeClass + '" id="' + n.id + '">' +
                     '<div class="notif-item-icon">' + n.icon + '</div>' +
                     '<div class="notif-item-body">' +
