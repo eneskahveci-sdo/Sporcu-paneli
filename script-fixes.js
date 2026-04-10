@@ -697,7 +697,7 @@ window.editPay = function(id) {
     + '<div id="p-cat-row" style="display:' + (p && p.ty === 'expense' ? 'block' : 'none') + '" class="mt2"><div class="fgr"><label>Gider Kategorisi</label><select id="p-cat"><option value="">Kategori Seçin</option>' + catOpts + '</select></div></div>'
     + '<div class="fgr mt2"><label>Açıklama / Hizmet Adı</label><input id="p-ds" value="' + FormatUtils.escape(p ? (p.ds || '') : '') + '" placeholder="Örn: Ekim Ayı Aidatı"/></div>'
     + '<div class="g21 mt2"><div class="fgr"><label>Durum</label><select id="p-st"><option value="completed"' + (p && p.st === 'completed' ? ' selected' : '') + '>Ödendi</option><option value="pending"' + (p && p.st === 'pending' ? ' selected' : '') + '>Bekliyor</option><option value="overdue"' + (p && p.st === 'overdue' ? ' selected' : '') + '>Gecikti</option></select></div><div class="fgr"><label>Tarih</label><input id="p-dt" type="date" value="' + FormatUtils.escape(p ? (p.dt || DateUtils.today()) : DateUtils.today()) + '"/></div></div>'
-    + '<div class="fgr mt2"><label>Ödeme Yöntemi</label><select id="p-method"><option value="">Belirtilmedi</option><option value="paytr"' + (p && p.payMethod === 'paytr' ? ' selected' : '') + '>🔵 PayTR Online</option></select></div>'
+    + '<div class="fgr mt2"><label>Ödeme Yöntemi</label><select id="p-method"><option value="">Belirtilmedi</option><option value="nakit"' + (p && p.payMethod === 'nakit' ? ' selected' : '') + '>💵 Nakit</option><option value="paytr"' + (p && p.payMethod === 'paytr' ? ' selected' : '') + '>🔵 PayTR Online</option></select></div>'
     , [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
         ...(p && p.st === 'completed' ? [{ lbl: '🧾 Makbuz', cls: 'bpur', fn: function() { closeModal(); generateReceipt(p.id); } }] : []),
@@ -706,6 +706,11 @@ window.editPay = function(id) {
             var ath = (AppState.data.athletes || []).find(function(a) { return a.id === aid; });
             var ds = UIUtils.getValue('p-ds');
             var ty = UIUtils.getValue('p-ty');
+
+            if (!AppState.currentOrgId || !AppState.currentBranchId) {
+                toast('Organizasyon bilgileri eksik. Lütfen çıkış yapıp tekrar giriş yapınız.', 'e');
+                return;
+            }
 
             var obj = {
                 id: p ? p.id : generateId(),
@@ -716,9 +721,18 @@ window.editPay = function(id) {
                 st: UIUtils.getValue('p-st'),
                 dt: UIUtils.getValue('p-dt'),
                 ty: ty,
-                cat: ty === 'expense' ? UIUtils.getValue('p-cat') : '',
+                cat: ty === 'expense' ? UIUtils.getValue('p-cat') : (p ? (p.cat || '') : ''),
                 serviceName: ds,
-                payMethod: UIUtils.getValue('p-method') || (p ? p.payMethod : '') || ''
+                payMethod: UIUtils.getValue('p-method') || (p ? p.payMethod : '') || '',
+                orgId: p ? (p.orgId || AppState.currentOrgId) : AppState.currentOrgId,
+                branchId: p ? (p.branchId || AppState.currentBranchId) : AppState.currentBranchId,
+                source: p ? (p.source || 'manual') : 'manual',
+                notifStatus: p ? (p.notifStatus || '') : '',
+                slipCode: p ? (p.slipCode || '') : '',
+                receiptNo: p ? (p.receiptNo || '') : '',
+                taxRate: p ? (p.taxRate || 0) : 0,
+                taxAmount: p ? (p.taxAmount || 0) : 0,
+                paymentType: p ? (p.paymentType || 'aidat') : 'aidat'
             };
 
             if (!obj.amt || obj.amt <= 0) { toast(i18n[AppState.lang].fillRequired, 'e'); return; }
@@ -3552,7 +3566,9 @@ window.registerGoHook('after', function(page) {
 
 // ── PAYMENT MAPPER: payment_type desteği ──────────────────────────
 (function() {
+    var _paymentTypeMapperExtended = false;
     function extendPaymentMappers() {
+        if (_paymentTypeMapperExtended) return true;
         if (!window.DB || !DB.mappers || !DB.mappers.toPayment) return false;
 
         var _prevToPayment = DB.mappers.toPayment;
@@ -3569,7 +3585,7 @@ window.registerGoHook('after', function(page) {
             return base;
         };
 
-        // payment_type mapper eklendi
+        _paymentTypeMapperExtended = true;
         return true;
     }
 
@@ -4369,7 +4385,9 @@ if (!DB.mappers.toInventoryMovement) {
 
 // ── Payment Mapper extension: inventory fields ───────────────────
 (function() {
+    var _inventoryMapperExtended = false;
     function extendPaymentMappersForInventory() {
+        if (_inventoryMapperExtended) return true;
         if (!window.DB || !DB.mappers || !DB.mappers.toPayment) return false;
         var _prevToPaymentInv = DB.mappers.toPayment;
         DB.mappers.toPayment = function(r) {
@@ -4389,6 +4407,7 @@ if (!DB.mappers.toInventoryMovement) {
             if (p.inventoryUnitPrice !== undefined) base.inventory_unit_price = p.inventoryUnitPrice;
             return base;
         };
+        _inventoryMapperExtended = true;
         return true;
     }
     if (!extendPaymentMappersForInventory()) {
