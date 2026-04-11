@@ -810,7 +810,9 @@ const DB = {
             const { data: result, error } = await sb.from(table).upsert(clean, { onConflict: 'id' }).select();
             if (error) {
                 console.error(`Supabase upsert error (${table})`, error);
-                toast('Kayıt hatası. Lütfen tekrar deneyin.', 'e');
+                const code = error.code || '';
+                const hint = error.message ? error.message.substring(0, 80) : '';
+                toast(`Kayıt hatası${code ? ' [' + code + ']' : ''}${hint ? ': ' + hint : ''}`, 'e');
                 return null;
             }
             return result;
