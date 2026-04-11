@@ -697,8 +697,6 @@ const DB = {
                 notif_status: p.notifStatus || '',
                 pay_method: p.payMethod || '',
                 slip_code: p.slipCode || '',
-                tax_rate: p.taxRate || 0,
-                tax_amount: p.taxAmount || 0,
                 receipt_no: p.receiptNo || ''
             };
         },

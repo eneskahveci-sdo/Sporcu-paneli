@@ -730,8 +730,6 @@ window.editPay = function(id) {
                 notifStatus: p ? (p.notifStatus || '') : '',
                 slipCode: p ? (p.slipCode || '') : '',
                 receiptNo: p ? (p.receiptNo || '') : '',
-                taxRate: p ? (p.taxRate || 0) : 0,
-                taxAmount: p ? (p.taxAmount || 0) : 0,
                 paymentType: p ? (p.paymentType || 'aidat') : 'aidat'
             };
 
