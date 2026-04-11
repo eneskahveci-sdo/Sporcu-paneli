@@ -1548,11 +1548,17 @@ async function checkOverdue() {
     const overdueList = AppState.data.payments.filter(
         p => p.st === 'pending' && p.dt && p.dt < today
     );
-    
+
     for (const p of overdueList) {
         p.st = 'overdue';
+        // orgId/branchId mevcut ödemeden korunuyor, eksikse AppState fallback
+        const updated = {
+            ...p,
+            orgId: p.orgId || AppState.currentOrgId,
+            branchId: p.branchId || AppState.currentBranchId
+        };
         try {
-            await DB.upsert('payments', DB.mappers.fromPayment(p));
+            await DB.upsert('payments', DB.mappers.fromPayment(updated));
         } catch (err) {
             console.error('Overdue güncelleme hatası:', err);
         }
@@ -2014,7 +2020,7 @@ window.initProfileTabs = function() {
 window.addPaymentForAthlete = function(aid) {
     const a = AppState.data.athletes.find(x => x.id === aid);
     if (!a) return;
-    
+
     modal('Yeni Ödeme Ekle', `
     <div class="fgr mb2">
         <label>Sporcu</label>
@@ -2050,9 +2056,21 @@ window.addPaymentForAthlete = function(aid) {
             <input id="p-dt" type="date" value="${DateUtils.today()}"/>
         </div>
     </div>
+    <div class="fgr mt2">
+        <label>Ödeme Yöntemi</label>
+        <select id="p-method">
+            <option value="">Belirtilmedi</option>
+            <option value="nakit">💵 Nakit</option>
+            <option value="paytr">🔵 PayTR Online</option>
+        </select>
+    </div>
     `, [
         { lbl: 'İptal', cls: 'bs', fn: closeModal },
         { lbl: 'Kaydet', cls: 'bp', fn: async () => {
+            if (!AppState.currentOrgId || !AppState.currentBranchId) {
+                toast('Organizasyon bilgileri eksik. Lütfen çıkış yapıp tekrar giriş yapınız.', 'e');
+                return;
+            }
             const obj = {
                 id: generateId(),
                 aid: aid,
@@ -2062,14 +2080,18 @@ window.addPaymentForAthlete = function(aid) {
                 st: UIUtils.getValue('p-st'),
                 dt: UIUtils.getValue('p-dt'),
                 ty: UIUtils.getValue('p-ty'),
-                serviceName: UIUtils.getValue('p-ds')
+                serviceName: UIUtils.getValue('p-ds'),
+                payMethod: UIUtils.getValue('p-method') || '',
+                orgId: AppState.currentOrgId,
+                branchId: AppState.currentBranchId,
+                source: 'manual'
             };
-            
+
             if (!obj.amt) {
                 toast(i18n[AppState.lang].fillRequired, 'e');
                 return;
             }
-            
+
             const result = await DB.upsert('payments', DB.mappers.fromPayment(obj));
             if (result) {
                 AppState.data.payments.push(obj);
