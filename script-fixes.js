@@ -1541,6 +1541,20 @@ window.initiatePayTRPayment = async function(amt, desc) {
             throw new Error(userMsg);
         }
 
+        // Önceki başarısız/iptal PayTR pending kayıtlarını temizle
+        // (Her denemede yeni kayıt birikmesini önler)
+        try {
+            var oldPending = (AppState.data.payments || []).filter(function(p) {
+                return p.aid === a.id && p.source === 'paytr' && p.st === 'pending';
+            });
+            for (var i = 0; i < oldPending.length; i++) {
+                await sb.from('payments').delete().eq('id', oldPending[i].id);
+                AppState.data.payments = AppState.data.payments.filter(function(p) { return p.id !== oldPending[i].id; });
+            }
+        } catch (cleanErr) {
+            console.warn('[PayTR] Eski pending temizleme hatası:', cleanErr);
+        }
+
         // Bekleyen ödeme kaydı oluştur
         var storedPlanIds = AppState._paytrPlanIds || [];
         var pendingPay = {
