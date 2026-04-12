@@ -1771,7 +1771,7 @@ window.handlePayTRCallback = async function(orderId, status) {
                     st: 'completed',
                     notif_status: 'approved',
                     pay_method: 'paytr'
-                }).eq('id', pid).eq('source', 'plan');
+                }).eq('id', pid);
                 if (athleteId) query = query.eq('aid', athleteId);
                 var updateRes = await query;
                 if (updateRes && updateRes.error) {

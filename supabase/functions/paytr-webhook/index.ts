@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
             st: "completed",
             notif_status: "approved",
             pay_method: "paytr",
-          }).eq("id", pid).eq("source", "plan").eq("aid", paytrRec.aid);
+          }).eq("id", pid).eq("aid", paytrRec.aid);
           if (planErr) {
             console.warn("Plan kaydı guncellenemedi:", pid, planErr.message);
           } else {
