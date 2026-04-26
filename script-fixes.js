@@ -1545,7 +1545,7 @@ window.initiatePayTRPayment = async function(amt, desc) {
         // (Her denemede yeni kayıt birikmesini önler)
         try {
             var oldPending = (AppState.data.payments || []).filter(function(p) {
-                return p.aid === a.id && p.source === 'paytr' && p.st === 'pending';
+                return p.aid === a.id && p.source === 'paytr' && (p.st === 'pending' || p.st === 'failed');
             });
             for (var i = 0; i < oldPending.length; i++) {
                 await sb.from('payments').delete().eq('id', oldPending[i].id);
@@ -1749,34 +1749,14 @@ window.handlePayTRCallback = async function(orderId, status) {
                 AppState._paytrPlanIds = null;
                 return;
             }
-            // PayTR ödeme kaydını tamamlandı olarak işaretle
-            await sb.from('payments').update({
-                st: 'completed',
-                source: 'paytr',
-                notif_status: 'approved',
-                pay_method: 'paytr'
-            }).eq('id', dbId);
-            var idx = (AppState.data.payments || []).findIndex(function(p) { return p.id === dbId; });
-            if (idx >= 0) {
-                AppState.data.payments[idx].st = 'completed';
-                AppState.data.payments[idx].notifStatus = 'approved';
-            }
+            // PayTR yardımcı kaydını AppState'ten kaldır — plan kayıtları canonical
+            // (DB güncellemesi webhook tarafından yapılır; anon role UPDATE yapamaz)
+            AppState.data.payments = (AppState.data.payments || []).filter(function(p) { return p.id !== dbId; });
 
-            // Bağlı plan kayıtlarını da tamamlandı olarak işaretle
-            // Güvenlik: sadece aynı sporcu (aid) ve source='plan' kayıtlarını güncelle
-            var athleteId = AppState.currentSporcu && AppState.currentSporcu.id;
+            // Bağlı plan kayıtlarını AppState'te tamamlandı olarak işaretle
+            // (DB güncellemesi webhook tarafından yapılır)
             for (var i = 0; i < planIds.length; i++) {
                 var pid = planIds[i];
-                var query = sb.from('payments').update({
-                    st: 'completed',
-                    notif_status: 'approved',
-                    pay_method: 'paytr'
-                }).eq('id', pid);
-                if (athleteId) query = query.eq('aid', athleteId);
-                var updateRes = await query;
-                if (updateRes && updateRes.error) {
-                    console.warn('[PayTR] Plan kaydı güncellenemedi (' + pid + '):', updateRes.error.message);
-                }
                 var pi = (AppState.data.payments || []).findIndex(function(p) { return p.id === pid; });
                 if (pi >= 0) {
                     AppState.data.payments[pi].st = 'completed';
@@ -1787,13 +1767,9 @@ window.handlePayTRCallback = async function(orderId, status) {
 
             toast('✅ PayTR ödemesi başarıyla tamamlandı!', 'g');
         } else {
-            // PayTR ödeme kaydını başarısız olarak işaretle
-            await sb.from('payments').update({ st: 'failed', notif_status: '' }).eq('id', dbId);
-            var fidx = (AppState.data.payments || []).findIndex(function(p) { return p.id === dbId; });
-            if (fidx >= 0) {
-                AppState.data.payments[fidx].st = 'failed';
-                AppState.data.payments[fidx].notifStatus = '';
-            }
+            // PayTR yardımcı kaydını AppState'ten kaldır — plan kayıtları pending kalır
+            // (DB'deki kayıt webhook tarafından silinir)
+            AppState.data.payments = (AppState.data.payments || []).filter(function(p) { return p.id !== dbId; });
             // Plan kayıtları 'pending' olarak bırakılır — kullanıcı yeniden deneyebilir
             toast('❌ Ödeme başarısız. Lütfen tekrar deneyin.', 'e');
         }

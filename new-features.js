@@ -450,8 +450,7 @@
 
     // ─── 7. PUSH BİLDİRİMLERİ ─────────────────────────────────────────────────────
 
-    // Supabase Secrets'a VAPID_PUBLIC_KEY eklendikten sonra buraya yapıştırın.
-    var VAPID_PUBLIC_KEY = '';
+    var VAPID_PUBLIC_KEY = 'BKMs9WEFjU_ZGG8_2A1bmX_yh75oTl8zo1yOmjGeKpgGyRxctvZB2DeRnKSlC_PrcGPZ8LRPVWJxNErI9mMwEG8';
 
     function urlBase64ToUint8Array(base64String) {
         var padding = '='.repeat((4 - base64String.length % 4) % 4);
