@@ -55,15 +55,15 @@ Deno.serve(async (req: Request) => {
     const dbId = toUuid(merchant_oid);
 
     if (status === "success") {
-      // PayTR ödeme kaydında plan ID'lerini oku (notif_status = "planids:id1,id2,...")
+      // PayTR ödeme kaydında plan ID'lerini, sporcu adını ve org_id'yi oku
       const { data: paytrRec, error: recErr } = await sb
         .from("payments")
-        .select("notif_status, aid")
+        .select("notif_status, aid, an, org_id")
         .eq("id", dbId)
         .maybeSingle();
 
       if (recErr) {
-        console.warn("PayTR webhook: plan ID okuma hatasi:", recErr.message);
+        console.warn("PayTR webhook: kayit okuma hatasi:", recErr.message);
       }
 
       const planIds: string[] = [];
@@ -74,18 +74,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const { error: updateErr } = await sb.from("payments").update({
-        st: "completed",
-        source: "paytr",
-        notif_status: "approved",
-        pay_method: "paytr",
-      }).eq("id", dbId);
-      if (updateErr) {
-        console.error("PayTR webhook: ana kayit guncelleme hatasi:", updateErr.message);
-      }
-      console.log("Odeme tamamlandi:", dbId);
-
-      // Bağlı plan kayıtlarını da tamamlandı olarak işaretle
+      // Bağlı plan kayıtlarını tamamlandı olarak işaretle
       if (paytrRec?.aid) {
         for (const pid of planIds) {
           const { error: planErr } = await sb.from("payments").update({
@@ -94,21 +83,51 @@ Deno.serve(async (req: Request) => {
             pay_method: "paytr",
           }).eq("id", pid).eq("aid", paytrRec.aid);
           if (planErr) {
-            console.warn("Plan kaydı guncellenemedi:", pid, planErr.message);
+            console.warn("Plan kaydi guncellenemedi:", pid, planErr.message);
           } else {
-            console.log("Plan kaydı tamamlandi:", pid);
+            console.log("Plan kaydi tamamlandi:", pid);
           }
         }
       }
-    } else {
-      const { error: failErr } = await sb.from("payments").update({
-        st: "failed",
-        notif_status: "",
-      }).eq("id", dbId);
-      if (failErr) {
-        console.error("PayTR webhook: basarisiz kayit guncelleme hatasi:", failErr.message);
+
+      // Admin/antrenörlere push bildirimi gönder (VAPID yapılandırılmışsa)
+      const orgId = paytrRec?.org_id;
+      const athleteName = paytrRec?.an || "Sporcu";
+      if (orgId) {
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SUPABASE_KEY}`,
+              "apikey": SUPABASE_KEY,
+            },
+            body: JSON.stringify({
+              orgId,
+              title: "Ödeme Tamamlandı",
+              body: `${athleteName} — online ödeme başarıyla alındı.`,
+              url: "/",
+            }),
+          });
+        } catch (pushErr) {
+          console.warn("Push bildirimi gonderilemedi:", pushErr);
+        }
       }
-      console.log("Odeme basarisiz:", merchant_oid, failed_reason_code, failed_reason_msg);
+
+      // PayTR yardımcı kaydını sil — plan kayıtları canonical, duplikasyon önlenir
+      const { error: delErr } = await sb.from("payments").delete().eq("id", dbId);
+      if (delErr) {
+        console.warn("PayTR webhook: yardimci kayit silinemedi:", delErr.message);
+      }
+      console.log("Odeme tamamlandi, paytr kaydi silindi:", dbId);
+
+    } else {
+      // Başarısız ödeme — yardımcı PayTR kaydını sil, plan kayıtları pending kalır
+      const { error: failErr } = await sb.from("payments").delete().eq("id", dbId);
+      if (failErr) {
+        console.error("PayTR webhook: basarisiz kayit silinemedi:", failErr.message);
+      }
+      console.log("Odeme basarisiz (kayit silindi):", merchant_oid, failed_reason_code, failed_reason_msg);
     }
 
     return new Response("OK", { status: 200 });

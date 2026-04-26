@@ -4603,9 +4603,9 @@ function spOdemeler() {
     const a = AppState.currentSporcu;
     if (!a) return '';
 
-    // Tamamlanmış (onaylanmış) ödemeler
+    // Tamamlanmış (onaylanmış) ödemeler — source='paytr' yardımcı kayıtları hariç
     const completed = AppState.data.payments
-        .filter(p => p.aid === a.id && p.st === 'completed')
+        .filter(p => p.aid === a.id && p.st === 'completed' && p.source !== 'paytr')
         .sort((x, y) => new Date(y.dt) - new Date(x.dt));
 
     // Sporcu tarafından bildirilmiş, henüz yönetici onaylamadığı bildirimler
