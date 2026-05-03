@@ -4922,6 +4922,7 @@ window.submitSpPayment = async function() {
     if (!totalAmt || totalAmt <= 0) { toast('Ödenecek tutar bulunamadı!', 'e'); return; }
 
     if (method === 'paytr') {
+        AppState._paytrPlanIds = planIds;
         await initiatePayTRPayment(totalAmt, desc);
         return;
     }
