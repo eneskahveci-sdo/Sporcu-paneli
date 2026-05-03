@@ -1450,7 +1450,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
         // PayTR resmi doküman: basket fiyatları TL cinsinden string
         // Örnek: [["Sample Product 1", "18.00", 1]]
         var basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, function(ch) {
-            var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            var map = {
+                'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I',
+                'ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U',
+                'â':'a','Â':'A','î':'i','Î':'I','û':'u','Û':'U',
+                'ê':'e','Ê':'E','ô':'o','Ô':'O','à':'a','À':'A',
+                'è':'e','È':'E','ù':'u','Ù':'U','é':'e','É':'E',
+                'ä':'a','Ä':'A','ï':'i','Ï':'I','ü':'u','ö':'o'
+            };
             return map[ch] || '';
         });
         var amtTL = amt.toFixed(2); // TL cinsinden: "2500.00"
@@ -1468,7 +1475,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
         var userName = ((a.fn || '') + ' ' + (a.ln || '')).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
-            var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            var map = {
+                'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I',
+                'ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U',
+                'â':'a','Â':'A','î':'i','Î':'I','û':'u','Û':'U',
+                'ê':'e','Ê':'E','ô':'o','Ô':'O','à':'a','À':'A',
+                'è':'e','È':'E','ù':'u','Ù':'U','é':'e','É':'E',
+                'ä':'a','Ä':'A','ï':'i','Ï':'I'
+            };
             return map[ch] || '';
         });
 
@@ -1479,7 +1493,6 @@ window.initiatePayTRPayment = async function(amt, desc) {
         }
 
         var requestBody = {
-            merchant_id: s.paytrMerchantId,
             merchant_oid: orderId,
             email: email,
             payment_amount: String(amtKurus),
@@ -1745,39 +1758,68 @@ window.handlePayTRCallback = async function(orderId, status) {
             if (_webhookAlreadyProcessed) {
                 // Webhook zaten DB'yi güncelledi — sadece UI'ı senkronize et
                 toast('Ödemeniz başarıyla tamamlandı!', 'g');
-                if (typeof spTab === 'function') spTab('odemeler');
                 AppState._paytrPlanIds = null;
+                if (typeof spTab === 'function') spTab('odemeler');
                 return;
             }
-            // PayTR yardımcı kaydını AppState'ten kaldır — plan kayıtları canonical
-            // (DB güncellemesi webhook tarafından yapılır; anon role UPDATE yapamaz)
-            AppState.data.payments = (AppState.data.payments || []).filter(function(p) { return p.id !== dbId; });
 
-            // Bağlı plan kayıtlarını AppState'te tamamlandı olarak işaretle
-            // (DB güncellemesi webhook tarafından yapılır)
-            for (var i = 0; i < planIds.length; i++) {
-                var pid = planIds[i];
-                var pi = (AppState.data.payments || []).findIndex(function(p) { return p.id === pid; });
-                if (pi >= 0) {
-                    AppState.data.payments[pi].st = 'completed';
-                    AppState.data.payments[pi].notifStatus = 'approved';
-                    AppState.data.payments[pi].payMethod = 'paytr';
+            // Önce DB'den taze veri çek; ardından webhook henüz gelmemiş planları
+            // optimistik olarak tamamlandı işaretle, sonra sayfayı render et.
+            // Bu sıra sayesinde spTab'ın tetiklediği ikinci refresh optimistik
+            // güncellemeyi ezmez.
+            var _successPlanIds = planIds.slice();
+            var _successDbId    = dbId;
+
+            var _applyAndRender = function() {
+                // PayTR yardımcı kaydını AppState'ten kaldır
+                AppState.data.payments = (AppState.data.payments || []).filter(function(p) {
+                    return p.id !== _successDbId;
+                });
+                // Webhook henüz işlemediyse planları optimistik tamamla
+                for (var i = 0; i < _successPlanIds.length; i++) {
+                    var pid = _successPlanIds[i];
+                    var pi  = (AppState.data.payments || []).findIndex(function(p) { return p.id === pid; });
+                    if (pi >= 0 && AppState.data.payments[pi].st !== 'completed') {
+                        AppState.data.payments[pi].st          = 'completed';
+                        AppState.data.payments[pi].notifStatus = 'approved';
+                        AppState.data.payments[pi].payMethod   = 'paytr';
+                    }
                 }
-            }
+                // Sekmeyi refresh tetiklemeden render et (veriyi az önce çektik)
+                var content = document.getElementById('sp-content');
+                if (content && typeof spOdemeler === 'function') {
+                    document.querySelectorAll('.sp-tab').forEach(function(el) {
+                        var elTab = el.getAttribute('data-tab');
+                        if (elTab) {
+                            el.classList.toggle('on', elTab === 'odemeler');
+                            el.setAttribute('aria-selected', elTab === 'odemeler' ? 'true' : 'false');
+                        }
+                    });
+                    content.innerHTML = spOdemeler();
+                } else if (typeof spTab === 'function') {
+                    spTab('odemeler');
+                }
+            };
 
             toast('✅ PayTR ödemesi başarıyla tamamlandı!', 'g');
+            AppState._paytrPlanIds = null;
+
+            if (typeof refreshSporcuPayments === 'function') {
+                refreshSporcuPayments().then(_applyAndRender).catch(_applyAndRender);
+            } else {
+                _applyAndRender();
+            }
+            return;
         } else {
             // PayTR yardımcı kaydını AppState'ten kaldır — plan kayıtları pending kalır
-            // (DB'deki kayıt webhook tarafından silinir)
             AppState.data.payments = (AppState.data.payments || []).filter(function(p) { return p.id !== dbId; });
-            // Plan kayıtları 'pending' olarak bırakılır — kullanıcı yeniden deneyebilir
             toast('❌ Ödeme başarısız. Lütfen tekrar deneyin.', 'e');
         }
 
         // Plan ID önbelleğini temizle
         AppState._paytrPlanIds = null;
 
-        // Ödemeler sekmesine dön
+        // Ödemeler sekmesine dön (başarısız akış — DB zaten doğru durumda)
         if (typeof spTab === 'function') spTab('odemeler');
     } catch(e) {
         console.error('[PayTR] handlePayTRCallback hatası:', e);
@@ -3979,9 +4021,13 @@ window.spTab = function(tab) {
     };
 
     if (tab === 'odemeler' && AppState.currentSporcu) {
+        if (_spTabRefreshing) return;
+        _spTabRefreshing = true;
         if (content) content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)">⏳ Yükleniyor...</div>';
         refreshSporcuPayments().then(function() {
             if (content && pages[tab]) content.innerHTML = pages[tab]();
+        }).finally(function() {
+            _spTabRefreshing = false;
         });
         return;
     }

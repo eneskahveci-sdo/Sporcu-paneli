@@ -7,6 +7,13 @@ async function hmacSha256Base64(data: string, key: string): Promise<string> {
   return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
+// paytr-token ile tutarlı: tırnak, BOM ve boşluk karakterlerini temizler
+function cleanSecret(val: string): string {
+  return val
+    .replace(/^["']|["']$/g, "")
+    .replace(/[\s​-‍﻿ \r\n\t]/g, "");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204 });
@@ -24,8 +31,8 @@ Deno.serve(async (req: Request) => {
     const failed_reason_code = formData.get("failed_reason_code")?.toString() ?? "";
     const failed_reason_msg = formData.get("failed_reason_msg")?.toString() ?? "";
 
-    const MERCHANT_KEY = Deno.env.get("PAYTR_MERCHANT_KEY") ?? "";
-    const MERCHANT_SALT = Deno.env.get("PAYTR_MERCHANT_SALT") ?? "";
+    const MERCHANT_KEY = cleanSecret(Deno.env.get("PAYTR_MERCHANT_KEY") ?? "");
+    const MERCHANT_SALT = cleanSecret(Deno.env.get("PAYTR_MERCHANT_SALT") ?? "");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
     const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -94,8 +101,10 @@ Deno.serve(async (req: Request) => {
       const orgId = paytrRec?.org_id;
       const athleteName = paytrRec?.an || "Sporcu";
       if (orgId) {
+        const pushController = new AbortController();
+        const pushTimeout = setTimeout(() => pushController.abort(), 8000);
         try {
-          await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+          const pushResp = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -108,9 +117,15 @@ Deno.serve(async (req: Request) => {
               body: `${athleteName} — online ödeme başarıyla alındı.`,
               url: "/",
             }),
+            signal: pushController.signal,
           });
+          if (!pushResp.ok) {
+            console.warn("Push bildirimi basarisiz, status:", pushResp.status);
+          }
         } catch (pushErr) {
           console.warn("Push bildirimi gonderilemedi:", pushErr);
+        } finally {
+          clearTimeout(pushTimeout);
         }
       }
 
