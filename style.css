@@ -700,3 +700,15 @@ html[data-theme="light"] .ni svg,html:not([data-theme]) .ni svg{color:#1e3d80}
 /* Koyu tema: alt nav aktif renk tutarlı (gold) */
 .bni-btn.on{color:#f5c400}
 .bni-btn.on svg{color:#f5c400}
+
+/* ── Ödeme Wizard Adım Çubuğu ── */
+.sp-wz-bar{display:flex;align-items:center;justify-content:center}
+.sp-wz-step{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px}
+.sp-wz-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;background:var(--bg3);border:2px solid var(--border);color:var(--text2);transition:all .2s}
+.sp-wz-step.active .sp-wz-dot{background:var(--blue2);border-color:var(--blue2);color:#fff}
+.sp-wz-step.done .sp-wz-dot{background:var(--green);border-color:var(--green);color:#fff}
+.sp-wz-lbl{font-size:11px;color:var(--text3);font-weight:600;white-space:nowrap}
+.sp-wz-step.active .sp-wz-lbl{color:var(--blue2)}
+.sp-wz-step.done .sp-wz-lbl{color:var(--green)}
+.sp-wz-line{flex:1;height:2px;background:var(--border);margin:0 4px;margin-bottom:16px;min-width:16px;transition:background .2s}
+.sp-wz-line.done{background:var(--green)}

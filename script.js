@@ -1544,24 +1544,19 @@ window.closeSide = function() {
 };
 
 async function checkOverdue() {
-    const today = DateUtils.today();
-    const overdueList = AppState.data.payments.filter(
-        p => p.st === 'pending' && p.dt && p.dt < today
-    );
-
-    for (const p of overdueList) {
-        p.st = 'overdue';
-        // orgId/branchId mevcut ödemeden korunuyor, eksikse AppState fallback
-        const updated = {
-            ...p,
-            orgId: p.orgId || AppState.currentOrgId,
-            branchId: p.branchId || AppState.currentBranchId
-        };
-        try {
-            await DB.upsert('payments', DB.mappers.fromPayment(updated));
-        } catch (err) {
-            console.error('Overdue güncelleme hatası:', err);
-        }
+    try {
+        const sb = getSupabase();
+        if (!sb) return;
+        // Tek RPC çağrısıyla tüm gecikmiş ödemeleri DB'de güncelle (N upsert yerine 1 sorgu)
+        const { error } = await sb.rpc('mark_overdue_payments');
+        if (error) { console.warn('checkOverdue RPC:', error.message); return; }
+        // Yerel state'i DB ile senkronize et
+        const today = DateUtils.today();
+        (AppState.data.payments || []).forEach(p => {
+            if (p.st === 'pending' && p.dt && p.dt < today) p.st = 'overdue';
+        });
+    } catch (err) {
+        console.warn('checkOverdue:', err);
     }
 }
 
