@@ -1450,7 +1450,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
         // PayTR resmi doküman: basket fiyatları TL cinsinden string
         // Örnek: [["Sample Product 1", "18.00", 1]]
         var basketDesc = (desc || 'Aidat').replace(/[^\x00-\x7F]/g, function(ch) {
-            var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            var map = {
+                'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I',
+                'ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U',
+                'â':'a','Â':'A','î':'i','Î':'I','û':'u','Û':'U',
+                'ê':'e','Ê':'E','ô':'o','Ô':'O','à':'a','À':'A',
+                'è':'e','È':'E','ù':'u','Ù':'U','é':'e','É':'E',
+                'ä':'a','Ä':'A','ï':'i','Ï':'I','ü':'u','ö':'o'
+            };
             return map[ch] || '';
         });
         var amtTL = amt.toFixed(2); // TL cinsinden: "2500.00"
@@ -1468,7 +1475,14 @@ window.initiatePayTRPayment = async function(amt, desc) {
 
         // user_name: PayTR 60 karakter limiti, Türkçe → ASCII
         var userName = ((a.fn || '') + ' ' + (a.ln || '')).substring(0, 60).replace(/[^\x00-\x7F]/g, function(ch) {
-            var map = {'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I','ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U'};
+            var map = {
+                'ç':'c','Ç':'C','ğ':'g','Ğ':'G','ı':'i','İ':'I',
+                'ö':'o','Ö':'O','ş':'s','Ş':'S','ü':'u','Ü':'U',
+                'â':'a','Â':'A','î':'i','Î':'I','û':'u','Û':'U',
+                'ê':'e','Ê':'E','ô':'o','Ô':'O','à':'a','À':'A',
+                'è':'e','È':'E','ù':'u','Ù':'U','é':'e','É':'E',
+                'ä':'a','Ä':'A','ï':'i','Ï':'I'
+            };
             return map[ch] || '';
         });
 
@@ -1479,7 +1493,6 @@ window.initiatePayTRPayment = async function(amt, desc) {
         }
 
         var requestBody = {
-            merchant_id: s.paytrMerchantId,
             merchant_oid: orderId,
             email: email,
             payment_amount: String(amtKurus),
