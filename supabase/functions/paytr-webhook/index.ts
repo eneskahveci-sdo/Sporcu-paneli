@@ -73,6 +73,12 @@ Deno.serve(async (req: Request) => {
         console.warn("PayTR webhook: kayit okuma hatasi:", recErr.message);
       }
 
+      // Idempotency: kayıt silinmişse önceki webhook başarıyla tamamlandı demektir
+      if (!recErr && !paytrRec) {
+        console.log("PayTR webhook: kayit zaten islendi, atlaniyor:", dbId);
+        return new Response("OK", { status: 200 });
+      }
+
       const planIds: string[] = [];
       if (paytrRec?.notif_status?.startsWith("planids:")) {
         paytrRec.notif_status.slice(8).split(",").forEach((id: string) => {
@@ -82,6 +88,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // Bağlı plan kayıtlarını tamamlandı olarak işaretle
+      let allPlansUpdated = true;
       if (paytrRec?.aid) {
         for (const pid of planIds) {
           const { error: planErr } = await sb.from("payments").update({
@@ -91,6 +98,7 @@ Deno.serve(async (req: Request) => {
           }).eq("id", pid).eq("aid", paytrRec.aid);
           if (planErr) {
             console.warn("Plan kaydi guncellenemedi:", pid, planErr.message);
+            allPlansUpdated = false;
           } else {
             console.log("Plan kaydi tamamlandi:", pid);
           }
@@ -129,12 +137,18 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // PayTR yardımcı kaydını sil — plan kayıtları canonical, duplikasyon önlenir
-      const { error: delErr } = await sb.from("payments").delete().eq("id", dbId);
-      if (delErr) {
-        console.warn("PayTR webhook: yardimci kayit silinemedi:", delErr.message);
+      // Tüm planlar başarıyla güncellendiyse yardımcı kaydı sil.
+      // Aksi takdirde PayTR'ın sonraki webhook denemesinde kalan planlar işlenebilir.
+      if (allPlansUpdated) {
+        const { error: delErr } = await sb.from("payments").delete().eq("id", dbId);
+        if (delErr) {
+          console.warn("PayTR webhook: yardimci kayit silinemedi:", delErr.message);
+        } else {
+          console.log("Odeme tamamlandi, paytr kaydi silindi:", dbId);
+        }
+      } else {
+        console.warn("PayTR webhook: bazi planlar guncellenemedi, kayit korunuyor:", dbId);
       }
-      console.log("Odeme tamamlandi, paytr kaydi silindi:", dbId);
 
     } else {
       // Başarısız ödeme — yardımcı PayTR kaydını sil, plan kayıtları pending kalır

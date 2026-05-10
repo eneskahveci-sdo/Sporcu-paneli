@@ -163,9 +163,13 @@ Webhook'ta `toUuid()` fonksiyonu geri dönüştürür.
 | 022_fix_sessions_table | fix_sessions_table | active_sessions temizliği, session_start düzeltmesi |
 | 022_new_features | new_features | athletes.photo_url, tax_rate/tax_amount, activity_logs, push_subscriptions, password_resets |
 | 023 | add_tax_columns | tax_rate/tax_amount idempotent ekleme (022_new_features çakışma fix'i) |
+| 024 | payments_missing_columns | pay_method, notif_status, slip_code, service_name, source, inv, dd kolonları |
+| 025 | missing_tables_and_columns | athletes/coaches/attendance/users org+branch, cash_transfers, wa_messages |
+| 026 | overdue_pg_function | mark_overdue_payments() RPC + trg_auto_mark_overdue trigger |
+| 027 | receipt_counter_atomic | get_next_receipt_no() atomik makbuz numarası RPC (race condition fix) |
 
 > **DİKKAT:** İki adet `022_` prefix'li migration var. `supabase db push` her ikisini de
-> tam dosya adıyla takip eder, çakışma yok. Ancak yeni migration eklerken `024_` ile başla.
+> tam dosya adıyla takip eder, çakışma yok. Yeni migration eklerken `028_` ile başla.
 
 CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`).
 
@@ -173,7 +177,7 @@ CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`)
 
 `supabase/functions/`:
 - `paytr-token/` — PayTR token üretir (v12). CORS whitelist: dragosfutbolakademisi.com + localhost
-- `paytr-webhook/` — PayTR sunucu bildirimi alır, HMAC doğrular, payments günceller, plan kayıtlarını işler
+- `paytr-webhook/` — PayTR sunucu bildirimi alır, HMAC doğrular, payments günceller, plan kayıtlarını işler. **Idempotency:** kayıt silinmişse (`!paytrRec`) erken `OK` döner. **Güvenli silme:** plan güncellemesi başarısız olursa yardımcı kayıt korunur (PayTR sonraki webhook denemesinde kalan planları işler).
 - `provision-auth-user/` — Yeni admin/kullanıcı auth kaydı oluşturur
 
 ## CI/CD
