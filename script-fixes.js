@@ -192,14 +192,39 @@ function getExpenseCategoryIcon(catId) {
 // ────────────────────────────────────────────────────────
 // 3) MAKBUZ SİSTEMİ
 // ────────────────────────────────────────────────────────
-window.generateReceipt = function(paymentId) {
+
+// DB'den atomik makbuz numarası al — race condition'ı önler (migration 027)
+async function _getReceiptNo(s) {
+    try {
+        var sb = getSupabase();
+        if (sb && s && s.id) {
+            var result = await sb.rpc('get_next_receipt_no', { p_settings_id: s.id });
+            if (!result.error && result.data) {
+                var match = result.data.match(/-(\d+)$/);
+                if (match && AppState.data.settings) {
+                    AppState.data.settings.receiptCounter = parseInt(match[1], 10);
+                }
+                return result.data;
+            }
+            console.warn('get_next_receipt_no RPC hatasi:', result.error);
+        }
+    } catch (e) {
+        console.warn('Receipt no RPC error:', e);
+    }
+    // Fallback: yerel sayaç (RPC başarısız olursa)
+    var year = new Date().getFullYear();
+    var counter = (s.receiptCounter || 0) + 1;
+    if (AppState.data.settings) AppState.data.settings.receiptCounter = counter;
+    return 'MKB-' + year + '-' + String(counter).padStart(4, '0');
+}
+
+window.generateReceipt = async function(paymentId, _reservedReceiptNo) {
     var p = (AppState.data.payments || []).find(function(x) { return x.id === paymentId; });
     if (!p) { toast('Ödeme bulunamadı!', 'e'); return; }
 
     var s = AppState.data.settings || {};
-    var year = new Date().getFullYear();
-    var counter = (s.receiptCounter || 0) + 1;
-    var receiptNo = 'MKB-' + year + '-' + String(counter).padStart(4, '0');
+    // _reservedReceiptNo: jsPDF yüklenince tekrar çağrıldığında aynı numarayı kullan
+    var receiptNo = _reservedReceiptNo || (await _getReceiptNo(s));
 
     // jsPDF ile makbuz oluştur — lazy-load
     var jsPDF = window.jspdf ? window.jspdf.jsPDF : (window.jsPDF || null);
@@ -208,7 +233,7 @@ window.generateReceipt = function(paymentId) {
         _pdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
         _pdfScript.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
         _pdfScript.crossOrigin = 'anonymous';
-        _pdfScript.onload = function() { window.generateReceipt(paymentId); };
+        _pdfScript.onload = function() { window.generateReceipt(paymentId, receiptNo); };
         _pdfScript.onerror = function() { _generateReceiptHTML(p, receiptNo, s); };
         document.head.appendChild(_pdfScript);
         return;
@@ -291,7 +316,7 @@ window.generateReceipt = function(paymentId) {
         doc.save('Makbuz_' + receiptNo + '.pdf');
 
         // Makbuz numarasını kaydet (fire-and-forget, hata yakalanır)
-        _saveReceiptNo(p.id, receiptNo, counter).catch(function(e) { console.warn('Makbuz kayıt hatası:', e); });
+        _saveReceiptNo(p.id, receiptNo).catch(function(e) { console.warn('Makbuz kayıt hatası:', e); });
         toast('✅ Makbuz oluşturuldu: ' + receiptNo, 'g');
 
     } catch (e) {
@@ -325,24 +350,18 @@ function _generateReceiptHTML(p, receiptNo, s) {
     if (!w) { URL.revokeObjectURL(blobUrl); toast('Popup engellenmiş!', 'e'); return; }
     setTimeout(function() { w.print(); URL.revokeObjectURL(blobUrl); }, 500);
 
-    _saveReceiptNo(p.id, receiptNo, (s.receiptCounter || 0) + 1).catch(function(e) { console.warn('Makbuz kayıt hatası:', e); });
+    _saveReceiptNo(p.id, receiptNo).catch(function(e) { console.warn('Makbuz kayıt hatası:', e); });
     toast('✅ Makbuz oluşturuldu: ' + receiptNo, 'g');
 }
 
-async function _saveReceiptNo(paymentId, receiptNo, counter) {
+async function _saveReceiptNo(paymentId, receiptNo) {
     try {
         var sb = getSupabase();
         if (!sb) return;
-        // Ödemeye makbuz no kaydet
         await sb.from('payments').update({ receipt_no: receiptNo }).eq('id', paymentId);
-        // AppState güncelle
         var idx = (AppState.data.payments || []).findIndex(function(p) { return p.id === paymentId; });
         if (idx >= 0) AppState.data.payments[idx].receiptNo = receiptNo;
-        // Sayacı güncelle
-        if (AppState.data.settings) {
-            AppState.data.settings.receiptCounter = counter;
-            await DB.upsert('settings', DB.mappers.fromSettings(AppState.data.settings));
-        }
+        // receiptCounter DB'de get_next_receipt_no RPC tarafından atomik güncellendi
     } catch (e) { console.warn('Receipt save error:', e); }
 }
 
