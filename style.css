@@ -712,3 +712,13 @@ html[data-theme="light"] .ni svg,html:not([data-theme]) .ni svg{color:#1e3d80}
 .sp-wz-step.done .sp-wz-lbl{color:var(--green)}
 .sp-wz-line{flex:1;height:2px;background:var(--border);margin:0 4px;margin-bottom:16px;min-width:16px;transition:background .2s}
 .sp-wz-line.done{background:var(--green)}
+
+/* ── Erişilebilirlik: hareket azaltma tercihi ── */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+}
