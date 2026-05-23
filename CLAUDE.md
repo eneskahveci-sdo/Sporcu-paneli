@@ -101,9 +101,9 @@ fromPayment(p)   // AppState objesi → DB satırı
 > **ÖNEMLİ:** `toPayment` `orgId`/`branchId` alanlarını saklar; `fromPayment` onları öncelikli kullanır.
 > Bu sayede mevcut ödeme düzenlenirken org/branch bilgisi kaybolmaz.
 
-> **NOT — tax_rate/tax_amount:** Bu alanlar `fromPayment`'tan kaldırılmıştır (migration 023 DB'ye
-> uygulanana kadar). Migration 023 tamamlandıktan sonra yeniden eklenebilir:
-> `tax_rate: p.taxRate || 0, tax_amount: p.taxAmount || 0`
+> **NOT — tax_rate/tax_amount:** Bu alanlar `fromPayment`'a 2026-05'te geri eklendi.
+> Migration 023 (`ADD COLUMN IF NOT EXISTS`) + migration 028 (3. seviye guard) ile DB kolonları garantili.
+> Mapper artık: `tax_rate: Number(p.taxRate) || 0, tax_amount: Number(p.taxAmount) || 0`.
 
 ## PayTR Entegrasyonu
 
@@ -167,9 +167,15 @@ Webhook'ta `toUuid()` fonksiyonu geri dönüştürür.
 | 025 | missing_tables_and_columns | athletes/coaches/attendance/users org+branch, cash_transfers, wa_messages |
 | 026 | overdue_pg_function | mark_overdue_payments() RPC + trg_auto_mark_overdue trigger |
 | 027 | receipt_counter_atomic | get_next_receipt_no() atomik makbuz numarası RPC (race condition fix) |
+| 028 | idempotency_guards | 022_new_features policy'leri DROP+CREATE deseniyle idempotent; tax_rate/tax_amount/photo_url/receipt_counter 3. seviye guard; payments index'leri (org+branch, aid+dt, st+dd partial); password_resets token/expires index'leri |
 
 > **DİKKAT:** İki adet `022_` prefix'li migration var. `supabase db push` her ikisini de
-> tam dosya adıyla takip eder, çakışma yok. Yeni migration eklerken `028_` ile başla.
+> tam dosya adıyla takip eder, çakışma yok. Yeni migration eklerken `029_` ile başla.
+
+> **NOT (Migration 028 — Idempotency):** PostgreSQL `CREATE POLICY IF NOT EXISTS` desteklemediğinden
+> 022_new_features yeniden çalıştırılırsa hata fırlatıyordu. 028 `DROP POLICY IF EXISTS` + `CREATE POLICY`
+> deseni ile `activity_logs` ve `push_subscriptions` policy'lerini güvenli yeniden oluşturur.
+> Tüm migration zinciri artık idempotenttir — `supabase db push` retry'ları sorunsuz çalışır.
 
 CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`).
 
@@ -197,8 +203,10 @@ CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`)
 6. **anon INSERT:** Sporcu panelinden yapılan tüm INSERT'ler `anon` role ile gider. `org_id` ve `branch_id` her zaman dolu olmalı (`fromPayment` bunu garantiler).
 7. **payments.org_id tipi:** DB'de TEXT, `sessions.org_id` UUID. Farklı tiplere dikkat et.
 8. **anon UPDATE yok:** `payments` tablosuna anon role UPDATE yapamaz (RLS). Sporcu tarafı DB güncellemelerini webhook üstlenir; frontend sadece AppState'i günceller.
-9. **tax_rate/tax_amount:** Migration 023 DB kolonlarını ekler. `fromPayment`'ta şu an eksik — migration onaylandıktan sonra eklenecek.
+9. **tax_rate/tax_amount:** Migration 023 + 028 DB kolonlarını idempotent ekler. `fromPayment` artık `tax_rate`/`tax_amount` yazıyor (2026-05'te geri eklendi).
 10. **session_start:** Eski production DB'lerde `active_sessions` tablosuna işaret eden eski fonksiyon olabilir. Migration 022_fix_sessions_table bunu temizler.
+11. **Maskable icon:** `manifest.json`'da maskable purpose ayrı PNG entry'sinde (`icon-512.png purpose: maskable`). SVG maskable Android'de safe-zone hesaplamadığı için güvensiz — bu yüzden ayrıldı.
+12. **index.html no-cache:** `vercel.json` artık `/` ve `/index.html` için `no-cache, no-store, must-revalidate` döner. JS/CSS dosyaları 7 gün cache'lenir (immutable benzeri davranış). PWA güncellemeleri SW dışında index.html sürümlemesiyle de yakalanır.
 
 ## Sık Kullanılan Fonksiyonlar
 
@@ -237,6 +245,20 @@ Kapsamlı taramada tespit edilen ve düzeltilen sorunlar:
 - **`unsafe-inline` CSP:** index.html'de artık inline script yok; `paytr-ok.html`/`paytr-fail.html` kendi CSP'sine sahip. Ana site CSP'sinden `unsafe-inline` kaldırılabilir ancak eski tarayıcı uyumluluğu test edilmeli.
 - **Supabase CDN SRI:** `cdn.jsdelivr.net`'ten yüklenen Supabase JS'e `integrity` hash eklenebilir.
 - **`window._sessionRestoring`:** `restoreSession()` mutex'i — script.js'te `window` üzerinde tutulur, Security.js ile senkronize.
+
+## SEO / Erişilebilirlik / PWA Güncellemeleri (2026-05)
+
+| Konu | Dosya | Değişiklik |
+|------|-------|-----------|
+| Canonical domain | `index.html`, `sitemap.xml`, `robots.txt` | `https://www.dragosfutbolakademisi.com` — vercel.app subdomain'i yerine canlı domain |
+| OG / Twitter | `index.html` | `summary_large_image`, `og:site_name`, `og:image:width/height/alt`, `og:locale:alternate`, mutlak resim URL'i |
+| JSON-LD | `index.html` | `logo` + `sameAs` (Instagram) eklendi, URL düzeltildi |
+| Sosyal butonlar | `index.html` | `aria-label` ve `rel="noopener noreferrer"` |
+| Reduced motion | `style.css` | `@media (prefers-reduced-motion: reduce)` tüm animasyon/transition'ı durdurur (WCAG 2.3.3) |
+| Maskable icon | `manifest.json` | PNG ayrı `purpose: maskable` entry'si |
+| Cache strategy | `vercel.json` | `/` ve `/index.html` no-cache, JS/CSS 7 gün |
+
+> **Robots.txt:** `Disallow: /` bilinçli (admin paneli indexlenmesin). Sitemap URL'i sadece canlı domaine düzeltildi — Disallow korundu.
 
 ## Geliştirme Ortamı
 
