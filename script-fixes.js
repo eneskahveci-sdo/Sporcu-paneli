@@ -398,9 +398,9 @@ window.showCashTransferModal = function() {
     ]);
 };
 
-function getCashBankBalances() {
+function getCashBankBalances(filtered) {
     var cashIn = 0, cashOut = 0, bankIn = 0, bankOut = 0;
-    (AppState.data.payments || []).filter(function(p) { return p.st === 'completed'; }).forEach(function(p) {
+    (AppState.data.payments || []).filter(function(p) { return p.st === 'completed' && (!filtered || isInPeriod(p.dt)); }).forEach(function(p) {
         var isCash = p.payMethod === 'nakit';
         if (p.ty === 'income') {
             if (isCash) cashIn += (p.amt || 0); else bankIn += (p.amt || 0);
@@ -609,7 +609,7 @@ window.pgAccountingV8 = function() {
     var expChange = changePercent(thisMonthExp, prevMonthExp);
     var yearIncChange = changePercent(yearInc, prevYearInc);
 
-    var balances = getCashBankBalances();
+    var balances = getCashBankBalances(true);
     var branchDist = getBranchIncomeDistribution();
     var expDist = getExpenseCategoryDistribution();
     var s = AppState.data.settings || {};
@@ -632,11 +632,11 @@ window.pgAccountingV8 = function() {
     + '<button class="btn btn-sm ' + (accFilter==='all'?'bp':'bs') + '" onclick="AppState.ui.accFilter=\'all\';go(\'accounting\')">Tümü</button>'
     + '</div>'
 
-    // Kasa & Banka Kartları
+    // Kasa & Banka Kartları (dönem filtresine göre)
     + '<div class="g3 mb3">'
-    + '<div class="card kasa-card" style="border-left:4px solid var(--green)"><div class="kasa-card-icon">🏦</div><div class="kasa-card-val tg">' + FormatUtils.currency(balances.bank) + '</div><div class="kasa-card-lbl">Banka Bakiyesi</div></div>'
-    + '<div class="card kasa-card" style="border-left:4px solid var(--blue2)"><div class="kasa-card-icon">💵</div><div class="kasa-card-val tb">' + FormatUtils.currency(balances.cash) + '</div><div class="kasa-card-lbl">Kasa (Nakit)</div></div>'
-    + '<div class="card kasa-card" style="border-left:4px solid var(--purple)"><div class="kasa-card-icon">💰</div><div class="kasa-card-val tpur">' + FormatUtils.currency(balances.cash + balances.bank) + '</div><div class="kasa-card-lbl">Toplam Bakiye</div></div>'
+    + '<div class="card kasa-card" style="border-left:4px solid var(--green)"><div class="kasa-card-icon">🏦</div><div class="kasa-card-val tg">' + FormatUtils.currency(balances.bank) + '</div><div class="kasa-card-lbl">Banka' + (accFilter !== 'all' ? ' (' + {month:'Bu Ay',quarter:'Son 3 Ay',year:'Bu Yıl'}[accFilter] + ')' : '') + '</div></div>'
+    + '<div class="card kasa-card" style="border-left:4px solid var(--blue2)"><div class="kasa-card-icon">💵</div><div class="kasa-card-val tb">' + FormatUtils.currency(balances.cash) + '</div><div class="kasa-card-lbl">Kasa (Nakit)' + (accFilter !== 'all' ? ' (' + {month:'Bu Ay',quarter:'Son 3 Ay',year:'Bu Yıl'}[accFilter] + ')' : '') + '</div></div>'
+    + '<div class="card kasa-card" style="border-left:4px solid var(--purple)"><div class="kasa-card-icon">💰</div><div class="kasa-card-val tpur">' + FormatUtils.currency(balances.cash + balances.bank) + '</div><div class="kasa-card-lbl">Toplam' + (accFilter !== 'all' ? ' (' + {month:'Bu Ay',quarter:'Son 3 Ay',year:'Bu Yıl'}[accFilter] + ')' : '') + '</div></div>'
     + '</div>'
 
     // Transfer butonu + Günlük kasa

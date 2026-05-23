@@ -2117,11 +2117,15 @@ window.printProfile = function(aid) {
 function pgDashboard() {
     const { athletes, payments } = AppState.data;
     const active = athletes.filter(a => a.st === 'active').length;
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const thisMonth = now.getMonth();
+    const monthStr = thisYear + '-' + String(thisMonth + 1).padStart(2, '0');
     const income = payments
-        .filter(p => p.ty === 'income' && p.st === 'completed')
+        .filter(p => p.ty === 'income' && p.st === 'completed' && p.dt && p.dt.startsWith(monthStr))
         .reduce((s, p) => s + (p.amt || 0), 0);
     const expense = payments
-        .filter(p => p.ty === 'expense' && p.st === 'completed')
+        .filter(p => p.ty === 'expense' && p.st === 'completed' && p.dt && p.dt.startsWith(monthStr))
         .reduce((s, p) => s + (p.amt || 0), 0);
     const overdue = payments.filter(p => p.st === 'overdue').length;
     
@@ -3677,11 +3681,13 @@ window.rejectPayment = function(id) {
 };
 
 function pgAccounting() {
+    const now = new Date();
+    const monthStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
     const income = AppState.data.payments
-        .filter(p => p.ty === 'income' && p.st === 'completed')
+        .filter(p => p.ty === 'income' && p.st === 'completed' && p.dt && p.dt.startsWith(monthStr))
         .reduce((s, p) => s + (p.amt || 0), 0);
     const expense = AppState.data.payments
-        .filter(p => p.ty === 'expense' && p.st === 'completed')
+        .filter(p => p.ty === 'expense' && p.st === 'completed' && p.dt && p.dt.startsWith(monthStr))
         .reduce((s, p) => s + (p.amt || 0), 0);
     
     return `
