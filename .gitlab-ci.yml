@@ -80,7 +80,8 @@ deploy-migrations:
   before_script:
     - *install_supabase
   script:
-    - supabase db push --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase link --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase db push
   variables:
     SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
     SUPABASE_DB_PASSWORD: "$SUPABASE_DB_PASSWORD"
