@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veri Taşıma</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#0d1117;color:#c9d1d9}
+h2{font-size:18px;margin-bottom:16px}
+label{display:block;font-size:13px;color:#8b949e;margin:12px 0 4px}
+input{width:100%;padding:10px;border:1px solid #30363d;border-radius:8px;background:#161b22;color:#c9d1d9;font-size:15px;box-sizing:border-box}
+button{width:100%;background:#238636;color:#fff;border:0;padding:14px;border-radius:8px;font-size:16px;cursor:pointer;margin-top:16px;font-weight:600}
+button:disabled{background:#2d3c2d;color:#555;cursor:not-allowed}
+#log{white-space:pre-wrap;background:#161b22;border:1px solid #30363d;padding:14px;border-radius:8px;font-family:monospace;font-size:13px;max-height:400px;overflow:auto;margin-top:16px;display:none}
+.ok{color:#3fb950}.err{color:#f85149}.warn{color:#d29922}.dim{color:#8b949e}
+</style>
+</head>
+<body>
+<h2>🔄 Veri Taşıma Aracı</h2>
+
+<label>Eski admin şifre</label>
+<input id="oldpass" type="password" placeholder="Eski Supabase şifresi">
+
+<label>Yeni admin şifre</label>
+<input id="newpass" type="password" placeholder="Yeni Supabase şifresi">
+
+<button id="btn">Taşımayı Başlat ▶</button>
+
+<div id="log"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const OLD={url:'https://wfarbydojxtufnkjuhtc.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw'};
+const NEW={url:'https://xnggnjstbqblnmouzihe.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZ2duanN0YnFibG5tb3V6aWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjcxOTgsImV4cCI6MjA5NjMwMzE5OH0.0LI3JqiKq2vIBFtjhy_i2XdmuY75i_a-LPVHj6tekXw'};
+const EMAIL='eneskahveci.bs@gmail.com';
+const TABLES=['orgs','branches','sports','coaches','classes','athletes','payments','attendance','messages','on_kayitlar','deletion_requests','settings'];
+
+const logEl=document.getElementById('log');
+function log(m,cls){logEl.style.display='block';const s=document.createElement('span');if(cls)s.className=cls;s.textContent=m+'\n';logEl.appendChild(s);logEl.scrollTop=logEl.scrollHeight;}
+
+async function fetchAll(c,t){
+  let rows=[],from=0;
+  while(true){
+    const{data,error}=await c.from(t).select('*').range(from,from+999);
+    if(error)throw error;
+    rows=rows.concat(data||[]);
+    if(!data||data.length<1000)break;
+    from+=1000;
+  }
+  return rows;
+}
+
+function dominant(rows,key){
+  const c={};rows.forEach(r=>{const v=r[key];if(v)c[v]=(c[v]||0)+1;});
+  let best=null,bn=-1;for(const k in c)if(c[k]>bn){bn=c[k];best=k;}return best;
+}
+
+document.getElementById('btn').onclick=async()=>{
+  const oldpass=document.getElementById('oldpass').value;
+  const newpass=document.getElementById('newpass').value;
+  if(!oldpass||!newpass){alert('Her iki şifreyi de girin');return;}
+  document.getElementById('btn').disabled=true;
+  logEl.innerHTML='';
+
+  const oldC=supabase.createClient(OLD.url,OLD.anon);
+  const newC=supabase.createClient(NEW.url,NEW.anon);
+
+  log('▶ Eski Supabase giriş...');
+  const{data:a1,error:e1}=await oldC.auth.signInWithPassword({email:EMAIL,password:oldpass});
+  if(e1){log('Eski giriş HATA: '+e1.message,'err');document.getElementById('btn').disabled=false;return;}
+  log('✓ Eski giriş OK','ok');
+
+  log('▶ Yeni Supabase giriş...');
+  const{data:a2,error:e2}=await newC.auth.signInWithPassword({email:EMAIL,password:newpass});
+  if(e2){log('Yeni giriş HATA: '+e2.message,'err');document.getElementById('btn').disabled=false;return;}
+  log('✓ Yeni giriş OK','ok');
+
+  log('\n▶ Eski veriler okunuyor...','dim');
+  const data={};
+  for(const t of TABLES){
+    try{data[t]=await fetchAll(oldC,t);log('  '+t+': '+data[t].length+' kayıt',data[t].length>0?'ok':'warn');}
+    catch(e){data[t]=[];log('  '+t+': HATA ('+e.message+')','err');}
+  }
+
+  const orgId=dominant(data.athletes||[],'org_id')||dominant(data.settings||[],'org_id');
+  const brId=dominant(data.athletes||[],'branch_id')||dominant(data.settings||[],'branch_id');
+  if(orgId){
+    await newC.from('users').upsert({id:a2.user.id,email:EMAIL,name:'admin',role:'admin',org_id:orgId,branch_id:brId},{onConflict:'id'});
+    log('\n✓ Admin org_id eşlendi','ok');
+  }
+
+  log('\n▶ Yeni Supabase yazılıyor...','dim');
+  for(const t of TABLES){
+    const rows=data[t];if(!rows||!rows.length){log('  '+t+': atlandı','dim');continue;}
+    let ok=0,fail=0;
+    for(let i=0;i<rows.length;i+=200){
+      const{error}=await newC.from(t).upsert(rows.slice(i,i+200),{onConflict:'id'});
+      if(error){fail+=Math.min(200,rows.length-i);log('  '+t+' hata: '+error.message,'err');}
+      else ok+=Math.min(200,rows.length-i);
+    }
+    log('  '+t+': '+ok+' yazıldı'+(fail?' / '+fail+' hata':''),fail?'warn':'ok');
+  }
+  log('\n✅ TAMAMLANDI! Siteye giriş yapabilirsiniz.','ok');
+  document.getElementById('btn').disabled=false;
+};
+</script>
+</body>
+</html>
