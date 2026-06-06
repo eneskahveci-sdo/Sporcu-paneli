@@ -178,8 +178,8 @@ const SessionManager = {
 // Supabase bağlantısı — anon key public-safe (RLS politikaları korur)
 // Bu key sadece public veri erişimi içindir, service_role key ASLA ekleme.
 const SUPABASE_CONFIG = {
-    url: 'https://wfarbydojxtufnkjuhtc.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw'
+    url: 'https://xnggnjstbqblnmouzihe.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZ2duanN0YnFibG5tb3V6aWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjcxOTgsImV4cCI6MjA5NjMwMzE5OH0.0LI3JqiKq2vIBFtjhy_i2XdmuY75i_a-LPVHj6tekXw'
 };
 
 const DEFAULT_LOGO = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIzMCIgZmlsbD0iIzNiODJmNiIvPjxwYXRoIGQ9Ik0zMiAxMEw0MiAyOEwyNCAyOEwzMiAxMFoiIGZpbGw9IndoaXRlIi8+PHBhdGggZD0iTTMyIDU0TDQyIDM2TDI0IDM2TDMyIDU0WiIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTAgMzJMMjggMjJMMjggNDJMMTAgMzJaIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik01NCAzMkwzNiAyMkwzNiA0Mkw1NCAzMloiIGZpbGw9IndoaXRlIi8+PC9zdmc+';
