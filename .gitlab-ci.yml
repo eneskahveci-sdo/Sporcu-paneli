@@ -4,12 +4,9 @@ stages:
   - deploy-functions
 
 .install_supabase: &install_supabase
-  - apt-get update -qq && apt-get install -y -qq curl tar
-  - |
-    curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz" -o /tmp/supabase.tar.gz
-    tar -xzf /tmp/supabase.tar.gz -C /tmp
-    mv -f /tmp/supabase /usr/local/bin/supabase
-    supabase --version
+  - apt-get update -qq && apt-get install -y -qq curl tar nodejs npm
+  - npm install -g supabase
+  - supabase --version
 
 # ────────────────────────────────────────────────
 # CI — Lint & Validate (her push'ta çalışır)
