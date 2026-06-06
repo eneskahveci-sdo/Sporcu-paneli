@@ -65,15 +65,13 @@ function extractBadCol(msg){
   return null;
 }
 
-// Satırları temizle: null değerleri varsayılana çevir, özel durum icon
+// Satırları temizle: kötü kolonları at, null'ları koru
 function sanitize(rows, badCols){
   return rows.map(r=>{
     const out={};
     for(const k in r){
       if(badCols.has(k)) continue;
-      const v=r[k];
-      if(v===null||v===undefined) out[k]='';
-      else out[k]=v;
+      out[k]=r[k]; // null olduğu gibi kalsın, DB default kullansın
     }
     return out;
   });
