@@ -65,13 +65,16 @@ function extractBadCol(msg){
   return null;
 }
 
-// Satırları temizle: kötü kolonları at, null'ları koru
+// Satırları temizle: kötü kolonları at, UUID alanlarda ''→null
 function sanitize(rows, badCols){
   return rows.map(r=>{
     const out={};
     for(const k in r){
       if(badCols.has(k)) continue;
-      out[k]=r[k]; // null olduğu gibi kalsın, DB default kullansın
+      let v=r[k];
+      // _id veya id kolonunda boş string → null (UUID tipi kabul etmez)
+      if(v==='' && (k==='id'||k.endsWith('_id'))) v=null;
+      out[k]=v;
     }
     return out;
   });
@@ -95,12 +98,28 @@ async function adaptiveUpsert(newC, table, rows){
       // Çözülemeyen hata
       return{ok:0,fail:rows.length,err:pe.message};
     }
-    // Probe başarılı — geri kalan hepsini yaz
+    // Probe başarılı — batch yaz, hatalıları satır satır retry et
     let ok=1,fail=0,lastErr='';
-    for(let i=1;i<cleaned.length;i+=200){
-      const{error}=await newC.from(table).upsert(cleaned.slice(i,i+200),{onConflict:'id'});
-      if(error){fail+=Math.min(200,cleaned.length-i);lastErr=error.message;}
-      else ok+=Math.min(200,cleaned.length-i);
+    const allCleaned=sanitize(rows,badCols);
+    for(let i=1;i<allCleaned.length;i+=200){
+      const batch=allCleaned.slice(i,i+200);
+      const{error}=await newC.from(table).upsert(batch,{onConflict:'id'});
+      if(!error){ok+=batch.length;continue;}
+      // Batch hatalı — satır satır dene
+      for(let j=0;j<batch.length;j++){
+        const rowBad=new Set(badCols);
+        let rt=0;
+        while(rt<15){
+          rt++;
+          const r1=sanitize([rows[i+j]],rowBad)[0];
+          const{error:re}=await newC.from(table).upsert([r1],{onConflict:'id'});
+          if(!re){ok++;[...rowBad].forEach(c=>badCols.add(c));break;}
+          const b=extractBadCol(re.message);
+          if(b){rowBad.add(b);}
+          else{fail++;lastErr=re.message;break;}
+        }
+        if(rt>=15){fail++;}
+      }
     }
     if(badCols.size) log('    atılan kolonlar: '+[...badCols].join(', '),'dim');
     return{ok,fail,err:lastErr};
