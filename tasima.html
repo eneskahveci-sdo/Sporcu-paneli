@@ -5,27 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Veri Taşıma</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#0d1117;color:#c9d1d9}
+body{font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:20px;background:#0d1117;color:#c9d1d9}
 h2{font-size:18px;margin-bottom:16px}
 label{display:block;font-size:13px;color:#8b949e;margin:12px 0 4px}
 input{width:100%;padding:10px;border:1px solid #30363d;border-radius:8px;background:#161b22;color:#c9d1d9;font-size:15px;box-sizing:border-box}
 button{width:100%;background:#238636;color:#fff;border:0;padding:14px;border-radius:8px;font-size:16px;cursor:pointer;margin-top:16px;font-weight:600}
 button:disabled{background:#2d3c2d;color:#555;cursor:not-allowed}
-#log{white-space:pre-wrap;background:#161b22;border:1px solid #30363d;padding:14px;border-radius:8px;font-family:monospace;font-size:13px;max-height:400px;overflow:auto;margin-top:16px;display:none}
+#log{white-space:pre-wrap;background:#161b22;border:1px solid #30363d;padding:14px;border-radius:8px;font-family:monospace;font-size:13px;max-height:420px;overflow:auto;margin-top:16px;display:none}
 .ok{color:#3fb950}.err{color:#f85149}.warn{color:#d29922}.dim{color:#8b949e}
 </style>
 </head>
 <body>
 <h2>🔄 Veri Taşıma Aracı</h2>
-
 <label>Eski admin şifre</label>
 <input id="oldpass" type="password" placeholder="Eski Supabase şifresi">
-
 <label>Yeni admin şifre</label>
 <input id="newpass" type="password" placeholder="Yeni Supabase şifresi">
-
 <button id="btn">Taşımayı Başlat ▶</button>
-
 <div id="log"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -50,6 +46,36 @@ async function fetchAll(c,t){
   return rows;
 }
 
+// Yeni Supabase'in hangi kolonları kabul ettiğini OpenAPI'den öğren
+async function getNewCols(table){
+  try{
+    const r=await fetch(NEW.url+'/rest/v1/?apikey='+NEW.anon);
+    const schema=await r.json();
+    const def=schema?.definitions?.[table];
+    if(!def) return null;
+    return Object.keys(def.properties||{});
+  }catch(e){return null;}
+}
+
+// Satırdan bilinmeyen kolonları temizle + null → default dönüştür
+function cleanRow(row, allowedCols){
+  if(!allowedCols) return row;
+  const out={};
+  for(const k of allowedCols){
+    if(k in row){
+      // NOT NULL kolonlar için null → varsayılan
+      const v=row[k];
+      if(v===null||v===undefined){
+        // sayı gibi görünen string değilse boş string kullan
+        out[k]='';
+      } else {
+        out[k]=v;
+      }
+    }
+  }
+  return out;
+}
+
 function dominant(rows,key){
   const c={};rows.forEach(r=>{const v=r[key];if(v)c[v]=(c[v]||0)+1;});
   let best=null,bn=-1;for(const k in c)if(c[k]>bn){bn=c[k];best=k;}return best;
@@ -58,7 +84,7 @@ function dominant(rows,key){
 document.getElementById('btn').onclick=async()=>{
   const oldpass=document.getElementById('oldpass').value;
   const newpass=document.getElementById('newpass').value;
-  if(!oldpass||!newpass){alert('Her iki şifreyi de girin');return;}
+  if(!oldpass||!newpass){alert('Her iki şifreyi girin');return;}
   document.getElementById('btn').disabled=true;
   logEl.innerHTML='';
 
@@ -75,10 +101,23 @@ document.getElementById('btn').onclick=async()=>{
   if(e2){log('Yeni giriş HATA: '+e2.message,'err');document.getElementById('btn').disabled=false;return;}
   log('✓ Yeni giriş OK','ok');
 
+  // Yeni Supabase kolon listelerini çek
+  log('\n▶ Yeni Supabase şeması okunuyor...','dim');
+  const schemaCols={};
+  try{
+    const r=await fetch(NEW.url+'/rest/v1/?apikey='+NEW.anon);
+    const schema=await r.json();
+    for(const t of TABLES){
+      const def=schema?.definitions?.[t];
+      if(def) schemaCols[t]=Object.keys(def.properties||{});
+    }
+    log('✓ Şema alındı','ok');
+  }catch(e){log('Şema alınamadı, ham veri denenecek: '+e.message,'warn');}
+
   log('\n▶ Eski veriler okunuyor...','dim');
   const data={};
   for(const t of TABLES){
-    try{data[t]=await fetchAll(oldC,t);log('  '+t+': '+data[t].length+' kayıt',data[t].length>0?'ok':'warn');}
+    try{data[t]=await fetchAll(oldC,t);log('  '+t+': '+data[t].length+' kayıt',data[t].length>0?'ok':'dim');}
     catch(e){data[t]=[];log('  '+t+': HATA ('+e.message+')','err');}
   }
 
@@ -86,19 +125,24 @@ document.getElementById('btn').onclick=async()=>{
   const brId=dominant(data.athletes||[],'branch_id')||dominant(data.settings||[],'branch_id');
   if(orgId){
     await newC.from('users').upsert({id:a2.user.id,email:EMAIL,name:'admin',role:'admin',org_id:orgId,branch_id:brId},{onConflict:'id'});
-    log('\n✓ Admin org_id eşlendi','ok');
+    log('\n✓ Admin org_id='+orgId+' eşlendi','ok');
   }
 
   log('\n▶ Yeni Supabase yazılıyor...','dim');
   for(const t of TABLES){
-    const rows=data[t];if(!rows||!rows.length){log('  '+t+': atlandı','dim');continue;}
-    let ok=0,fail=0;
+    const rows=data[t];if(!rows||!rows.length){log('  '+t+': boş, atlandı','dim');continue;}
+    const cols=schemaCols[t]||null;
+    if(cols) log('  '+t+' kolonlar: '+cols.length+' → eski fazla kolonlar atılıyor','dim');
+
+    let ok=0,fail=0,lastErr='';
     for(let i=0;i<rows.length;i+=200){
-      const{error}=await newC.from(t).upsert(rows.slice(i,i+200),{onConflict:'id'});
-      if(error){fail+=Math.min(200,rows.length-i);log('  '+t+' hata: '+error.message,'err');}
-      else ok+=Math.min(200,rows.length-i);
+      const chunk=rows.slice(i,i+200).map(r=>cleanRow(r,cols));
+      const{error}=await newC.from(t).upsert(chunk,{onConflict:'id'});
+      if(error){fail+=chunk.length;lastErr=error.message;}
+      else ok+=chunk.length;
     }
-    log('  '+t+': '+ok+' yazıldı'+(fail?' / '+fail+' hata':''),fail?'warn':'ok');
+    if(fail) log('  '+t+': '+ok+' yazıldı / '+fail+' hata — '+lastErr,'warn');
+    else log('  '+t+': '+ok+' yazıldı ✓','ok');
   }
   log('\n✅ TAMAMLANDI! Siteye giriş yapabilirsiniz.','ok');
   document.getElementById('btn').disabled=false;
