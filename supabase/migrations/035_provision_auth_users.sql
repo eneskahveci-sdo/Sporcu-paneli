@@ -3,40 +3,40 @@
 -- Mevcut sporcular, antrenörler ve adminler için Supabase Auth
 -- kullanıcıları oluşturur.
 --
--- Şifre mantığı (her rol için):
---   bcrypt   ($2a/b/x/y$...)  → direkt kopyala (zaten güvenli)
---   plaintext (bcrypt değil, SHA256 değil)  → crypt() ile bcrypt'e çevir
---   SHA-256  (64 hex karakter) → plaintext bilinemiyor
---                                 → sporcu/antrenör: TC son 6 hane (varsayılan)
---                                 → admin: geçici şifre 'Dragos2025!'
---   NULL/boş → sporcu/antrenör: TC son 6 hane
---             → admin: geçici şifre 'Dragos2025!'
+-- Şifre mantığı (sporcu/antrenör):
+--   bcrypt ($2a/b/x/y$...)     → direkt kopyala
+--   plaintext (diğer, boş değil) → crypt() ile bcrypt'e çevir
+--   SHA-256 (64 hex karakter)  → plaintext bilinemiyor → TC son 6 hane
+--   NULL/boş                   → TC son 6 hane (varsayılan şifre)
 --
--- Admin özel kural: users.id == auth.uid() olmalı.
---   is_admin() fonksiyonu: SELECT id FROM users WHERE id = auth.uid()
---   Bu nedenle adminler için AYNI UUID kullanılır.
+-- Admin şifre mantığı:
+--   bcrypt     → direkt kopyala
+--   plaintext  → bcrypt'e çevir
+--   SHA-256/boş → geçici 'Dragos2025!'  (hemen değiştir)
 --
--- Email belirleme:
---   Sporcu/antrenör tablosunda geçerli em varsa onu kullan,
---   yoksa tc || '@dragosfk.com' fallback'i.
---   Bir email başka auth user'a aitse tc@dragosfk.com'a geç.
+-- ADMİN KRİTİK: users.id == auth.uid() zorunlu (is_admin() bunu gerektirir).
+--   Bu migration daima YENİ UUID ile auth user oluşturur, ardından
+--   public.users.id'yi yeni UUID ile GÜNCELLER.
+--   → Eski Supabase'den taşınan adminler de dahil, tüm adminler çalışır.
 --
--- Idempotent: her kullanıcı için önce var mı kontrolü yapılır.
---   auth.identities provider_id kolonu var/yok → EXECUTE ile handle edilir.
+-- İdempotent:
+--   • Sporcu/antrenör: email zaten auth.users'da varsa atla.
+--   • Admin: email zaten auth.users'da varsa → public.users.id senkronize et.
+--   • auth.identities provider_id kolonu var/yok → EXECUTE ile dinamik.
 -- ============================================================
 
 DO $$
 DECLARE
-  rec          RECORD;
-  _id          UUID;
-  _email       TEXT;
-  _pass        TEXT;
-  _encrypted   TEXT;
-  _default_pass TEXT;
-  _meta        JSONB;
-  _has_prov_id BOOLEAN;
-  _identity_sql TEXT;
-  _skip        BOOLEAN;
+  rec               RECORD;
+  _id               UUID;
+  _existing_auth_id UUID;
+  _email            TEXT;
+  _pass             TEXT;
+  _encrypted        TEXT;
+  _default_pass     TEXT;
+  _meta             JSONB;
+  _has_prov_id      BOOLEAN;
+  _skip             BOOLEAN;
 BEGIN
 
   -- auth.identities tablosunda provider_id kolonu var mı? (schema versiyonu tespiti)
@@ -48,12 +48,7 @@ BEGIN
   ) INTO _has_prov_id;
 
   RAISE NOTICE '--- 035: Auth kullanıcı provisioning başladı ---';
-  RAISE NOTICE 'auth.identities provider_id kolonu: %', _has_prov_id;
-
-  -- ──────────────────────────────────────────────────────────────────
-  -- YARDIMCI MAKRO: auth.users + auth.identities ekleme
-  -- (PL/pgSQL fonksiyon tanımı yerine inline, performans için)
-  -- ──────────────────────────────────────────────────────────────────
+  RAISE NOTICE 'auth.identities.provider_id mevcut: %', _has_prov_id;
 
   -- ──────────────────────────────────────────────────────────────────
   -- 1. SPORCUlar
@@ -85,7 +80,7 @@ BEGIN
         _email := rec.tc || '@dragosfk.com';
       END IF;
 
-      -- Fallback da alınmışsa atla
+      -- Fallback da alınmışsa atla (bu TC zaten auth'ta var)
       IF EXISTS (SELECT 1 FROM auth.users WHERE email = _email) THEN
         _skip := TRUE;
       END IF;
@@ -95,13 +90,13 @@ BEGIN
         _pass         := COALESCE(trim(rec.sp_pass), '');
 
         IF    _pass ~ '^\$2[abxy]\$' THEN
-          _encrypted := _pass;                                         -- bcrypt: direkt kopyala
+          _encrypted := _pass;
         ELSIF length(_pass) = 64 AND _pass ~ '^[0-9a-f]{64}$' THEN
-          _encrypted := crypt(_default_pass, gen_salt('bf', 10));      -- SHA-256: default
+          _encrypted := crypt(_default_pass, gen_salt('bf', 10));
         ELSIF _pass <> '' THEN
-          _encrypted := crypt(_pass, gen_salt('bf', 10));              -- plaintext: bcrypt'e çevir
+          _encrypted := crypt(_pass, gen_salt('bf', 10));
         ELSE
-          _encrypted := crypt(_default_pass, gen_salt('bf', 10));      -- boş: default
+          _encrypted := crypt(_default_pass, gen_salt('bf', 10));
         END IF;
 
         _id   := gen_random_uuid();
@@ -132,14 +127,12 @@ BEGIN
           '', '', '', '', false
         );
 
-        -- auth.identities — schema versiyonuna göre
         IF _has_prov_id THEN
           EXECUTE
             'INSERT INTO auth.identities ' ||
             '(id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at) ' ||
             'VALUES ($1, $2, $3, $4, $5, now(), now(), now())'
-          USING
-            _id, _id,
+          USING _id, _id,
             jsonb_build_object('sub', _id::text, 'email', _email),
             'email', _email;
         ELSE
@@ -147,8 +140,7 @@ BEGIN
             'INSERT INTO auth.identities ' ||
             '(id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at) ' ||
             'VALUES ($1, $2, $3, $4, now(), now(), now())'
-          USING
-            _id, _id,
+          USING _id, _id,
             jsonb_build_object('sub', _id::text, 'email', _email),
             'email';
         END IF;
@@ -238,8 +230,7 @@ BEGIN
             'INSERT INTO auth.identities ' ||
             '(id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at) ' ||
             'VALUES ($1, $2, $3, $4, $5, now(), now(), now())'
-          USING
-            _id, _id,
+          USING _id, _id,
             jsonb_build_object('sub', _id::text, 'email', _email),
             'email', _email;
         ELSE
@@ -247,8 +238,7 @@ BEGIN
             'INSERT INTO auth.identities ' ||
             '(id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at) ' ||
             'VALUES ($1, $2, $3, $4, now(), now(), now())'
-          USING
-            _id, _id,
+          USING _id, _id,
             jsonb_build_object('sub', _id::text, 'email', _email),
             'email';
         END IF;
@@ -262,12 +252,20 @@ BEGIN
   -- ──────────────────────────────────────────────────────────────────
   -- 3. ADMİNLER (public.users tablosu)
   --
-  -- KRİTİK: users.id == auth.uid() zorunlu.
-  --   is_admin() RPC:  SELECT id FROM users WHERE id = auth.uid() AND role = 'admin'
-  --   Bu nedenle auth.users'a AYNI UUID ile ekliyoruz.
+  -- KRİTİK: users.id == auth.uid() ZORUNLU
+  --   is_admin(): SELECT id FROM users WHERE id = auth.uid() AND role = 'admin'
   --
-  -- SHA-256/boş şifreli adminler geçici şifre alır: Dragos2025!
-  --   → Admin Dashboard'dan hemen değiştirmesi önerilir.
+  -- Eski Supabase'den taşınan adminlerin UUID'si yeni projede geçersiz.
+  -- Çözüm: daima YENİ UUID ile auth user oluştur, ardından
+  --        public.users.id'yi yeni UUID ile UPDATE et.
+  --
+  -- Durum A: Bu email için auth.users kaydı ZATen VAR
+  --   → existing UUID al → public.users.id'yi o UUID ile güncelle
+  --
+  -- Durum B: Auth kaydı YOK
+  --   → Yeni UUID üret → auth.users ekle → public.users.id güncelle
+  --
+  -- Böylece her admin için users.id = auth.uid() garantilenir.
   -- ──────────────────────────────────────────────────────────────────
   RAISE NOTICE '→ Adminler işleniyor...';
 
@@ -281,44 +279,57 @@ BEGIN
   LOOP
     BEGIN
       _email := lower(trim(rec.email));
-      _pass  := COALESCE(trim(rec.pass), '');
 
-      IF    _pass ~ '^\$2[abxy]\$' THEN
-        _encrypted := _pass;
-      ELSIF length(_pass) = 64 AND _pass ~ '^[0-9a-f]{64}$' THEN
-        _encrypted := crypt('Dragos2025!', gen_salt('bf', 10));
-        RAISE WARNING 'ADMİN SHA-256 şifresi: id=%, email=% → geçici şifre Dragos2025! ile oluşturuldu. Hemen değiştirin!', rec.id, _email;
-      ELSIF _pass <> '' THEN
-        _encrypted := crypt(_pass, gen_salt('bf', 10));
-      ELSE
-        _encrypted := crypt('Dragos2025!', gen_salt('bf', 10));
-        RAISE WARNING 'ADMİN boş şifresi: id=%, email=% → geçici şifre Dragos2025! ile oluşturuldu. Hemen değiştirin!', rec.id, _email;
-      END IF;
+      -- Bu email için mevcut auth user var mı?
+      SELECT id INTO _existing_auth_id
+      FROM   auth.users
+      WHERE  email = _email
+      LIMIT  1;
 
-      _meta := jsonb_build_object(
-        'role',      rec.role,
-        'full_name', rec.name,
-        'org_id',    rec.org_id,
-        'branch_id', rec.branch_id
-      );
-
-      -- id çakışması: aynı id başka auth user'a aitse güncelle
-      -- Email çakışması ama farklı id: warn et, atla
-      IF EXISTS (SELECT 1 FROM auth.users WHERE id = rec.id) THEN
-        -- Auth user zaten bu id ile var → şifre ve meta güncelle
-        UPDATE auth.users
-        SET encrypted_password = _encrypted,
-            raw_user_meta_data = _meta,
-            updated_at         = now()
-        WHERE id = rec.id;
-        RAISE NOTICE 'Admin güncellendi: id=%, email=%', rec.id, _email;
-
-      ELSIF EXISTS (SELECT 1 FROM auth.users WHERE email = _email) THEN
-        -- Farklı id ile bu email var → uyarı, atla (id eşleşmeden is_admin çalışmaz)
-        RAISE WARNING 'Admin atlandı (email başka id ile var): id=%, email=%', rec.id, _email;
+      IF _existing_auth_id IS NOT NULL THEN
+        -- ── Durum A: Auth user zaten var ────────────────────────────
+        IF _existing_auth_id = rec.id THEN
+          -- Zaten senkronize, bir şey yapmaya gerek yok
+          RAISE NOTICE 'Admin zaten senkronize: id=%, email=%', rec.id, _email;
+        ELSE
+          -- users.id ≠ auth.uid → public.users.id'yi düzelt
+          -- Önce bu UUID ile başka users satırı var mı?
+          IF EXISTS (SELECT 1 FROM public.users WHERE id = _existing_auth_id) THEN
+            -- Hem eski (rec.id) hem yeni (_existing_auth_id) satır var → eski silinir
+            DELETE FROM public.users WHERE id = rec.id;
+            RAISE NOTICE 'Admin eski UUID satırı silindi (yeni UUID satırı zaten var): old=%, email=%', rec.id, _email;
+          ELSE
+            -- Sadece eski satır var → UUID güncelle
+            UPDATE public.users SET id = _existing_auth_id WHERE id = rec.id;
+            RAISE NOTICE 'Admin UUID güncellendi: old=% → new=%, email=%', rec.id, _existing_auth_id, _email;
+          END IF;
+        END IF;
 
       ELSE
-        -- Yeni kayıt: users.id ile aynı UUID kullan
+        -- ── Durum B: Auth user yok → oluştur + users.id güncelle ───
+        _pass := COALESCE(trim(rec.pass), '');
+
+        IF    _pass ~ '^\$2[abxy]\$' THEN
+          _encrypted := _pass;
+        ELSIF length(_pass) = 64 AND _pass ~ '^[0-9a-f]{64}$' THEN
+          _encrypted := crypt('Dragos2025!', gen_salt('bf', 10));
+          RAISE WARNING 'ADMİN SHA-256 şifresi: email=% → geçici şifre Dragos2025! Hemen değiştirin!', _email;
+        ELSIF _pass <> '' THEN
+          _encrypted := crypt(_pass, gen_salt('bf', 10));
+        ELSE
+          _encrypted := crypt('Dragos2025!', gen_salt('bf', 10));
+          RAISE WARNING 'ADMİN boş şifresi: email=% → geçici şifre Dragos2025! Hemen değiştirin!', _email;
+        END IF;
+
+        _meta := jsonb_build_object(
+          'role',      rec.role,
+          'full_name', rec.name,
+          'org_id',    rec.org_id,
+          'branch_id', rec.branch_id
+        );
+
+        _id := gen_random_uuid();
+
         INSERT INTO auth.users (
           instance_id, id, aud, role, email,
           encrypted_password, email_confirmed_at,
@@ -329,7 +340,7 @@ BEGIN
           is_super_admin
         ) VALUES (
           '00000000-0000-0000-0000-000000000000',
-          rec.id, 'authenticated', 'authenticated', _email,
+          _id, 'authenticated', 'authenticated', _email,
           _encrypted, now(),
           '{"provider":"email","providers":["email"]}',
           _meta,
@@ -342,22 +353,28 @@ BEGIN
             'INSERT INTO auth.identities ' ||
             '(id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at) ' ||
             'VALUES ($1, $2, $3, $4, $5, now(), now(), now())'
-          USING
-            rec.id, rec.id,
-            jsonb_build_object('sub', rec.id::text, 'email', _email),
+          USING _id, _id,
+            jsonb_build_object('sub', _id::text, 'email', _email),
             'email', _email;
         ELSE
           EXECUTE
             'INSERT INTO auth.identities ' ||
             '(id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at) ' ||
             'VALUES ($1, $2, $3, $4, now(), now(), now())'
-          USING
-            rec.id, rec.id,
-            jsonb_build_object('sub', rec.id::text, 'email', _email),
+          USING _id, _id,
+            jsonb_build_object('sub', _id::text, 'email', _email),
             'email';
         END IF;
 
-        RAISE NOTICE 'Admin oluşturuldu: id=%, email=%', rec.id, _email;
+        -- ZORUNLU: public.users.id'yi yeni auth UUID ile güncelle
+        IF EXISTS (SELECT 1 FROM public.users WHERE id = _id) THEN
+          -- Nadir çakışma: yeni UUID zaten başka satırda var → hata
+          RAISE WARNING 'ADMİN UUID çakışması (son derece nadir): yeni id=%, email=% — users.id güncellenmedi!', _id, _email;
+        ELSE
+          UPDATE public.users SET id = _id WHERE id = rec.id;
+          RAISE NOTICE 'Admin oluşturuldu: auth_id=%, email=%', _id, _email;
+        END IF;
+
       END IF;
 
     EXCEPTION WHEN OTHERS THEN
@@ -369,11 +386,10 @@ BEGIN
   -- Özet
   -- ──────────────────────────────────────────────────────────────────
   RAISE NOTICE '--- 035: Tamamlandı ---';
-  RAISE NOTICE 'Toplam auth.users: %', (SELECT count(*) FROM auth.users);
+  RAISE NOTICE 'Toplam auth.users sayısı: %', (SELECT count(*) FROM auth.users);
+  RAISE NOTICE 'Toplam public.users sayısı: %', (SELECT count(*) FROM public.users);
 
 END $$;
 
--- ============================================================
--- Yeni eklemeler sonrası PostgREST schema cache yenile
--- ============================================================
+-- PostgREST schema cache yenile
 NOTIFY pgrst, 'reload schema';

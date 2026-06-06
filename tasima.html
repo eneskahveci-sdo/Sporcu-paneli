@@ -29,7 +29,7 @@ button:disabled{background:#2d3c2d;color:#555;cursor:not-allowed}
 const OLD={url:'https://wfarbydojxtufnkjuhtc.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw'};
 const NEW={url:'https://xnggnjstbqblnmouzihe.supabase.co',anon:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZ2duanN0YnFibG5tb3V6aWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjcxOTgsImV4cCI6MjA5NjMwMzE5OH0.0LI3JqiKq2vIBFtjhy_i2XdmuY75i_a-LPVHj6tekXw'};
 const EMAIL='eneskahveci.bs@gmail.com';
-const TABLES=['orgs','branches','sports','coaches','classes','athletes','payments','attendance','messages','on_kayitlar','deletion_requests','settings'];
+const TABLES=['orgs','branches','sports','coaches','classes','athletes','payments','attendance','messages','on_kayitlar','deletion_requests','settings','users'];
 
 const logEl=document.getElementById('log');
 function log(m,cls){logEl.style.display='block';const s=document.createElement('span');if(cls)s.className=cls;s.textContent=m+'\n';logEl.appendChild(s);logEl.scrollTop=logEl.scrollHeight;}
@@ -163,8 +163,24 @@ document.getElementById('btn').onclick=async()=>{
 
   log('\n▶ Yeni Supabase yazılıyor...','dim');
   for(const t of TABLES){
-    const rows=data[t];
+    let rows=data[t];
     if(!rows||!rows.length){log('  '+t+': boş, atlandı','dim');continue;}
+
+    // users tablosu: email bazlı dedup — yeni projede zaten aynı email varsa atla
+    if(t==='users'){
+      const{data:existingUsers}=await newC.from('users').select('email');
+      const existingEmails=new Set((existingUsers||[]).map(r=>r.email.toLowerCase().trim()));
+      // Aktif auth kullanıcısının (a2) email+id'sini koru, eski kaydı ekleme
+      rows=rows.filter(r=>{
+        const em=(r.email||'').toLowerCase().trim();
+        if(!em) return false;                 // email'siz satırı atla
+        if(existingEmails.has(em)) return false; // zaten var, atla
+        return true;
+      });
+      log('  users: '+rows.length+' yeni admin (zaten mevcut olanlar atlandı)','dim');
+    }
+
+    if(!rows.length){log('  '+t+': boş, atlandı','dim');continue;}
     log('  '+t+'...','dim');
     const{ok,fail,err}=await adaptiveUpsert(newC,t,rows);
     if(fail) log('  '+t+': '+ok+' yazıldı / '+fail+' hata — '+err,'warn');
