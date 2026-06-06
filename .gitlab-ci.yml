@@ -2,6 +2,7 @@ stages:
   - lint
   - deploy-migrations
   - deploy-functions
+  - setup-secrets
 
 .install_supabase: &install_supabase
   - apt-get update -qq && apt-get install -y -qq curl tar nodejs npm
@@ -119,3 +120,26 @@ setup-vapid-secrets:
         VAPID_EMAIL="mailto:admin@dragosfutbolakademisi.com" \
         --project-ref "$SUPABASE_PROJECT_REF"
     - supabase secrets list --project-ref "$SUPABASE_PROJECT_REF" | grep VAPID
+
+# ────────────────────────────────────────────────
+# PayTR + VAPID Secrets — tek seferlik kurulum
+# ────────────────────────────────────────────────
+set-supabase-secrets:
+  stage: setup-secrets
+  image: debian:bookworm-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $SET_SECRETS == "true"'
+      when: manual
+  before_script:
+    - *install_supabase
+  script:
+    - |
+      supabase secrets set \
+        PAYTR_MERCHANT_ID="$PAYTR_MERCHANT_ID" \
+        PAYTR_MERCHANT_KEY="$PAYTR_MERCHANT_KEY" \
+        PAYTR_MERCHANT_SALT="$PAYTR_MERCHANT_SALT" \
+        VAPID_PUBLIC_KEY="BNDYtcl3-TuAE2g3GskLY5KAkrWKU6zD9ktn8oeYsBsgypTHxD6iqrUnEGpgrVh1NcqgOjVlMl0lSu4ulgdr7h4" \
+        VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" \
+        VAPID_EMAIL="mailto:admin@dragosfutbolakademisi.com" \
+        --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase secrets list --project-ref "$SUPABASE_PROJECT_REF"
