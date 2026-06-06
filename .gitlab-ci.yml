@@ -1,0 +1,125 @@
+stages:
+  - lint
+  - deploy-migrations
+  - deploy-functions
+
+# ────────────────────────────────────────────────
+# CI — Lint & Validate (her push'ta çalışır)
+# ────────────────────────────────────────────────
+lint-and-validate:
+  stage: lint
+  image: node:20-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq python3
+  script:
+    - |
+      echo "=== Zorunlu dosya kontrolü ==="
+      files=(
+        "index.html" "script.js" "script-fixes.js" "ui-improvements.js"
+        "Security.js" "init.js" "pwa-register.js" "sw.js" "style.css"
+        "manifest.json" "vercel.json" "RLS_POLICIES.sql" "robots.txt" "sitemap.xml"
+      )
+      for f in "${files[@]}"; do
+        if [ -f "$f" ]; then echo "  ✔ $f"; else echo "  ✘ EKSİK: $f"; exit 1; fi
+      done
+
+    - |
+      echo "=== HTML yapı kontrolü ==="
+      grep -q '<html'               index.html && echo "  ✔ <html>"
+      grep -q '<head>'              index.html && echo "  ✔ <head>"
+      grep -q '<body'               index.html && echo "  ✔ <body>"
+      grep -q 'rel="canonical"'     index.html && echo "  ✔ canonical"
+      grep -q 'og:url'              index.html && echo "  ✔ og:url"
+      grep -q 'og:title'            index.html && echo "  ✔ og:title"
+      grep -q 'application/ld+json' index.html && echo "  ✔ JSON-LD"
+      grep -q 'rel="manifest"'      index.html && echo "  ✔ manifest"
+
+    - |
+      echo "=== JSON doğrulama ==="
+      python3 -c "import json; json.load(open('manifest.json')); print('  ✔ manifest.json')"
+      python3 -c "import json; json.load(open('vercel.json'));   print('  ✔ vercel.json')"
+      python3 -c "import json; json.load(open('i18n/tr.json'));  print('  ✔ i18n/tr.json')"
+      python3 -c "import json; json.load(open('i18n/en.json'));  print('  ✔ i18n/en.json')"
+
+    - |
+      echo "=== JS söz dizimi ==="
+      for f in error-handler.js script.js script-fixes.js ui-improvements.js \
+                Security.js init.js pwa-register.js sw.js; do
+        node --check "$f" && echo "  ✔ $f"
+      done
+
+    - |
+      echo "=== CSP header kontrolü ==="
+      python3 -c "
+      import json, sys
+      v = json.load(open('vercel.json'))
+      found = any(
+        kv.get('key') == 'Content-Security-Policy'
+        for h in v.get('headers', [])
+        for kv in h.get('headers', [])
+      )
+      print('  ✔ CSP header bulundu' if found else (print('  ✘ CSP eksik') or sys.exit(1)))
+      "
+
+# ────────────────────────────────────────────────
+# Supabase Migration Deploy (sadece main, migrations değişince)
+# ────────────────────────────────────────────────
+deploy-migrations:
+  stage: deploy-migrations
+  image: debian:bookworm-slim
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - supabase/migrations/**
+    - if: '$CI_PIPELINE_SOURCE == "web"'   # manuel tetikleme
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh
+  script:
+    - supabase db push --project-ref "$SUPABASE_PROJECT_REF"
+  variables:
+    SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
+    SUPABASE_DB_PASSWORD: "$SUPABASE_DB_PASSWORD"
+
+# ────────────────────────────────────────────────
+# Supabase Edge Functions Deploy (sadece main, her push'ta)
+# ────────────────────────────────────────────────
+deploy-functions:
+  stage: deploy-functions
+  image: debian:bookworm-slim
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh
+  script:
+    - supabase functions deploy paytr-token        --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase functions deploy paytr-webhook      --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase functions deploy provision-auth-user --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase functions deploy send-push          --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
+  variables:
+    SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
+
+# ────────────────────────────────────────────────
+# VAPID Secrets — sadece manuel tetikleme (web arayüzünden)
+# ────────────────────────────────────────────────
+setup-vapid-secrets:
+  stage: deploy-functions
+  image: debian:bookworm-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $SETUP_VAPID == "true"'
+      when: manual
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh
+  script:
+    - |
+      supabase secrets set \
+        VAPID_PUBLIC_KEY="BKMs9WEFjU_ZGG8_2A1bmX_yh75oTl8zo1yOmjGeKpgGyRxctvZB2DeRnKSlC_PrcGPZ8LRPVWJxNErI9mMwEG8" \
+        VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" \
+        VAPID_EMAIL="mailto:admin@dragosfutbolakademisi.com" \
+        --project-ref "$SUPABASE_PROJECT_REF"
+    - supabase secrets list --project-ref "$SUPABASE_PROJECT_REF" | grep VAPID
+  variables:
+    SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
