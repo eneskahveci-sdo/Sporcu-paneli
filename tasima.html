@@ -52,15 +52,15 @@ function dominant(rows,key){
 }
 
 // Hata mesajından sorunlu kolon adını çıkar
+// Supabase farklı tırnak karakterleri kullanabilir: ' ' " " ` vs '
 function extractBadCol(msg){
-  let m=msg.match(/find the '(\w+)' column/i);
+  let m=msg.match(/find the .(\w+). column/i);
   if(m)return m[1];
-  m=msg.match(/column[s]? "(\w+)"/i);
+  m=msg.match(/null value in column .(\w+)./i);
   if(m)return m[1];
-  m=msg.match(/"(\w+)".*not-null/i);
+  m=msg.match(/column .(\w+). of relation/i);
   if(m)return m[1];
-  // null value in column "icon" of relation
-  m=msg.match(/null value in column "(\w+)"/i);
+  m=msg.match(/column .(\w+). does not exist/i);
   if(m)return m[1];
   return null;
 }
