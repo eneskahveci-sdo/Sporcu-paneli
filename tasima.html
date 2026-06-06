@@ -11,7 +11,7 @@ label{display:block;font-size:13px;color:#8b949e;margin:12px 0 4px}
 input{width:100%;padding:10px;border:1px solid #30363d;border-radius:8px;background:#161b22;color:#c9d1d9;font-size:15px;box-sizing:border-box}
 button{width:100%;background:#238636;color:#fff;border:0;padding:14px;border-radius:8px;font-size:16px;cursor:pointer;margin-top:16px;font-weight:600}
 button:disabled{background:#2d3c2d;color:#555;cursor:not-allowed}
-#log{white-space:pre-wrap;background:#161b22;border:1px solid #30363d;padding:14px;border-radius:8px;font-family:monospace;font-size:13px;max-height:420px;overflow:auto;margin-top:16px;display:none}
+#log{white-space:pre-wrap;background:#161b22;border:1px solid #30363d;padding:14px;border-radius:8px;font-family:monospace;font-size:13px;max-height:450px;overflow:auto;margin-top:16px;display:none}
 .ok{color:#3fb950}.err{color:#f85149}.warn{color:#d29922}.dim{color:#8b949e}
 </style>
 </head>
@@ -46,39 +46,68 @@ async function fetchAll(c,t){
   return rows;
 }
 
-// Yeni Supabase'in hangi kolonları kabul ettiğini OpenAPI'den öğren
-async function getNewCols(table){
-  try{
-    const r=await fetch(NEW.url+'/rest/v1/?apikey='+NEW.anon);
-    const schema=await r.json();
-    const def=schema?.definitions?.[table];
-    if(!def) return null;
-    return Object.keys(def.properties||{});
-  }catch(e){return null;}
-}
-
-// Satırdan bilinmeyen kolonları temizle + null → default dönüştür
-function cleanRow(row, allowedCols){
-  if(!allowedCols) return row;
-  const out={};
-  for(const k of allowedCols){
-    if(k in row){
-      // NOT NULL kolonlar için null → varsayılan
-      const v=row[k];
-      if(v===null||v===undefined){
-        // sayı gibi görünen string değilse boş string kullan
-        out[k]='';
-      } else {
-        out[k]=v;
-      }
-    }
-  }
-  return out;
-}
-
 function dominant(rows,key){
   const c={};rows.forEach(r=>{const v=r[key];if(v)c[v]=(c[v]||0)+1;});
   let best=null,bn=-1;for(const k in c)if(c[k]>bn){bn=c[k];best=k;}return best;
+}
+
+// Hata mesajından sorunlu kolon adını çıkar
+function extractBadCol(msg){
+  let m=msg.match(/find the '(\w+)' column/i);
+  if(m)return m[1];
+  m=msg.match(/column[s]? "(\w+)"/i);
+  if(m)return m[1];
+  m=msg.match(/"(\w+)".*not-null/i);
+  if(m)return m[1];
+  // null value in column "icon" of relation
+  m=msg.match(/null value in column "(\w+)"/i);
+  if(m)return m[1];
+  return null;
+}
+
+// Satırları temizle: null değerleri varsayılana çevir, özel durum icon
+function sanitize(rows, badCols){
+  return rows.map(r=>{
+    const out={};
+    for(const k in r){
+      if(badCols.has(k)) continue;
+      const v=r[k];
+      if(v===null||v===undefined) out[k]='';
+      else out[k]=v;
+    }
+    return out;
+  });
+}
+
+// Adaptif upsert: hata alırsa sorunlu kolonu tespit edip tekrar dener
+async function adaptiveUpsert(newC, table, rows){
+  if(!rows.length) return {ok:0,fail:0};
+  const badCols=new Set();
+  let attempts=0;
+
+  while(attempts<20){
+    attempts++;
+    const cleaned=sanitize(rows, badCols);
+    // Önce 1 kayıtla test et
+    const probe=[cleaned[0]];
+    const{error:pe}=await newC.from(table).upsert(probe,{onConflict:'id'});
+    if(pe){
+      const bad=extractBadCol(pe.message);
+      if(bad){badCols.add(bad);continue;}
+      // Çözülemeyen hata
+      return{ok:0,fail:rows.length,err:pe.message};
+    }
+    // Probe başarılı — geri kalan hepsini yaz
+    let ok=1,fail=0,lastErr='';
+    for(let i=1;i<cleaned.length;i+=200){
+      const{error}=await newC.from(table).upsert(cleaned.slice(i,i+200),{onConflict:'id'});
+      if(error){fail+=Math.min(200,cleaned.length-i);lastErr=error.message;}
+      else ok+=Math.min(200,cleaned.length-i);
+    }
+    if(badCols.size) log('    atılan kolonlar: '+[...badCols].join(', '),'dim');
+    return{ok,fail,err:lastErr};
+  }
+  return{ok:0,fail:rows.length,err:'Çok fazla hatalı kolon'};
 }
 
 document.getElementById('btn').onclick=async()=>{
@@ -101,19 +130,6 @@ document.getElementById('btn').onclick=async()=>{
   if(e2){log('Yeni giriş HATA: '+e2.message,'err');document.getElementById('btn').disabled=false;return;}
   log('✓ Yeni giriş OK','ok');
 
-  // Yeni Supabase kolon listelerini çek
-  log('\n▶ Yeni Supabase şeması okunuyor...','dim');
-  const schemaCols={};
-  try{
-    const r=await fetch(NEW.url+'/rest/v1/?apikey='+NEW.anon);
-    const schema=await r.json();
-    for(const t of TABLES){
-      const def=schema?.definitions?.[t];
-      if(def) schemaCols[t]=Object.keys(def.properties||{});
-    }
-    log('✓ Şema alındı','ok');
-  }catch(e){log('Şema alınamadı, ham veri denenecek: '+e.message,'warn');}
-
   log('\n▶ Eski veriler okunuyor...','dim');
   const data={};
   for(const t of TABLES){
@@ -130,19 +146,12 @@ document.getElementById('btn').onclick=async()=>{
 
   log('\n▶ Yeni Supabase yazılıyor...','dim');
   for(const t of TABLES){
-    const rows=data[t];if(!rows||!rows.length){log('  '+t+': boş, atlandı','dim');continue;}
-    const cols=schemaCols[t]||null;
-    if(cols) log('  '+t+' kolonlar: '+cols.length+' → eski fazla kolonlar atılıyor','dim');
-
-    let ok=0,fail=0,lastErr='';
-    for(let i=0;i<rows.length;i+=200){
-      const chunk=rows.slice(i,i+200).map(r=>cleanRow(r,cols));
-      const{error}=await newC.from(t).upsert(chunk,{onConflict:'id'});
-      if(error){fail+=chunk.length;lastErr=error.message;}
-      else ok+=chunk.length;
-    }
-    if(fail) log('  '+t+': '+ok+' yazıldı / '+fail+' hata — '+lastErr,'warn');
-    else log('  '+t+': '+ok+' yazıldı ✓','ok');
+    const rows=data[t];
+    if(!rows||!rows.length){log('  '+t+': boş, atlandı','dim');continue;}
+    log('  '+t+'...','dim');
+    const{ok,fail,err}=await adaptiveUpsert(newC,t,rows);
+    if(fail) log('  '+t+': '+ok+' yazıldı / '+fail+' hata — '+err,'warn');
+    else log('  '+t+': '+ok+' ✓','ok');
   }
   log('\n✅ TAMAMLANDI! Siteye giriş yapabilirsiniz.','ok');
   document.getElementById('btn').disabled=false;
