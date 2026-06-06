@@ -3,6 +3,14 @@ stages:
   - deploy-migrations
   - deploy-functions
 
+.install_supabase: &install_supabase
+  - apt-get update -qq && apt-get install -y -qq curl tar
+  - |
+    curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz" -o supabase.tar.gz
+    tar -xzf supabase.tar.gz supabase
+    mv supabase /usr/local/bin/supabase
+    supabase --version
+
 # ────────────────────────────────────────────────
 # CI — Lint & Validate (her push'ta çalışır)
 # ────────────────────────────────────────────────
@@ -71,10 +79,9 @@ deploy-migrations:
     - if: '$CI_COMMIT_BRANCH == "main"'
       changes:
         - supabase/migrations/**
-    - if: '$CI_PIPELINE_SOURCE == "web"'   # manuel tetikleme
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
-    - apt-get update -qq && apt-get install -y -qq curl
-    - curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh
+    - *install_supabase
   script:
     - supabase db push --project-ref "$SUPABASE_PROJECT_REF"
   variables:
@@ -91,8 +98,7 @@ deploy-functions:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
-    - apt-get update -qq && apt-get install -y -qq curl
-    - curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh
+    - *install_supabase
   script:
     - supabase functions deploy paytr-token        --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
     - supabase functions deploy paytr-webhook      --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
@@ -111,8 +117,7 @@ setup-vapid-secrets:
     - if: '$CI_PIPELINE_SOURCE == "web" && $SETUP_VAPID == "true"'
       when: manual
   before_script:
-    - apt-get update -qq && apt-get install -y -qq curl
-    - curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/scripts/install.sh | sh
+    - *install_supabase
   script:
     - |
       supabase secrets set \
