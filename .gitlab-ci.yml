@@ -128,8 +128,7 @@ set-supabase-secrets:
   stage: setup-secrets
   image: debian:bookworm-slim
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "web" && $SET_SECRETS == "true"'
-      when: manual
+    - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
     - *install_supabase
   script:
