@@ -7,8 +7,8 @@ stages:
   - apt-get update -qq && apt-get install -y -qq curl tar
   - |
     curl -fsSL "https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz" -o supabase.tar.gz
-    tar -xzf supabase.tar.gz supabase
-    mv supabase /usr/local/bin/supabase
+    tar -xzf supabase.tar.gz
+    mv -f supabase /usr/local/bin/supabase
     supabase --version
 
 # ────────────────────────────────────────────────
