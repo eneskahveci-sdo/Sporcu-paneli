@@ -82,9 +82,6 @@ deploy-migrations:
   script:
     - supabase link --project-ref "$SUPABASE_PROJECT_REF"
     - supabase db push
-  variables:
-    SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
-    SUPABASE_DB_PASSWORD: "$SUPABASE_DB_PASSWORD"
 
 # ────────────────────────────────────────────────
 # Supabase Edge Functions Deploy (sadece main, her push'ta)
@@ -102,8 +99,6 @@ deploy-functions:
     - supabase functions deploy paytr-webhook      --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
     - supabase functions deploy provision-auth-user --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
     - supabase functions deploy send-push          --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
-  variables:
-    SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
 
 # ────────────────────────────────────────────────
 # VAPID Secrets — sadece manuel tetikleme (web arayüzünden)
@@ -124,5 +119,3 @@ setup-vapid-secrets:
         VAPID_EMAIL="mailto:admin@dragosfutbolakademisi.com" \
         --project-ref "$SUPABASE_PROJECT_REF"
     - supabase secrets list --project-ref "$SUPABASE_PROJECT_REF" | grep VAPID
-  variables:
-    SUPABASE_ACCESS_TOKEN: "$SUPABASE_ACCESS_TOKEN"
