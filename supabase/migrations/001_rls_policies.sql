@@ -55,32 +55,40 @@ END $$;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
--- ── authenticated + service_role: tüm tablolara tam erişim
-GRANT SELECT, INSERT, UPDATE, DELETE ON athletes   TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON payments   TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON coaches    TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON attendance TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON messages   TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON settings   TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON sports     TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON classes    TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON branches   TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON orgs       TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON users      TO authenticated, service_role;
+-- ── authenticated + service_role: tüm tablolara tam erişim (tablo varsa)
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['athletes','payments','coaches','attendance','messages',
+                        'settings','sports','classes','branches','orgs','users'];
+BEGIN
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.tables
+               WHERE table_schema='public' AND table_name=tbl) THEN
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO authenticated, service_role', tbl);
+    END IF;
+  END LOOP;
+END $$;
 
 -- ── anon role: SELECT tüm tablolara (sporcu/veli paneli için gerekli),
 -- users tablosu hariç. Yazma işlemleri (INSERT/UPDATE/DELETE) engellenir.
-REVOKE ALL ON users FROM anon;
-GRANT SELECT ON athletes   TO anon;
-GRANT SELECT ON payments   TO anon;
-GRANT SELECT ON coaches    TO anon;
-GRANT SELECT ON attendance TO anon;
-GRANT SELECT ON messages   TO anon;
-GRANT SELECT ON settings   TO anon;
-GRANT SELECT ON sports     TO anon;
-GRANT SELECT ON classes    TO anon;
-GRANT SELECT ON branches   TO anon;
-GRANT SELECT ON orgs       TO anon;
+DO $$
+DECLARE
+  tbl TEXT;
+  tbls TEXT[] := ARRAY['athletes','payments','coaches','attendance','messages',
+                        'settings','sports','classes','branches','orgs'];
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables
+             WHERE table_schema='public' AND table_name='users') THEN
+    REVOKE ALL ON users FROM anon;
+  END IF;
+  FOREACH tbl IN ARRAY tbls LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.tables
+               WHERE table_schema='public' AND table_name=tbl) THEN
+      EXECUTE format('GRANT SELECT ON %I TO anon', tbl);
+    END IF;
+  END LOOP;
+END $$;
 
 -- Sequence erişim hakları (INSERT + auto-increment id'ler için)
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
