@@ -450,7 +450,7 @@
 
     // ─── 7. PUSH BİLDİRİMLERİ ─────────────────────────────────────────────────────
 
-    var VAPID_PUBLIC_KEY = 'BKMs9WEFjU_ZGG8_2A1bmX_yh75oTl8zo1yOmjGeKpgGyRxctvZB2DeRnKSlC_PrcGPZ8LRPVWJxNErI9mMwEG8';
+    var VAPID_PUBLIC_KEY = 'BNDYtcl3-TuAE2g3GskLY5KAkrWKU6zD9ktn8oeYsBsgypTHxD6iqrUnEGpgrVh1NcqgOjVlMl0lSu4ulgdr7h4';
 
     function urlBase64ToUint8Array(base64String) {
         var padding = '='.repeat((4 - base64String.length % 4) % 4);

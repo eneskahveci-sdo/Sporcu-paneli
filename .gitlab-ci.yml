@@ -116,7 +116,7 @@ setup-vapid-secrets:
   script:
     - |
       supabase secrets set \
-        VAPID_PUBLIC_KEY="BKMs9WEFjU_ZGG8_2A1bmX_yh75oTl8zo1yOmjGeKpgGyRxctvZB2DeRnKSlC_PrcGPZ8LRPVWJxNErI9mMwEG8" \
+        VAPID_PUBLIC_KEY="BNDYtcl3-TuAE2g3GskLY5KAkrWKU6zD9ktn8oeYsBsgypTHxD6iqrUnEGpgrVh1NcqgOjVlMl0lSu4ulgdr7h4" \
         VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" \
         VAPID_EMAIL="mailto:admin@dragosfutbolakademisi.com" \
         --project-ref "$SUPABASE_PROJECT_REF"
