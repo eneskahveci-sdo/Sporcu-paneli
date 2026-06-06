@@ -51,7 +51,11 @@ BEGIN
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_al_org_date ON activity_logs (org_id, created_at DESC);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='activity_logs') THEN
+    CREATE INDEX IF NOT EXISTS idx_al_org_date ON activity_logs (org_id, created_at DESC);
+  END IF;
+END $$;
 
 -- ── 5. push_subscriptions idempotent policy reset ────────────
 DO $$
@@ -83,8 +87,12 @@ BEGIN
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_pr_token   ON password_resets (token);
-CREATE INDEX IF NOT EXISTS idx_pr_expires ON password_resets (expires_at);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='password_resets') THEN
+    CREATE INDEX IF NOT EXISTS idx_pr_token   ON password_resets (token);
+    CREATE INDEX IF NOT EXISTS idx_pr_expires ON password_resets (expires_at);
+  END IF;
+END $$;
 
 -- ── 7. payments performans index (sık kullanılan filtreler) ──
 CREATE INDEX IF NOT EXISTS idx_payments_org_branch ON payments (org_id, branch_id);
