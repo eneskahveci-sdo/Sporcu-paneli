@@ -8,4 +8,4 @@ ALTER TABLE attendance ADD COLUMN IF NOT EXISTS class_id uuid REFERENCES classes
 CREATE INDEX IF NOT EXISTS idx_attendance_class_id ON attendance(class_id);
 
 -- Create composite index for per-class attendance lookups
-CREATE INDEX IF NOT EXISTS idx_attendance_date_class ON attendance(dt, class_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_date_class ON attendance(att_date, class_id);

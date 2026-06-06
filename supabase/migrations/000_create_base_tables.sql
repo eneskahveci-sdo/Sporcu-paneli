@@ -106,13 +106,13 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 CREATE TABLE IF NOT EXISTS attendance (
-  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id    TEXT NOT NULL DEFAULT '',
-  branch_id TEXT NOT NULL DEFAULT '',
-  aid       TEXT NOT NULL DEFAULT '',
-  class_id  UUID REFERENCES classes(id),
-  dt        DATE,
-  st        TEXT
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id     TEXT NOT NULL DEFAULT '',
+  branch_id  TEXT NOT NULL DEFAULT '',
+  athlete_id TEXT NOT NULL DEFAULT '',
+  class_id   UUID REFERENCES classes(id),
+  att_date   DATE,
+  status     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS messages (
