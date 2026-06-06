@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth Provisioning — Dragos</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0d1117;color:#c9d1d9;padding:20px;max-width:680px;margin:0 auto}
+h2{font-size:17px;color:#e6edf3;margin-bottom:4px}
+.sub{font-size:13px;color:#8b949e;margin-bottom:18px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:18px;margin-bottom:16px}
+.card h3{font-size:14px;color:#7d8590;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+label{display:block;font-size:13px;color:#8b949e;margin:10px 0 4px}
+input{width:100%;padding:10px;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#c9d1d9;font-size:14px}
+input:focus{outline:none;border-color:#388bfd}
+.btn{display:block;width:100%;padding:13px;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:14px;transition:opacity .15s}
+.btn-g{background:#238636;color:#fff}
+.btn-g:hover{background:#2ea043}
+.btn-b{background:#1f6feb;color:#fff}
+.btn-b:hover{background:#388bfd}
+.btn-c{background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+.btn-c:hover{background:#30363d}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+#log{display:none;white-space:pre-wrap;background:#0d1117;border:1px solid #30363d;padding:14px;border-radius:8px;font-family:monospace;font-size:12px;max-height:280px;overflow:auto;margin-top:14px}
+.ok{color:#3fb950}.err{color:#f85149}.warn{color:#d29922}.dim{color:#8b949e}
+#sql-section{display:none}
+#sql-box{width:100%;height:220px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#8b949e;font-family:monospace;font-size:11px;padding:10px;resize:vertical;margin-top:10px}
+.step-badge{display:inline-block;background:#1f6feb;color:#fff;border-radius:12px;font-size:11px;font-weight:700;padding:2px 9px;margin-right:8px;vertical-align:middle}
+.done-badge{background:#238636}
+a.dashboard-link{display:block;text-align:center;padding:11px;border-radius:8px;background:#161b22;border:1px solid #388bfd;color:#58a6ff;font-size:14px;text-decoration:none;margin-top:10px}
+a.dashboard-link:hover{background:#1f6feb;color:#fff}
+</style>
+</head>
+<body>
+
+<h2 style="margin-bottom:2px">🔑 Auth Provisioning</h2>
+<p class="sub">Eski Supabase adminlerini taşı + tüm kullanıcılar için 035 SQL'i hazırla.</p>
+
+<!-- ADIM 1 -->
+<div class="card">
+  <h3><span class="step-badge" id="badge1">1</span>Eski Adminleri Taşı</h3>
+
+  <label>Eski Supabase admin şifresi</label>
+  <input id="oldpass" type="password" autocomplete="off" placeholder="Eski proje admin şifresi">
+
+  <label>Yeni Supabase admin şifresi</label>
+  <input id="newpass" type="password" autocomplete="off" placeholder="Yeni proje admin şifresi">
+
+  <button class="btn btn-g" id="runBtn">▶ Başlat</button>
+  <div id="log"></div>
+</div>
+
+<!-- ADIM 2 -->
+<div class="card" id="sql-section">
+  <h3><span class="step-badge" id="badge2">2</span>SQL Editor'da Çalıştır</h3>
+  <p style="font-size:13px;color:#8b949e;margin-bottom:10px">
+    Aşağıdaki SQL'i kopyala →
+    <a href="https://supabase.com/dashboard/project/xnggnjstbqblnmouzihe/sql/new"
+       target="_blank" style="color:#58a6ff">Supabase SQL Editor</a>'u aç → yapıştır → <strong>RUN</strong>.
+    <br><small>Bu SQL <strong>tüm sporcular, antrenörler ve adminler</strong> için auth kaydı oluşturur.</small>
+  </p>
+  <button class="btn btn-c" onclick="copySql()">📋 SQL'i Kopyala</button>
+  <textarea id="sql-box" readonly></textarea>
+
+  <a class="dashboard-link"
+     href="https://supabase.com/dashboard/project/xnggnjstbqblnmouzihe/sql/new"
+     target="_blank">
+    🚀 Dashboard SQL Editor'ı Aç
+  </a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ── Sabit değerler ─────────────────────────────────────────
+const OLD_URL  = 'https://wfarbydojxtufnkjuhtc.supabase.co';
+const OLD_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYXJieWRvanh0dWZua2p1aHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTA1MzUsImV4cCI6MjA4ODIyNjUzNX0.-v9mu-jvt-sFOLyki5uKvEbh3uY_3e3wHniKj8PezYw';
+const NEW_URL  = 'https://xnggnjstbqblnmouzihe.supabase.co';
+const NEW_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZ2duanN0YnFibG5tb3V6aWhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MjcxOTgsImV4cCI6MjA5NjMwMzE5OH0.0LI3JqiKq2vIBFtjhy_i2XdmuY75i_a-LPVHj6tekXw';
+const ADMIN_EMAIL = 'eneskahveci.bs@gmail.com';
+
+// ── Log yardımcıları ────────────────────────────────────────
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  logEl.style.display = 'block';
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = msg + '\n';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function logOk(m)   { log('✓ ' + m, 'ok'); }
+function logErr(m)  { log('✗ ' + m, 'err'); }
+function logWarn(m) { log('⚠ ' + m, 'warn'); }
+function logDim(m)  { log('  ' + m, 'dim'); }
+
+// ── Tüm satırları çek (RLS pagination) ─────────────────────
+async function fetchAll(client, table) {
+  const rows = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await client.from(table).select('*').range(from, from + 999);
+    if (error) throw new Error(table + ': ' + error.message);
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+    from += 1000;
+  }
+  return rows;
+}
+
+// ── Ana işlem ───────────────────────────────────────────────
+document.getElementById('runBtn').addEventListener('click', async () => {
+  const oldpass = document.getElementById('oldpass').value.trim();
+  const newpass = document.getElementById('newpass').value.trim();
+
+  if (!oldpass || !newpass) {
+    alert('Her iki şifreyi de girin.');
+    return;
+  }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ İşleniyor...';
+  logEl.innerHTML = '';
+  logEl.style.display = 'block';
+
+  try {
+    // ── 1. Eski projeye giriş ─────────────────────────────
+    log('▶ Eski Supabase bağlanılıyor...', 'dim');
+    const oldC = supabase.createClient(OLD_URL, OLD_ANON);
+    const { data: a1, error: e1 } = await oldC.auth.signInWithPassword({
+      email: ADMIN_EMAIL, password: oldpass
+    });
+    if (e1) { logErr('Eski giriş hatası: ' + e1.message); btn.disabled = false; btn.textContent = '▶ Başlat'; return; }
+    logOk('Eski proje girişi başarılı');
+
+    // ── 2. Eski projedeki users tablosunu çek ─────────────
+    log('▶ Eski adminler okunuyor...', 'dim');
+    let oldUsers = [];
+    try {
+      oldUsers = await fetchAll(oldC, 'users');
+      logOk('Eski admins: ' + oldUsers.length + ' kayıt');
+    } catch (e) {
+      logWarn('Eski users tablosu okunamadı: ' + e.message + ' (atlanıyor)');
+    }
+
+    // ── 3. Yeni projeye giriş ─────────────────────────────
+    log('▶ Yeni Supabase bağlanılıyor...', 'dim');
+    const newC = supabase.createClient(NEW_URL, NEW_ANON);
+    const { data: a2, error: e2 } = await newC.auth.signInWithPassword({
+      email: ADMIN_EMAIL, password: newpass
+    });
+    if (e2) { logErr('Yeni giriş hatası: ' + e2.message); btn.disabled = false; btn.textContent = '▶ Başlat'; return; }
+    logOk('Yeni proje girişi başarılı (auth_id: ' + a2.user.id.substring(0,8) + '...)');
+
+    // ── 4. Yeni projedeki mevcut users email'lerini al ────
+    const { data: newExisting } = await newC.from('users').select('id, email');
+    const existingEmails = new Set((newExisting || []).map(r => (r.email || '').toLowerCase().trim()));
+    const existingIds    = new Set((newExisting || []).map(r => r.id));
+    logDim('Yeni projede mevcut admin sayısı: ' + existingEmails.size);
+
+    // ── 5. Ana admini senkronize et (users.id = auth.uid) ─
+    // tasima.html'in setlediği satırı güncelle: id = auth.uid ile eşleştir
+    const { data: myRow } = await newC
+      .from('users')
+      .select('id, email')
+      .eq('email', ADMIN_EMAIL)
+      .maybeSingle();
+
+    if (myRow && myRow.id !== a2.user.id) {
+      // id uyuşmuyor — upsert ile düzelt
+      const { error: upsertErr } = await newC.from('users').upsert(
+        { id: a2.user.id, email: ADMIN_EMAIL, name: 'admin', role: 'admin',
+          org_id: myRow.org_id || '', branch_id: myRow.branch_id || '', pass: '' },
+        { onConflict: 'id' }
+      );
+      if (!upsertErr) {
+        logOk('Ana admin UUID düzeltildi: auth_id ile senkronize');
+      }
+    } else if (!myRow) {
+      // Hiç satır yoksa ekle (org_id yeni projeden al)
+      const { data: settingsRow } = await newC.from('settings').select('org_id, branch_id').limit(1).maybeSingle();
+      const { error: insErr } = await newC.from('users').insert({
+        id: a2.user.id, email: ADMIN_EMAIL, name: 'admin', role: 'admin',
+        org_id: settingsRow?.org_id || '', branch_id: settingsRow?.branch_id || '', pass: ''
+      });
+      if (!insErr) logOk('Ana admin yeni projede oluşturuldu');
+      else logWarn('Ana admin eklenemedi: ' + insErr.message);
+    } else {
+      logOk('Ana admin zaten senkronize');
+    }
+
+    // ── 6. Eski projedeki diğer adminleri ekle ─────────────
+    if (oldUsers.length > 0) {
+      log('▶ Eski adminler yeni projeye ekleniyor...', 'dim');
+      let added = 0, skipped = 0;
+
+      for (const u of oldUsers) {
+        const em = (u.email || '').toLowerCase().trim();
+        if (!em || !em.includes('@')) { skipped++; continue; }
+        if (em === ADMIN_EMAIL) { skipped++; continue; } // Ana admin zaten işlendi
+        if (existingEmails.has(em)) {
+          logDim('  Atlandı (zaten var): ' + em);
+          skipped++;
+          continue;
+        }
+
+        // Yeni UUID ile ekle (eski UUID'yi kullanma — is_admin() için 035 SQL yeniden ayarlayacak)
+        const newId = crypto.randomUUID();
+        const { error: addErr } = await newC.from('users').insert({
+          id: newId,
+          email: em,
+          name:  u.name  || 'admin',
+          role:  u.role  || 'admin',
+          org_id:    u.org_id    || '',
+          branch_id: u.branch_id || '',
+          pass:  u.pass  || ''
+        });
+
+        if (addErr) {
+          logWarn('  Eklenemedi: ' + em + ' — ' + addErr.message);
+        } else {
+          logOk('  Eklendi: ' + em);
+          existingEmails.add(em);
+          added++;
+        }
+      }
+
+      log('Eski admin taşıma: ' + added + ' eklendi, ' + skipped + ' atlandı', added > 0 ? 'ok' : 'dim');
+    } else {
+      logDim('Eski projede users tablosu boş ya da okunamadı.');
+    }
+
+    // ── TAMAMLANDI ─────────────────────────────────────────
+    logOk('\n✅ Adım 1 tamamlandı!');
+    log('→ Şimdi Adım 2\'yi uygula: aşağıdaki SQL\'i Dashboard\'a yapıştır.', 'warn');
+
+    document.getElementById('badge1').classList.add('done-badge');
+    document.getElementById('badge1').textContent = '✓';
+    document.getElementById('sql-section').style.display = 'block';
+    document.getElementById('sql-box').value = SQL_035;
+
+  } catch (err) {
+    logErr('Beklenmeyen hata: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Tekrar Çalıştır';
+  }
+});
+
+// ── SQL kopyala ─────────────────────────────────────────────
+function copySql() {
+  const box = document.getElementById('sql-box');
+  box.select();
+  try {
+    navigator.clipboard.writeText(box.value)
+      .then(() => { document.querySelector('[onclick="copySql()"]').textContent = '✓ Kopyalandı!'; setTimeout(() => { document.querySelector('[onclick="copySql()"]').textContent = '📋 SQL\'i Kopyala'; }, 2000); })
+      .catch(() => { document.execCommand('copy'); });
+  } catch(e) {
+    document.execCommand('copy');
+  }
+}
+
+// ── 035 Migration SQL (tüm auth kullanıcıları oluşturur) ────
+const SQL_035 = `-- 035_provision_auth_users.sql
+-- Sporcular, antrenörler ve adminler için Supabase Auth kullanıcıları oluşturur.
+-- Idempotent: zaten varsa atlar veya senkronize eder.
+DO $$
+DECLARE
+  rec               RECORD;
+  _id               UUID;
+  _existing_auth_id UUID;
+  _email            TEXT;
+  _pass             TEXT;
+  _encrypted        TEXT;
+  _default_pass     TEXT;
+  _meta             JSONB;
+  _has_prov_id      BOOLEAN;
+  _skip             BOOLEAN;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'auth' AND table_name = 'identities' AND column_name = 'provider_id'
+  ) INTO _has_prov_id;
+
+  RAISE NOTICE '--- 035: Auth provisioning başladı (provider_id: %) ---', _has_prov_id;
+
+  -- ── 1. SPORCUlar ──
+  FOR rec IN
+    SELECT id, tc, em, sp_pass, fn, ln, org_id, branch_id
+    FROM public.athletes
+    WHERE tc IS NOT NULL AND length(trim(tc)) = 11
+    ORDER BY created_at NULLS LAST, id
+  LOOP
+    BEGIN
+      _skip := FALSE;
+      _email := CASE
+        WHEN rec.em IS NOT NULL AND length(trim(rec.em)) > 3 AND position('@' IN trim(rec.em)) > 0
+        THEN lower(trim(rec.em)) ELSE rec.tc || '@dragosfk.com' END;
+      IF _email <> (rec.tc || '@dragosfk.com') AND EXISTS (SELECT 1 FROM auth.users WHERE email = _email) THEN
+        _email := rec.tc || '@dragosfk.com'; END IF;
+      IF EXISTS (SELECT 1 FROM auth.users WHERE email = _email) THEN _skip := TRUE; END IF;
+      IF NOT _skip THEN
+        _default_pass := right(rec.tc, 6);
+        _pass := COALESCE(trim(rec.sp_pass), '');
+        IF    _pass ~ '^\\$2[abxy]\\$' THEN _encrypted := _pass;
+        ELSIF length(_pass) = 64 AND _pass ~ '^[0-9a-f]{64}$' THEN _encrypted := crypt(_default_pass, gen_salt('bf',10));
+        ELSIF _pass <> '' THEN _encrypted := crypt(_pass, gen_salt('bf',10));
+        ELSE _encrypted := crypt(_default_pass, gen_salt('bf',10)); END IF;
+        _id := gen_random_uuid();
+        _meta := jsonb_build_object('tc',rec.tc,'role','athlete','full_name',trim(COALESCE(rec.fn,'')||' '||COALESCE(rec.ln,'')),'org_id',rec.org_id,'branch_id',rec.branch_id,'athlete_id',rec.id::text);
+        INSERT INTO auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change,is_super_admin)
+        VALUES ('00000000-0000-0000-0000-000000000000',_id,'authenticated','authenticated',_email,_encrypted,now(),'{"provider":"email","providers":["email"]}',_meta,now(),now(),'','','','',false);
+        IF _has_prov_id THEN
+          EXECUTE 'INSERT INTO auth.identities(id,user_id,identity_data,provider,provider_id,last_sign_in_at,created_at,updated_at) VALUES($1,$2,$3,$4,$5,now(),now(),now())'
+          USING _id,_id,jsonb_build_object('sub',_id::text,'email',_email),'email',_email;
+        ELSE
+          EXECUTE 'INSERT INTO auth.identities(id,user_id,identity_data,provider,last_sign_in_at,created_at,updated_at) VALUES($1,$2,$3,$4,now(),now(),now())'
+          USING _id,_id,jsonb_build_object('sub',_id::text,'email',_email),'email';
+        END IF;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Sporcu atlandı: tc=% hata=%', rec.tc, SQLERRM; END;
+  END LOOP;
+
+  -- ── 2. ANTRENÖRLER ──
+  FOR rec IN
+    SELECT id, tc, em, coach_pass, fn, ln, org_id, branch_id
+    FROM public.coaches
+    WHERE tc IS NOT NULL AND length(trim(tc)) = 11
+    ORDER BY created_at NULLS LAST, id
+  LOOP
+    BEGIN
+      _skip := FALSE;
+      _email := CASE
+        WHEN rec.em IS NOT NULL AND length(trim(rec.em)) > 3 AND position('@' IN trim(rec.em)) > 0
+        THEN lower(trim(rec.em)) ELSE rec.tc || '@dragosfk.com' END;
+      IF _email <> (rec.tc || '@dragosfk.com') AND EXISTS (SELECT 1 FROM auth.users WHERE email = _email) THEN
+        _email := rec.tc || '@dragosfk.com'; END IF;
+      IF EXISTS (SELECT 1 FROM auth.users WHERE email = _email) THEN _skip := TRUE; END IF;
+      IF NOT _skip THEN
+        _default_pass := right(rec.tc, 6);
+        _pass := COALESCE(trim(rec.coach_pass), '');
+        IF    _pass ~ '^\\$2[abxy]\\$' THEN _encrypted := _pass;
+        ELSIF length(_pass) = 64 AND _pass ~ '^[0-9a-f]{64}$' THEN _encrypted := crypt(_default_pass, gen_salt('bf',10));
+        ELSIF _pass <> '' THEN _encrypted := crypt(_pass, gen_salt('bf',10));
+        ELSE _encrypted := crypt(_default_pass, gen_salt('bf',10)); END IF;
+        _id := gen_random_uuid();
+        _meta := jsonb_build_object('tc',rec.tc,'role','coach','full_name',trim(COALESCE(rec.fn,'')||' '||COALESCE(rec.ln,'')),'org_id',rec.org_id,'branch_id',rec.branch_id,'coach_id',rec.id::text);
+        INSERT INTO auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change,is_super_admin)
+        VALUES ('00000000-0000-0000-0000-000000000000',_id,'authenticated','authenticated',_email,_encrypted,now(),'{"provider":"email","providers":["email"]}',_meta,now(),now(),'','','','',false);
+        IF _has_prov_id THEN
+          EXECUTE 'INSERT INTO auth.identities(id,user_id,identity_data,provider,provider_id,last_sign_in_at,created_at,updated_at) VALUES($1,$2,$3,$4,$5,now(),now(),now())'
+          USING _id,_id,jsonb_build_object('sub',_id::text,'email',_email),'email',_email;
+        ELSE
+          EXECUTE 'INSERT INTO auth.identities(id,user_id,identity_data,provider,last_sign_in_at,created_at,updated_at) VALUES($1,$2,$3,$4,now(),now(),now())'
+          USING _id,_id,jsonb_build_object('sub',_id::text,'email',_email),'email';
+        END IF;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Antrenör atlandı: tc=% hata=%', rec.tc, SQLERRM; END;
+  END LOOP;
+
+  -- ── 3. ADMİNLER ──
+  FOR rec IN
+    SELECT id, email, name, pass, org_id, branch_id, role
+    FROM public.users
+    WHERE email IS NOT NULL AND length(trim(email)) > 3 AND position('@' IN trim(email)) > 0
+    ORDER BY id
+  LOOP
+    BEGIN
+      _email := lower(trim(rec.email));
+      SELECT id INTO _existing_auth_id FROM auth.users WHERE email = _email LIMIT 1;
+      IF _existing_auth_id IS NOT NULL THEN
+        IF _existing_auth_id = rec.id THEN
+          RAISE NOTICE 'Admin zaten senkronize: %', _email;
+        ELSE
+          IF EXISTS (SELECT 1 FROM public.users WHERE id = _existing_auth_id) THEN
+            DELETE FROM public.users WHERE id = rec.id;
+            RAISE NOTICE 'Admin eski satır silindi: %', _email;
+          ELSE
+            UPDATE public.users SET id = _existing_auth_id WHERE id = rec.id;
+            RAISE NOTICE 'Admin UUID güncellendi: %', _email;
+          END IF;
+        END IF;
+      ELSE
+        _pass := COALESCE(trim(rec.pass), '');
+        IF    _pass ~ '^\\$2[abxy]\\$' THEN _encrypted := _pass;
+        ELSIF length(_pass) = 64 AND _pass ~ '^[0-9a-f]{64}$' THEN
+          _encrypted := crypt('Dragos2025!', gen_salt('bf',10));
+          RAISE WARNING 'Admin SHA-256 şifresi → geçici: Dragos2025! — %', _email;
+        ELSIF _pass <> '' THEN _encrypted := crypt(_pass, gen_salt('bf',10));
+        ELSE
+          _encrypted := crypt('Dragos2025!', gen_salt('bf',10));
+          RAISE WARNING 'Admin boş şifresi → geçici: Dragos2025! — %', _email;
+        END IF;
+        _meta := jsonb_build_object('role',rec.role,'full_name',rec.name,'org_id',rec.org_id,'branch_id',rec.branch_id);
+        _id := gen_random_uuid();
+        INSERT INTO auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,recovery_token,email_change_token_new,email_change,is_super_admin)
+        VALUES ('00000000-0000-0000-0000-000000000000',_id,'authenticated','authenticated',_email,_encrypted,now(),'{"provider":"email","providers":["email"]}',_meta,now(),now(),'','','','',false);
+        IF _has_prov_id THEN
+          EXECUTE 'INSERT INTO auth.identities(id,user_id,identity_data,provider,provider_id,last_sign_in_at,created_at,updated_at) VALUES($1,$2,$3,$4,$5,now(),now(),now())'
+          USING _id,_id,jsonb_build_object('sub',_id::text,'email',_email),'email',_email;
+        ELSE
+          EXECUTE 'INSERT INTO auth.identities(id,user_id,identity_data,provider,last_sign_in_at,created_at,updated_at) VALUES($1,$2,$3,$4,now(),now(),now())'
+          USING _id,_id,jsonb_build_object('sub',_id::text,'email',_email),'email';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = _id) THEN
+          UPDATE public.users SET id = _id WHERE id = rec.id;
+          RAISE NOTICE 'Admin oluşturuldu: %', _email;
+        END IF;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN RAISE WARNING 'Admin atlandı: % hata=%', rec.email, SQLERRM; END;
+  END LOOP;
+
+  RAISE NOTICE '--- 035 tamamlandı. auth.users: %, public.users: % ---',
+    (SELECT count(*) FROM auth.users), (SELECT count(*) FROM public.users);
+END $$;
+NOTIFY pgrst, 'reload schema';`;
+</script>
+</body>
+</html>
