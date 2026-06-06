@@ -150,6 +150,25 @@ CREATE TABLE IF NOT EXISTS settings (
   receipt_counter INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS on_kayitlar (
+  id           TEXT PRIMARY KEY,
+  student_name TEXT NOT NULL DEFAULT '',
+  fn           TEXT DEFAULT '',
+  ln           TEXT DEFAULT '',
+  bd           DATE,
+  tc           TEXT,
+  cls_id       TEXT,
+  class_name   TEXT DEFAULT '',
+  parent_name  TEXT DEFAULT '',
+  parent_phone TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'new',
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  org_id       TEXT,
+  branch_id    TEXT,
+  kvkk_consent BOOLEAN DEFAULT false,
+  consent_date DATE
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id    TEXT NOT NULL DEFAULT '',
