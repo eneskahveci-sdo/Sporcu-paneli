@@ -2558,10 +2558,20 @@ window.editAth = function(id, prefill) {
 
 window.delAth = function(id) {
     confirm2('Sporcu Sil', i18n[AppState.lang].deleteConfirm, async () => {
+        const _bak = AppState.data.athletes.find(x => x.id === id);
         if (await DB.remove('athletes', { id })) {
             AppState.data.athletes = AppState.data.athletes.filter(x => x.id !== id);
-            toast('Sporcu silindi', 'g');
             go('athletes');
+            if (window.showUndoToast && _bak) {
+                showUndoToast('Sporcu silindi', async () => {
+                    await DB.upsert('athletes', DB.mappers.fromAthlete(_bak));
+                    if (!AppState.data.athletes.some(x => x.id === _bak.id)) AppState.data.athletes.push(_bak);
+                    go('athletes');
+                    toast('Geri alındı', 'g');
+                });
+            } else {
+                toast('Sporcu silindi', 'g');
+            }
         }
     });
 };
@@ -3203,10 +3213,20 @@ window.editPay = function(id) {
 
 window.delPay = function(id) {
     confirm2('İşlem Sil', i18n[AppState.lang].deleteConfirm, async () => {
+        const _bak = AppState.data.payments.find(x => x.id === id);
         if (await DB.remove('payments', { id })) {
             AppState.data.payments = AppState.data.payments.filter(x => x.id !== id);
-            toast('İşlem silindi', 'g');
             go('payments');
+            if (window.showUndoToast && _bak) {
+                showUndoToast('İşlem silindi', async () => {
+                    await DB.upsert('payments', DB.mappers.fromPayment(_bak));
+                    if (!AppState.data.payments.some(x => x.id === _bak.id)) AppState.data.payments.push(_bak);
+                    go('payments');
+                    toast('Geri alındı', 'g');
+                });
+            } else {
+                toast('İşlem silindi', 'g');
+            }
         }
     });
 };

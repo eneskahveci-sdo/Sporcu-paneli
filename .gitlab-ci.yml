@@ -50,7 +50,8 @@ lint-and-validate:
     - |
       echo "=== JS söz dizimi ==="
       for f in error-handler.js script.js script-fixes.js ui-improvements.js \
-                Security.js init.js pwa-register.js sw.js; do
+                Security.js init.js pwa-register.js sw.js \
+                new-features.js payment-improvements.js ux-enhancements.js; do
         node --check "$f" && echo "  ✔ $f"
       done
 
