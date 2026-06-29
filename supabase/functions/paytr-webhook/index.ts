@@ -105,35 +105,43 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Admin/antrenörlere push bildirimi gönder (VAPID yapılandırılmışsa)
+      // Admin/antrenörlere push bildirimi gönder — ARKA PLANDA.
+      // ÖNEMLİ: Push'u senkron await ETME. Eski/geçersiz VAPID abonelikleri
+      // (Supabase projesi değişince push anahtarları yenilendi) send-push'u
+      // yavaşlatınca, webhook PayTR'ın bildirim timeout'unu aşıp ödemenin
+      // "provizyonda kalmasına" yol açıyordu. Artık fire-and-forget:
+      // PayTR'a OK yanıtı bekletilmez.
       const orgId = paytrRec?.org_id;
       const athleteName = paytrRec?.an || "Sporcu";
       if (orgId) {
         const pushController = new AbortController();
-        const pushTimeout = setTimeout(() => pushController.abort(), 8000);
-        try {
-          const pushResp = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${SUPABASE_KEY}`,
-              "apikey": SUPABASE_KEY,
-            },
-            body: JSON.stringify({
-              orgId,
-              title: "Ödeme Tamamlandı",
-              body: `${athleteName} — online ödeme başarıyla alındı.`,
-              url: "/",
-            }),
-            signal: pushController.signal,
-          });
-          if (!pushResp.ok) {
-            console.warn("Push bildirimi basarisiz, status:", pushResp.status);
-          }
-        } catch (pushErr) {
-          console.warn("Push bildirimi gonderilemedi:", pushErr);
-        } finally {
-          clearTimeout(pushTimeout);
+        const pushTimeout = setTimeout(() => pushController.abort(), 5000);
+        const pushTask = fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_KEY}`,
+            "apikey": SUPABASE_KEY,
+          },
+          body: JSON.stringify({
+            orgId,
+            title: "Ödeme Tamamlandı",
+            body: `${athleteName} — online ödeme başarıyla alındı.`,
+            url: "/",
+          }),
+          signal: pushController.signal,
+        })
+          .then((pushResp) => {
+            if (!pushResp.ok) console.warn("Push bildirimi basarisiz, status:", pushResp.status);
+          })
+          .catch((pushErr) => console.warn("Push bildirimi gonderilemedi:", pushErr))
+          .finally(() => clearTimeout(pushTimeout));
+
+        // Supabase Edge Runtime: yanıt döndükten sonra arka planda tamamla
+        // @ts-ignore — EdgeRuntime global Supabase ortamında mevcuttur
+        if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(pushTask);
         }
       }
 
