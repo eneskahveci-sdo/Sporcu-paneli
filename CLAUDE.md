@@ -6,7 +6,7 @@ Vanilla JS SPA (Single Page Application) + Supabase + Vercel stack'i üzerine ku
 
 - **Canlı site:** https://www.dragosfutbolakademisi.com
 - **Vercel:** https://sporcu-paneli.vercel.app
-- **Supabase:** project ref, GitHub Secrets'ta (`SUPABASE_PROJECT_REF`)
+- **Supabase (aktif proje):** `xnggnjstbqblnmouzihe` — URL + anon key `script.js`'te `SUPABASE_CONFIG` içinde hardcoded (client tarafı için kaçınılmaz). CI/CD'deki `SUPABASE_PROJECT_REF` secret'ı ayrı bir şeydir, sadece deploy komutlarında (`supabase db push`/`functions deploy`) kullanılır — o da bu ref'i göstermelidir. Proje 2026-06'da eski bir Supabase projesinden taşındı; detay için "Supabase Proje Geçişi" bölümüne bakın.
 
 ## Mimari
 
@@ -14,43 +14,77 @@ Vanilla JS SPA (Single Page Application) + Supabase + Vercel stack'i üzerine ku
 Tek HTML dosyası + ayrı JS modülleri (bundle yok, CDN'den yüklenir):
 
 ```
-index.html          — tek sayfa, tüm DOM şablonları
-script.js           — ana SPA mantığı (~6000+ satır)
-script-fixes.js     — makbuz/belge yardımcıları + PayTR override'ları
-ui-improvements.js  — sayfalama, skeleton, oturum sayacı
-Security.js         — sporcu/antrenör TC girişi
-init.js             — Supabase başlatma
-event-handlers.js   — global event listener'lar
-pwa-register.js     — Service Worker kaydı
-error-handler.js    — global hata yakalama
-sw.js               — Service Worker (PWA), STATIC_CACHE = 'dragos-static-v22'
-style.css           — tek CSS dosyası
-paytr-ok.html       — PayTR başarı callback sayfası (iframe postMessage + top redirect)
-paytr-fail.html     — PayTR hata callback sayfası (iframe postMessage + top redirect)
-i18n/tr.json        — Türkçe çeviriler
-i18n/en.json        — İngilizce çeviriler
+index.html              — tek sayfa, tüm DOM şablonları
+script.js                — ana SPA mantığı (~6000+ satır)
+script-fixes.js          — makbuz/belge yardımcıları + PayTR override'ları
+ui-improvements.js       — sayfalama, skeleton, oturum sayacı
+Security.js              — sporcu/antrenör/admin giriş akışı (Auth-first + RPC fallback)
+init.js                  — Supabase CDN yükleme + retry fallback
+event-handlers.js        — global event listener'lar
+pwa-register.js          — Service Worker kaydı
+new-features.js          — aktivite logu, doğum günü widget'ı, push abonelik UI'ı, Excel export, admin listesi yönetimi
+payment-improvements.js  — gelişmiş ödeme sihirbazı/akışı
+ux-enhancements.js       — tablo sıralama, Ctrl/Cmd+K global arama, silme geri-alma (undo toast)
+error-handler.js         — global hata yakalama
+sw.js                    — Service Worker (PWA), STATIC_CACHE = 'dragos-static-v25'
+style.css                — tek CSS dosyası
+paytr-ok.html            — PayTR başarı callback sayfası (iframe postMessage + top redirect)
+paytr-fail.html          — PayTR hata callback sayfası (iframe postMessage + top redirect)
+i18n/tr.json             — Türkçe çeviriler
+i18n/en.json             — İngilizce çeviriler
 ```
+
+> **Yükleme sırası (index.html):** supabase-js CDN → error-handler.js → init.js → script.js →
+> script-fixes.js → ui-improvements.js → Security.js → event-handlers.js → pwa-register.js →
+> new-features.js → payment-improvements.js → ux-enhancements.js.
+> Sıra önemli: sonradan yüklenen dosyalar öncekileri override edebilir (bkz. aşağıdaki not).
 
 > **ÖNEMLİ:** `script-fixes.js` içinde `window.initiatePayTRPayment` ve `window.showPayTRModal`
 > override'ları bulunur. Bu fonksiyonlar `script.js`'teki orijinal versiyonların üzerine yazar.
 > PayTR akışında sorun varsa hem `script.js` hem `script-fixes.js` kontrol edilmeli.
 
+> **NOT:** `sw.js`'e yeni dosya eklendiğinde (`new-features.js`, `payment-improvements.js`,
+> `ux-enhancements.js` dahil) precache listesine ekli olduğundan emin ol ve `STATIC_CACHE`
+> versiyon numarasını artır.
+
 ### Backend
 - **Supabase** — DB (PostgreSQL) + Auth + RLS + Edge Functions
-- **Edge Functions:** `paytr-token`, `paytr-webhook`, `provision-auth-user`
+- **Edge Functions (6):** `paytr-token`, `paytr-webhook`, `provision-auth-user`, `reset-password`, `send-push`, `send-sms`
+  - `config.toml`'da `verify_jwt = false` sadece ilk 5'inde tanımlı; `send-sms` config.toml'da yok.
+  - `send-sms` durumu belirsiz: kodu `check_sms_rate_limit` RPC'sine bağımlı ama migration 009 bu RPC'yi ve `sms_rate_limits` tablosunu DROP ediyor. Fonksiyon hiçbir CI pipeline'ının deploy listesinde de yok (ne GitHub Actions ne GitLab CI). Muhtemelen yetim/kullanılmıyor — kaldırılmadan önce doğrulanmalı.
 - **Vercel** — static hosting + vercel.json başlıkları (CSP dahil)
 
 ## Kimlik Doğrulama Akışı
 
-Üç farklı giriş modu:
+**v6.1 (Security.js) itibariyle tüm roller önce Supabase Auth dener; `login_with_tc` RPC artık
+sadece altyapı arızası durumunda devreye giren bir fallback'tir, birincil yöntem değildir.**
 
-| Rol | Yöntem | Notlar |
-|-----|--------|--------|
-| **Yönetici** | Supabase Auth (`signInWithPassword`) | Email + şifre, `authenticated` role |
-| **Antrenör** | TC + şifre → `login_with_tc` RPC | `anon` role, SECURITY DEFINER |
-| **Sporcu/Veli** | TC + şifre → `login_with_tc` RPC | `anon` role, SECURITY DEFINER |
+| Rol | Birincil Yöntem | Fallback | Notlar |
+|-----|-----------------|----------|--------|
+| **Yönetici** | Supabase Auth (`signInWithPassword`) | yok | Email + şifre, `authenticated` role |
+| **Antrenör** | Supabase Auth (`signInWithPassword`) | `login_with_tc` RPC (koşullu) | `resolveAuthEmails()` ile email çözülür |
+| **Sporcu/Veli** | Supabase Auth (`signInWithPassword`) | `login_with_tc` RPC (koşullu) | `resolveAuthEmails()` ile email çözülür |
+
+### Antrenör/Sporcu giriş akışı (Security.js)
+1. `resolveAuthEmails(sb, role, tc)` aday email listesi üretir:
+   - `get_auth_email` RPC çağrılır (migration 007) — DB'deki gerçek email'i döner, tablo içeriği sızmaz.
+   - RPC başarılıysa ve dönen email `tc@dragosfk.com` fallback'inden farklıysa, önce o denenir.
+   - `tc + '@dragosfk.com'` her zaman listeye eklenir (RPC hata verse bile giriş çalışsın diye).
+2. Aday email listesi sırayla `signInWithPassword` ile denenir; ilk başarılı olan kullanılır.
+3. **Auth başarısız olursa `login_with_tc` RPC fallback'i SADECE şu hata mesajı kalıplarından biri
+   eşleşirse tetiklenir** (aksi halde direkt "TC Kimlik No veya Şifre Hatalı" gösterilir):
+   - `database error querying schema`
+   - `unexpected_failure`
+   - `email not confirmed`
+   - `email_not_confirmed`
+4. Yanlış şifre bu kalıplara girmez → RPC fallback'e düşmez, direkt hata gösterir + 30 saniyelik
+   cooldown başlatır (`_startLoginCooldown`).
 
 Oturum verisi `localStorage`'da saklanır (`sporcu_app_user`, `sporcu_app_sporcu`).
+
+> **ÖNEMLİ:** Bu akışın çalışması için sporcu/antrenörlerin gerçek `auth.users` kayıtlarına sahip
+> olması gerekir (migration 035 ile provision edildi). `login_with_tc` RPC hâlâ mevcut ve
+> çalışıyor ama artık sadece Auth altyapısı arızalandığında devreye giren bir güvenlik ağıdır.
 
 ## Kritik AppState Alanları
 
@@ -161,44 +195,141 @@ Webhook'ta `toUuid()` fonksiyonu geri dönüştürür.
 | 020 | sessions_tracking | sessions tablosu + SECURITY DEFINER fonksiyonlar |
 | 021 | inventory_tables | Envanter tabloları |
 | 022_fix_sessions_table | fix_sessions_table | active_sessions temizliği, session_start düzeltmesi |
-| 022_new_features | new_features | athletes.photo_url, tax_rate/tax_amount, activity_logs, push_subscriptions, password_resets |
-| 023 | add_tax_columns | tax_rate/tax_amount idempotent ekleme (022_new_features çakışma fix'i) |
+| 023 | add_tax_columns | tax_rate/tax_amount idempotent ekleme |
 | 024 | payments_missing_columns | pay_method, notif_status, slip_code, service_name, source, inv, dd kolonları |
 | 025 | missing_tables_and_columns | athletes/coaches/attendance/users org+branch, cash_transfers, wa_messages |
 | 026 | overdue_pg_function | mark_overdue_payments() RPC + trg_auto_mark_overdue trigger |
 | 027 | receipt_counter_atomic | get_next_receipt_no() atomik makbuz numarası RPC (race condition fix) |
-| 028 | idempotency_guards | 022_new_features policy'leri DROP+CREATE deseniyle idempotent; tax_rate/tax_amount/photo_url/receipt_counter 3. seviye guard; payments index'leri (org+branch, aid+dt, st+dd partial); password_resets token/expires index'leri |
+| 028 | idempotency_guards | 022_new_features (bugünkü 029) policy'leri DROP+CREATE deseniyle idempotent; tax_rate/tax_amount/photo_url/receipt_counter 3. seviye guard; payments/password_resets index'leri |
+| 029 | new_features | **(eski 022_new_features.sql'in yeniden adlandırılmış hali)** athletes.photo_url, tax_rate/tax_amount, activity_logs, push_subscriptions, password_resets |
+| 030 | fix_attendance_columns | attendance kolonlarını kod ile hizalar: aid→athlete_id, dt→att_date, st→status (idempotent) |
+| 031 | missing_columns_from_old_db | Eski DB'de olup yeni şemada eksik kolonlar: approved_at, address, created_at, account_type, def_due, def_vat |
+| 032 | more_missing_columns | Ek eksik kolonlar: coaches.nt, classes.schedule, athletes.blood_type, payments.approved_at, settings.def_vat; sports.icon NOT NULL kaldırıldı |
+| 033 | text_ids_for_orgs_branches | orgs.id ve branches.id UUID → TEXT (eski DB'nin "org-xyz" formatlı ID'lerini desteklemek için) |
+| 034 | full_schema_sync | id tipi düzeltmeleri + eksik kolonların konsolidasyonu, schema cache reload |
+| 035 | provision_auth_users | Sporcu/antrenör/admin için `auth.users` + `auth.identities` kayıtları oluşturur (bkz. "Migration 035 — Auth Kullanıcı Provisioning") |
 
-> **DİKKAT:** İki adet `022_` prefix'li migration var. `supabase db push` her ikisini de
-> tam dosya adıyla takip eder, çakışma yok. Yeni migration eklerken `029_` ile başla.
+Toplam 36 migration dosyası (000-035).
+
+> **NOT:** Eskiden iki adet `022_` prefix'li migration vardı (`022_fix_sessions_table` ve
+> `022_new_features`); bu çakışma, `022_new_features.sql` migration 029 olarak yeniden
+> adlandırılarak çözüldü. Yeni migration eklerken **`036_`** ile başla.
 
 > **NOT (Migration 028 — Idempotency):** PostgreSQL `CREATE POLICY IF NOT EXISTS` desteklemediğinden
 > 022_new_features yeniden çalıştırılırsa hata fırlatıyordu. 028 `DROP POLICY IF EXISTS` + `CREATE POLICY`
 > deseni ile `activity_logs` ve `push_subscriptions` policy'lerini güvenli yeniden oluşturur.
 > Tüm migration zinciri artık idempotenttir — `supabase db push` retry'ları sorunsuz çalışır.
 
-CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`).
+### Migration 035 — Auth Kullanıcı Provisioning
+
+`035_provision_auth_users.sql`, mevcut sporcular, antrenörler ve adminler için gerçek
+`auth.users` (+ `auth.identities`) kayıtları oluşturur. Supabase projesi yeni bir projeye
+taşındığında (bkz. "Supabase Proje Geçişi") `auth.users` tablosu BOŞ başlıyordu — bu migration
+çalışmadan hiç kimse giriş yapamıyordu.
+
+**Şifre taşıma mantığı (sporcu/antrenör — `sp_pass`/`coach_pass`):**
+| Mevcut format | Sonuç |
+|---|---|
+| bcrypt (`$2a/b/x/y$` ile başlar) | direkt kopyalanır |
+| SHA-256 hex (64 karakter) | geri çevrilemez → TC'nin son 6 hanesi varsayılan şifre olur |
+| plaintext | `crypt()` ile bcrypt'e çevrilir |
+| NULL/boş | TC'nin son 6 hanesi varsayılan şifre olur |
+
+**Admin şifre mantığı benzer, tek fark:** SHA-256/boş durumunda geçici şifre `Dragos2025!` olur
+(hemen değiştirilmeli).
+
+> **KRİTİK — Admin UUID kısıtı:** `is_admin()` fonksiyonu (migration 018)
+> `SELECT id FROM users WHERE id = auth.uid() AND role = 'admin'` sorgusu yapar — yani
+> `public.users.id` MUTLAKA `auth.uid()` ile eşleşmelidir. Migration 035 bunu şöyle garantiler:
+> aynı email için `auth.users` kaydı zaten varsa o UUID'yi kullanıp `public.users.id`'yi ona göre
+> günceller; yoksa yeni bir UUID ile `auth.users` kaydı oluşturup `public.users.id`'yi bu yeni
+> UUID ile UPDATE eder. Eski projeden taşınan adminlerin eski UUID'si yeni projede geçersiz
+> olduğundan bu adım zorunludur.
+
+> **NOT — İdempotency:** Sporcu/antrenör için email `auth.users`'da zaten varsa atlanır. Admin
+> için email varsa sadece UUID senkronize edilir (tekrar INSERT yapılmaz). `auth.identities`
+> tablosunda `provider_id` kolonunun var olup olmadığı `information_schema` sorgusuyla dinamik
+> tespit edilir ve INSERT ifadesi `EXECUTE` ile buna göre kurulur (Supabase şema versiyonları
+> arası fark).
+
+CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`) — **ama bkz.
+aşağıdaki "CI/CD" bölümündeki kritik uyarı: bu otomasyon şu an sadece GitLab'da işliyor.**
+
+## Supabase Proje Geçişi
+
+Proje 2026-06'da eski bir Supabase projesinden yeni bir projeye taşındı.
+
+| | Eski Proje | Yeni Proje (aktif) |
+|---|---|---|
+| Project ref | `wfarbydojxtufnkjuhtc` | `xnggnjstbqblnmouzihe` |
+
+Yeni ref `script.js`'teki `SUPABASE_CONFIG.url`/`SUPABASE_CONFIG.anonKey` içinde hardcoded.
+CI/CD'deki `SUPABASE_PROJECT_REF` secret'ı da bu yeni ref'i göstermelidir.
+
+### Tek seferlik taşıma araçları (repo kökünde, uygulamanın parçası DEĞİL)
+- **`tasima.html`** — Eski projeden yeni projeye veri taşıyan standalone sayfa. `orgs, branches,
+  sports, coaches, classes, athletes, payments, attendance, messages, on_kayitlar,
+  deletion_requests, settings, users` tablolarını okuyup yeni projeye adaptif olarak upsert eder
+  (hatalı/eksik kolonları hata mesajından tespit edip atlayarak). Eski/yeni proje URL+anon key'i
+  içinde hardcoded (`OLD`/`NEW` objeleri).
+- **`provision-auth.html`** — Migration 035'ten ÖNCE çalıştırılan standalone araç. Eski projeden
+  `public.users` (admin) satırlarını yeni projeye kopyalar (email ile dedup), admin UUID'lerini
+  yeni projenin `auth.uid()`'ine senkronize eder.
+
+> **ÖNEMLİ:** Her iki HTML dosyası da `index.html`'in `<script>` etiketlerinde YOK — çalışan
+> uygulamanın bir parçası değiller, doğrudan tarayıcıda açılan tek-kullanımlık ops araçlarıdır.
+> Taşıma tamamen doğrulandıktan sonra silinmeleri düşünülebilir, ama repoda hâlâ referans/tekrar
+> kullanım için duruyorlar (ör. başka bir org için taşıma tekrarlanırsa).
 
 ## Edge Functions
 
 `supabase/functions/`:
 - `paytr-token/` — PayTR token üretir (v12). CORS whitelist: dragosfutbolakademisi.com + localhost
-- `paytr-webhook/` — PayTR sunucu bildirimi alır, HMAC doğrular, payments günceller, plan kayıtlarını işler. **Idempotency:** kayıt silinmişse (`!paytrRec`) erken `OK` döner. **Güvenli silme:** plan güncellemesi başarısız olursa yardımcı kayıt korunur (PayTR sonraki webhook denemesinde kalan planları işler).
+- `paytr-webhook/` — PayTR sunucu bildirimi alır, HMAC doğrular, payments günceller, plan kayıtlarını işler. **Idempotency:** kayıt silinmişse (`!paytrRec`) erken `OK` döner. **Güvenli silme:** plan güncellemesi başarısız olursa yardımcı kayıt korunur (PayTR sonraki webhook denemesinde kalan planları işler). **Fire-and-forget push:** bkz. "Bilinen Kısıtlamalar" #13.
 - `provision-auth-user/` — Yeni admin/kullanıcı auth kaydı oluşturur
+- `reset-password/` — Şifre sıfırlama akışı
+- `send-push/` — VAPID ile web push bildirimi gönderir; `paytr-webhook` tarafından arka planda çağrılır
+- `send-sms/` — NetGSM SMS gönderimi (durumu belirsiz, bkz. yukarıdaki Backend notu)
 
 ## CI/CD
 
-`.github/workflows/`:
+> **KRİTİK — Production GitLab'dan deploy oluyor, GitHub'dan DEĞİL:**
+> Vercel production deployment'ı **GitLab** reposuna bağlı. GitHub reposu ayrı/legacy bir
+> remote'tur — bu coding asistanının harness'ı sadece GitHub'a erişebildiği için varsayılan
+> olarak oraya push yapılır, ama GitHub'a yapılan push'lar production'a YANSIMAZ.
+> Ayrıca GitHub Actions'ın `deploy-functions` job'ı aylardır `SUPABASE_ACCESS_TOKEN` secret'ı
+> eskimiş/geçersiz olduğundan `401 Unauthorized` ile başarısız oluyor — yani sessizce işlevsiz.
+> **Sonuç: Edge Function veya migration değişikliği GitLab'a bağlı CI ile ya da Supabase
+> Dashboard/CLI ile manuel deploy edilmeli. Sadece GitHub'a push yapmak production'a HİÇBİR ŞEY
+> deploy etmez.** Bu boşluk daha önce gerçek bir olayda (PayTR webhook fire-and-forget fix'i)
+> değişikliğin bir süre deploy edilmeden GitHub'da beklemesine yol açtı.
+
+### `.github/workflows/` (GitHub Actions — production'a etkisi YOK, bkz. yukarıdaki uyarı)
 - `ci.yml` — HTML/CSS/JS lint, `node --check` söz dizimi kontrolü
-- `deploy-functions.yml` — Edge function deploy (main push)
+- `deploy-functions.yml` — Edge function deploy (main push) — **şu an 401 ile başarısız**
 - `deploy-migrations.yml` — Migration deploy (supabase/migrations/** değişince, `supabase db push`)
+- `setup-vapid-secrets.yml` — VAPID secrets tek seferlik/manuel kurulum
+
+### `.gitlab-ci.yml` (GitLab CI — production'ı besleyen gerçek pipeline)
+Stages: `lint` → `deploy-migrations` → `deploy-functions` → `setup-secrets`.
+- `lint-and-validate` — zorunlu dosya kontrolü, HTML yapı kontrolü, JSON doğrulama, JS söz
+  dizimi kontrolü, CSP header kontrolü
+- `deploy-migrations` — `main` branch + `supabase/migrations/**` değişince, `supabase db push`
+- `deploy-functions` — `main` branch'e her push'ta: `paytr-token`, `paytr-webhook`,
+  `provision-auth-user`, `send-push` deploy eder (**`reset-password` ve `send-sms` bu listede
+  YOK — deploy edilmiyorlar**)
+- `setup-vapid-secrets` / `set-supabase-secrets` — manuel tetiklemeli tek seferlik secret kurulum
+  job'ları
+
+Supabase CLI kurulumu GitHub Actions'ta `supabase/setup-cli@v1` action'ı ile, GitLab CI'de
+`npm install -g supabase` ile yapılır.
 
 ## Bilinen Kısıtlamalar / Dikkat Edilecekler
 
 1. **Büyük tek dosyalar:** `script.js` ~6000 satır. Değişiklik yaparken arama yaparak ilgili bölümü bul.
 2. **script-fixes.js override'ları:** `window.initiatePayTRPayment` ve `window.showPayTRModal` `script-fixes.js`'te override edilir. Bu fonksiyonları değiştirirken her iki dosyayı da kontrol et.
 3. **innerHTML kullanımı:** `pages[page]()` ve `modal()` innerHTML kullanıyor — XSS için `FormatUtils.escape()` zorunlu.
-4. **PWA cache:** Değişiklikler SW cache'i atlayana kadar görünmeyebilir. `sw.js`'de `STATIC_CACHE = 'dragos-static-v22'`. Değişiklik yapınca versiyon numarasını artır.
+4. **PWA cache:** Değişiklikler SW cache'i atlayana kadar görünmeyebilir. `sw.js`'de `STATIC_CACHE = 'dragos-static-v25'`. Değişiklik yapınca versiyon numarasını artır.
 5. **CSP:** `vercel.json`'da Content-Security-Policy var. Yeni CDN eklersen buraya da ekle.
 6. **anon INSERT:** Sporcu panelinden yapılan tüm INSERT'ler `anon` role ile gider. `org_id` ve `branch_id` her zaman dolu olmalı (`fromPayment` bunu garantiler).
 7. **payments.org_id tipi:** DB'de TEXT, `sessions.org_id` UUID. Farklı tiplere dikkat et.
@@ -207,6 +338,15 @@ CI/CD: `supabase/migrations/**` değişince otomatik deploy (`supabase db push`)
 10. **session_start:** Eski production DB'lerde `active_sessions` tablosuna işaret eden eski fonksiyon olabilir. Migration 022_fix_sessions_table bunu temizler.
 11. **Maskable icon:** `manifest.json`'da maskable purpose ayrı PNG entry'sinde (`icon-512.png purpose: maskable`). SVG maskable Android'de safe-zone hesaplamadığı için güvensiz — bu yüzden ayrıldı.
 12. **index.html no-cache:** `vercel.json` artık `/` ve `/index.html` için `no-cache, no-store, must-revalidate` döner. JS/CSS dosyaları 7 gün cache'lenir (immutable benzeri davranış). PWA güncellemeleri SW dışında index.html sürümlemesiyle de yakalanır.
+13. **Webhook fire-and-forget kuralı:** PayTR webhook (`paytr-webhook/index.ts`) daha önce
+    push bildirimini (`send-push`) `await` ederek PayTR'a "OK" dönmeden bekliyordu. Supabase
+    proje geçişinde VAPID anahtarları değişince eski/geçersiz push abonelikleri `send-push`'u
+    yavaşlattı, bu da webhook yanıtının PayTR'ın bildirim timeout'unu aşmasına ve ödemelerin
+    "provizyonda" takılı kalmasına yol açtı (PayTR "OK" almazsa 720 defaya kadar retry eder).
+    **Kural: PayTR webhook (ve benzer hızlı-ack gerektiren webhook'lar) yavaş/kritik-olmayan
+    yan etkileri (push bildirimi gibi) ASLA `await` ETMEMELİ** — `fetch().then().catch()`
+    ile fire-and-forget yapıp mevcutsa `EdgeRuntime.waitUntil()`'a devretmeli, yanıt DB
+    güncellemesinden hemen sonra dönmeli.
 
 ## Sık Kullanılan Fonksiyonlar
 
@@ -228,6 +368,13 @@ handlePayTRCallback(oid, st) // PayTR sonucu işle ('success'|'fail')
 ```
 
 ## Güvenlik Audit Notları (2026-04)
+
+> **NOT — Kanonik kaynaklar:** Bu bölüm bir özettir. Detaylı/güncel güvenlik audit takibi için
+> `SECURITY_AUDIT_REPORT.md`'ye bakın (kategori bazlı Kritik/Yüksek/Orta/Düşük tablosu +
+> KAPATILANLAR log'u ile bu bölümden daha ayrıntılı ve daha sık güncellenir — iki dosya
+> zamanla çelişmesin diye orası kanonik kabul edilmeli). Henüz uygulanmamış özellik fikirleri
+> için `FEATURES.prompt.md`'ye bakın — gelecekteki bir Claude Code oturumuna doğrudan
+> verilebilecek, sprint bazlı, self-contained bir prompt kütüphanesidir.
 
 Kapsamlı taramada tespit edilen ve düzeltilen sorunlar:
 
@@ -275,4 +422,4 @@ node --check ui-improvements.js
 node --check Security.js
 ```
 
-Supabase bağlantısı için `init.js`'teki `SUPABASE_URL` ve `SUPABASE_ANON_KEY` değerleri production değerlerdir.
+Supabase bağlantısı için `script.js`'teki `SUPABASE_CONFIG.url`/`SUPABASE_CONFIG.anonKey` değerleri production değerlerdir (`init.js` artık sadece CDN yükleme/fallback yapar, config barındırmaz).
